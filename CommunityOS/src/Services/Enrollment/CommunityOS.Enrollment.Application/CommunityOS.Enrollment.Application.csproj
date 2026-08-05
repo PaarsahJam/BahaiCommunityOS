@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CommunityOS.Enrollment.Application</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CommunityOS.Enrollment.Domain\CommunityOS.Enrollment.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CommunityOS.Abstractions\CommunityOS.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\CommunityOS.Contracts\CommunityOS.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="Mapster" />
+  </ItemGroup>
+</Project>

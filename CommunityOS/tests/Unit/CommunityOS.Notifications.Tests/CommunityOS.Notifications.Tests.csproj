@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.Application\CommunityOS.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.Domain\CommunityOS.Notifications.Domain.csproj" />
+  </ItemGroup>
+</Project>

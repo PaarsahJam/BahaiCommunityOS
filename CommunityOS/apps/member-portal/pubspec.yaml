@@ -1,0 +1,54 @@
+name: member_portal
+description: CommunityOS Member Portal — Flutter application for community members.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # State management
+  flutter_bloc: ^8.1.6
+  bloc: ^8.1.4
+
+  # DI
+  get_it: ^8.0.2
+  injectable: ^2.4.4
+
+  # Networking
+  dio: ^5.7.0
+  retrofit: ^4.4.1
+
+  # Local storage
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.3
+
+  # Serialization
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # Observability
+  sentry_flutter: ^8.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+  injectable_generator: ^2.6.2
+  retrofit_generator: ^9.1.4
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

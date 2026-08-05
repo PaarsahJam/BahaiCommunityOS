@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Enrollment\CommunityOS.Enrollment.Application\CommunityOS.Enrollment.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Enrollment\CommunityOS.Enrollment.Domain\CommunityOS.Enrollment.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,136 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+
+# ─── Building Blocks ───────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.SharedKernel", "src\BuildingBlocks\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj", "{BB000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Contracts", "src\BuildingBlocks\CommunityOS.Contracts\CommunityOS.Contracts.csproj", "{BB000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Abstractions", "src\BuildingBlocks\CommunityOS.Abstractions\CommunityOS.Abstractions.csproj", "{BB000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.EventBus", "src\BuildingBlocks\CommunityOS.EventBus\CommunityOS.EventBus.csproj", "{BB000004-0000-0000-0000-000000000004}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Infrastructure.Common", "src\BuildingBlocks\CommunityOS.Infrastructure.Common\CommunityOS.Infrastructure.Common.csproj", "{BB000005-0000-0000-0000-000000000005}"
+EndProject
+
+# ─── Identity ──────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Identity.Domain", "src\Services\Identity\CommunityOS.Identity.Domain\CommunityOS.Identity.Domain.csproj", "{ID000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Identity.Application", "src\Services\Identity\CommunityOS.Identity.Application\CommunityOS.Identity.Application.csproj", "{ID000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Identity.Infrastructure", "src\Services\Identity\CommunityOS.Identity.Infrastructure\CommunityOS.Identity.Infrastructure.csproj", "{ID000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Identity.API", "src\Services\Identity\CommunityOS.Identity.API\CommunityOS.Identity.API.csproj", "{ID000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Community ─────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Community.Domain", "src\Services\Community\CommunityOS.Community.Domain\CommunityOS.Community.Domain.csproj", "{CM000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Community.Application", "src\Services\Community\CommunityOS.Community.Application\CommunityOS.Community.Application.csproj", "{CM000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Community.Infrastructure", "src\Services\Community\CommunityOS.Community.Infrastructure\CommunityOS.Community.Infrastructure.csproj", "{CM000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Community.API", "src\Services\Community\CommunityOS.Community.API\CommunityOS.Community.API.csproj", "{CM000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Events ────────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Events.Domain", "src\Services\Events\CommunityOS.Events.Domain\CommunityOS.Events.Domain.csproj", "{EV000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Events.Application", "src\Services\Events\CommunityOS.Events.Application\CommunityOS.Events.Application.csproj", "{EV000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Events.Infrastructure", "src\Services\Events\CommunityOS.Events.Infrastructure\CommunityOS.Events.Infrastructure.csproj", "{EV000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Events.API", "src\Services\Events\CommunityOS.Events.API\CommunityOS.Events.API.csproj", "{EV000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Content ───────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Content.Domain", "src\Services\Content\CommunityOS.Content.Domain\CommunityOS.Content.Domain.csproj", "{CO000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Content.Application", "src\Services\Content\CommunityOS.Content.Application\CommunityOS.Content.Application.csproj", "{CO000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Content.Infrastructure", "src\Services\Content\CommunityOS.Content.Infrastructure\CommunityOS.Content.Infrastructure.csproj", "{CO000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Content.API", "src\Services\Content\CommunityOS.Content.API\CommunityOS.Content.API.csproj", "{CO000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Enrollment ────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Enrollment.Domain", "src\Services\Enrollment\CommunityOS.Enrollment.Domain\CommunityOS.Enrollment.Domain.csproj", "{EN000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Enrollment.Application", "src\Services\Enrollment\CommunityOS.Enrollment.Application\CommunityOS.Enrollment.Application.csproj", "{EN000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Enrollment.Infrastructure", "src\Services\Enrollment\CommunityOS.Enrollment.Infrastructure\CommunityOS.Enrollment.Infrastructure.csproj", "{EN000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Enrollment.API", "src\Services\Enrollment\CommunityOS.Enrollment.API\CommunityOS.Enrollment.API.csproj", "{EN000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Notifications ─────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Notifications.Domain", "src\Services\Notifications\CommunityOS.Notifications.Domain\CommunityOS.Notifications.Domain.csproj", "{NO000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Notifications.Application", "src\Services\Notifications\CommunityOS.Notifications.Application\CommunityOS.Notifications.Application.csproj", "{NO000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Notifications.Infrastructure", "src\Services\Notifications\CommunityOS.Notifications.Infrastructure\CommunityOS.Notifications.Infrastructure.csproj", "{NO000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Notifications.API", "src\Services\Notifications\CommunityOS.Notifications.API\CommunityOS.Notifications.API.csproj", "{NO000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Reporting ─────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Reporting.Domain", "src\Services\Reporting\CommunityOS.Reporting.Domain\CommunityOS.Reporting.Domain.csproj", "{RE000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Reporting.Application", "src\Services\Reporting\CommunityOS.Reporting.Application\CommunityOS.Reporting.Application.csproj", "{RE000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Reporting.Infrastructure", "src\Services\Reporting\CommunityOS.Reporting.Infrastructure\CommunityOS.Reporting.Infrastructure.csproj", "{RE000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Reporting.API", "src\Services\Reporting\CommunityOS.Reporting.API\CommunityOS.Reporting.API.csproj", "{RE000004-0000-0000-0000-000000000004}"
+EndProject
+
+# ─── Host ──────────────────────────────────────────────────────────────────────
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Host", "src\Host\CommunityOS.Host\CommunityOS.Host.csproj", "{HO000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Host.ApiGateway", "src\Host\CommunityOS.Host.ApiGateway\CommunityOS.Host.ApiGateway.csproj", "{HO000002-0000-0000-0000-000000000002}"
+EndProject
+
+# ─── Tests ─────────────────────────────────────────────────────────────────────
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Identity.Tests", "tests\Unit\CommunityOS.Identity.Tests\CommunityOS.Identity.Tests.csproj", "{UT000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Community.Tests", "tests\Unit\CommunityOS.Community.Tests\CommunityOS.Community.Tests.csproj", "{UT000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Events.Tests", "tests\Unit\CommunityOS.Events.Tests\CommunityOS.Events.Tests.csproj", "{UT000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Content.Tests", "tests\Unit\CommunityOS.Content.Tests\CommunityOS.Content.Tests.csproj", "{UT000004-0000-0000-0000-000000000004}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Enrollment.Tests", "tests\Unit\CommunityOS.Enrollment.Tests\CommunityOS.Enrollment.Tests.csproj", "{UT000005-0000-0000-0000-000000000005}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Notifications.Tests", "tests\Unit\CommunityOS.Notifications.Tests\CommunityOS.Notifications.Tests.csproj", "{UT000006-0000-0000-0000-000000000006}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Reporting.Tests", "tests\Unit\CommunityOS.Reporting.Tests\CommunityOS.Reporting.Tests.csproj", "{UT000007-0000-0000-0000-000000000007}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Identity.IntegrationTests", "tests\Integration\CommunityOS.Identity.IntegrationTests\CommunityOS.Identity.IntegrationTests.csproj", "{IT000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Community.IntegrationTests", "tests\Integration\CommunityOS.Community.IntegrationTests\CommunityOS.Community.IntegrationTests.csproj", "{IT000002-0000-0000-0000-000000000002}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Events.IntegrationTests", "tests\Integration\CommunityOS.Events.IntegrationTests\CommunityOS.Events.IntegrationTests.csproj", "{IT000003-0000-0000-0000-000000000003}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Content.IntegrationTests", "tests\Integration\CommunityOS.Content.IntegrationTests\CommunityOS.Content.IntegrationTests.csproj", "{IT000004-0000-0000-0000-000000000004}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Enrollment.IntegrationTests", "tests\Integration\CommunityOS.Enrollment.IntegrationTests\CommunityOS.Enrollment.IntegrationTests.csproj", "{IT000005-0000-0000-0000-000000000005}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Notifications.IntegrationTests", "tests\Integration\CommunityOS.Notifications.IntegrationTests\CommunityOS.Notifications.IntegrationTests.csproj", "{IT000006-0000-0000-0000-000000000006}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.Reporting.IntegrationTests", "tests\Integration\CommunityOS.Reporting.IntegrationTests\CommunityOS.Reporting.IntegrationTests.csproj", "{IT000007-0000-0000-0000-000000000007}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityOS.E2E.Tests", "tests\E2E\CommunityOS.E2E.Tests\CommunityOS.E2E.Tests.csproj", "{E2000001-0000-0000-0000-000000000001}"
+EndProject
+
+Global
+  GlobalSection(SolutionConfigurationPlatforms) = preSolution
+    Debug|Any CPU = Debug|Any CPU
+    Release|Any CPU = Release|Any CPU
+  EndGlobalSection
+  GlobalSection(SolutionProperties) = preSolution
+    HideSolutionNode = FALSE
+  EndGlobalSection
+  GlobalSection(NestedProjects) = preSolution
+  EndGlobalSection
+EndGlobal

@@ -1,0 +1,88 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!-- ASP.NET Core / EF Core -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi"                    Version="9.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore"                   Version="9.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design"            Version="9.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational"        Version="9.0.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL"           Version="9.0.0" />
+  </ItemGroup>
+
+  <!-- CQRS / Mediator -->
+  <ItemGroup>
+    <PackageVersion Include="MediatR"                                         Version="12.4.1" />
+    <PackageVersion Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="11.1.0" />
+  </ItemGroup>
+
+  <!-- Validation -->
+  <ItemGroup>
+    <PackageVersion Include="FluentValidation"                                Version="11.11.0" />
+    <PackageVersion Include="FluentValidation.AspNetCore"                     Version="11.3.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions"  Version="11.11.0" />
+  </ItemGroup>
+
+  <!-- Mapping -->
+  <ItemGroup>
+    <PackageVersion Include="Mapster"                                         Version="7.4.0" />
+    <PackageVersion Include="Mapster.DependencyInjection"                     Version="1.0.2" />
+  </ItemGroup>
+
+  <!-- Auth -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer"   Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Identity.Web"                          Version="3.3.1" />
+  </ItemGroup>
+
+  <!-- Messaging -->
+  <ItemGroup>
+    <PackageVersion Include="MassTransit"                                     Version="8.3.6" />
+    <PackageVersion Include="MassTransit.RabbitMQ"                            Version="8.3.6" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore"                 Version="8.3.6" />
+  </ItemGroup>
+
+  <!-- Caching -->
+  <ItemGroup>
+    <PackageVersion Include="StackExchange.Redis"                             Version="2.8.16" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+  </ItemGroup>
+
+  <!-- Observability -->
+  <ItemGroup>
+    <PackageVersion Include="OpenTelemetry"                                   Version="1.10.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting"                Version="1.10.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore"        Version="1.10.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"    Version="1.10.0" />
+    <PackageVersion Include="Serilog.AspNetCore"                              Version="9.0.0" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry"                     Version="4.0.0" />
+  </ItemGroup>
+
+  <!-- API -->
+  <ItemGroup>
+    <PackageVersion Include="Swashbuckle.AspNetCore"                          Version="7.2.0" />
+    <PackageVersion Include="Asp.Versioning.Mvc"                              Version="8.1.0" />
+    <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer"                  Version="8.1.0" />
+  </ItemGroup>
+
+  <!-- Resilience -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience"            Version="9.3.0" />
+    <PackageVersion Include="Polly"                                            Version="8.5.1" />
+  </ItemGroup>
+
+  <!-- Testing -->
+  <ItemGroup>
+    <PackageVersion Include="xunit"                                           Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio"                       Version="2.8.2" />
+    <PackageVersion Include="FluentAssertions"                                Version="7.0.0" />
+    <PackageVersion Include="NSubstitute"                                     Version="5.3.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing"                Version="9.0.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql"                       Version="4.1.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq"                         Version="4.1.0" />
+    <PackageVersion Include="Bogus"                                           Version="35.6.1" />
+    <PackageVersion Include="coverlet.collector"                              Version="6.0.4" />
+  </ItemGroup>
+</Project>

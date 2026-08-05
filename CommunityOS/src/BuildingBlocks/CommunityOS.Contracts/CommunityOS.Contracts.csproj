@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CommunityOS.Contracts</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

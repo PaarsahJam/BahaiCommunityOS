@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Reporting\CommunityOS.Reporting.Application\CommunityOS.Reporting.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Reporting\CommunityOS.Reporting.Domain\CommunityOS.Reporting.Domain.csproj" />
+  </ItemGroup>
+</Project>

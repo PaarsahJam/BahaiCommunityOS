@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Identity\CommunityOS.Identity.Application\CommunityOS.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Identity\CommunityOS.Identity.Domain\CommunityOS.Identity.Domain.csproj" />
+  </ItemGroup>
+</Project>

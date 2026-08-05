@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>CommunityOS.Host</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Service Application layers (business logic modules) -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Services\Identity\CommunityOS.Identity.Application\CommunityOS.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Identity\CommunityOS.Identity.Infrastructure\CommunityOS.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Community\CommunityOS.Community.Application\CommunityOS.Community.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Community\CommunityOS.Community.Infrastructure\CommunityOS.Community.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Events\CommunityOS.Events.Application\CommunityOS.Events.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Events\CommunityOS.Events.Infrastructure\CommunityOS.Events.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Content\CommunityOS.Content.Application\CommunityOS.Content.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Content\CommunityOS.Content.Infrastructure\CommunityOS.Content.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Enrollment\CommunityOS.Enrollment.Application\CommunityOS.Enrollment.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Enrollment\CommunityOS.Enrollment.Infrastructure\CommunityOS.Enrollment.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Notifications\CommunityOS.Notifications.Application\CommunityOS.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Notifications\CommunityOS.Notifications.Infrastructure\CommunityOS.Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Reporting\CommunityOS.Reporting.Application\CommunityOS.Reporting.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Reporting\CommunityOS.Reporting.Infrastructure\CommunityOS.Reporting.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Asp.Versioning.Mvc" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+  </ItemGroup>
+</Project>
