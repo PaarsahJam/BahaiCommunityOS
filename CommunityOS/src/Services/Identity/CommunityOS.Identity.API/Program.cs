@@ -1,0 +1,29 @@
+using CommunityOS.Identity.API.Extensions;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog((ctx, lc) =>
+        lc.ReadFrom.Configuration(ctx.Configuration));
+
+    builder.Services.AddIdentityServices(builder.Configuration);
+
+    var app = builder.Build();
+
+    await app.ConfigurePipelineAsync();
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Identity service terminated unexpectedly.");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
