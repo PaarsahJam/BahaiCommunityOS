@@ -53,5 +53,13 @@ public sealed class Community : AggregateRoot<Guid>
         RaiseDomainEvent(new CommunityHierarchyChangedEvent(Id, newParentId));
     }
 
+    public void UpdateDetails(CommunityName name, GeographicArea area)
+    {
+        Guard.NotNull(name, nameof(name));
+        Guard.NotNull(area, nameof(area));
+        Name = name;
+        Area = area;
+    }
+
     public void Deactivate() => IsActive = false;
 }
