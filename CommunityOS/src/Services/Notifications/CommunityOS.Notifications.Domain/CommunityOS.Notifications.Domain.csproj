@@ -3,6 +3,6 @@
     <AssemblyName>CommunityOS.Notifications.Domain</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\BuildingBlocks\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj" />
   </ItemGroup>
 </Project>

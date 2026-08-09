@@ -1,11 +1,33 @@
 <Project>
   <PropertyGroup>
+    <!-- Target -->
     <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Nullability & style -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Code quality -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+
+    <!-- Build reproducibility -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Documentation (enables XML doc generation for OpenAPI) -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+
+    <!-- Namespace root -->
     <RootNamespace>CommunityOS</RootNamespace>
-    <LangVersion>latest</LangVersion>
+
+    <!-- Artifact output — all binaries land under /artifacts at solution root -->
+    <ArtifactsRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\artifacts\'))</ArtifactsRoot>
+    <BaseOutputPath>$(ArtifactsRoot)bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(ArtifactsRoot)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
 </Project>

@@ -4,8 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\CommunityOS.Community.Domain\CommunityOS.Community.Domain.csproj" />
-    <ProjectReference Include="..\..\..\..\BuildingBlocks\CommunityOS.Abstractions\CommunityOS.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\..\BuildingBlocks\CommunityOS.Contracts\CommunityOS.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Abstractions\CommunityOS.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Contracts\CommunityOS.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MediatR" />
