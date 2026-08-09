@@ -2,7 +2,7 @@ using CommunityOS.Identity.API.Extensions;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    .WriteTo.Console(formatProvider: System.Globalization.CultureInfo.InvariantCulture)
     .CreateBootstrapLogger();
 
 try

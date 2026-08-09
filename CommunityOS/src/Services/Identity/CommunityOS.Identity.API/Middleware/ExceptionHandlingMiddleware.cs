@@ -1,13 +1,21 @@
 using CommunityOS.Identity.Domain.Exceptions;
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace CommunityOS.Identity.API.Middleware;
 
-internal sealed class ExceptionHandlingMiddleware(
+internal sealed partial class ExceptionHandlingMiddleware(
     RequestDelegate next,
     ILogger<ExceptionHandlingMiddleware> logger)
 {
+    [LoggerMessage(
+        EventId = 0,
+        Level = LogLevel.Error,
+        Message = "Unhandled exception: {Message}")]
+    private static partial void LogUnhandledError(
+        ILogger logger, string message);
+
     public async Task InvokeAsync(HttpContext ctx)
     {
         try
@@ -16,7 +24,7 @@ internal sealed class ExceptionHandlingMiddleware(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            LogUnhandledError(logger, ex.Message);
             await WriteErrorAsync(ctx, ex);
         }
     }
@@ -25,11 +33,28 @@ internal sealed class ExceptionHandlingMiddleware(
     {
         var (status, title) = ex switch
         {
-            MemberNotFoundException      => (StatusCodes.Status404NotFound,       "Member not found."),
-            DuplicateEmailException      => (StatusCodes.Status409Conflict,        ex.Message),
-            InvalidMemberStateException  => (StatusCodes.Status422UnprocessableEntity, ex.Message),
-            ValidationException          => (StatusCodes.Status400BadRequest,      "Validation failed."),
-            _                            => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.")
+            UserAccountNotFoundException         => (StatusCodes.Status404NotFound,     ex.Message),
+            UserAccountNotFoundByEmailException  => (StatusCodes.Status404NotFound,     ex.Message),
+            DuplicateEmailException              => (StatusCodes.Status409Conflict,      ex.Message),
+            AccountNotVerifiedException          => (StatusCodes.Status403Forbidden,     ex.Message),
+            AccountLockedException               => (StatusCodes.Status423Locked,        ex.Message),
+            AccountDeactivatedException          => (StatusCodes.Status403Forbidden,     ex.Message),
+            InvalidCredentialsException          => (StatusCodes.Status401Unauthorized,  ex.Message),
+            InvalidMfaCodeException              => (StatusCodes.Status401Unauthorized,  ex.Message),
+            MfaRequiredException                 => (StatusCodes.Status401Unauthorized,  ex.Message),
+            InvalidSessionException              => (StatusCodes.Status401Unauthorized,  ex.Message),
+            InvalidRefreshTokenException         => (StatusCodes.Status401Unauthorized,  ex.Message),
+            RefreshTokenReuseDetectedException   => (StatusCodes.Status401Unauthorized,  ex.Message),
+            InvalidRecoveryTokenException        => (StatusCodes.Status400BadRequest,    ex.Message),
+            InvalidClientException               => (StatusCodes.Status401Unauthorized,  ex.Message),
+            InvalidGrantException                => (StatusCodes.Status400BadRequest,    ex.Message),
+            InvalidRedirectUriException          => (StatusCodes.Status400BadRequest,    ex.Message),
+            UnauthorizedGrantException           => (StatusCodes.Status400BadRequest,    ex.Message),
+            InvalidScopeException                => (StatusCodes.Status400BadRequest,    ex.Message),
+            UnsupportedGrantTypeException        => (StatusCodes.Status400BadRequest,    ex.Message),
+            UnauthorisedAccessException          => (StatusCodes.Status403Forbidden,     ex.Message),
+            ValidationException                  => (StatusCodes.Status400BadRequest,    "Validation failed."),
+            _                                    => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.")
         };
 
         ctx.Response.StatusCode = status;

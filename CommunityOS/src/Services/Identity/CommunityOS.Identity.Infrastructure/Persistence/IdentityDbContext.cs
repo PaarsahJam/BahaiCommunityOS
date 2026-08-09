@@ -1,15 +1,19 @@
 using CommunityOS.Identity.Domain.Aggregates;
 using CommunityOS.Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
 namespace CommunityOS.Identity.Infrastructure.Persistence;
 
 public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options)
     : DbContext(options)
 {
-    public DbSet<Member> Members => Set<Member>();
-    public DbSet<Role> Roles => Set<Role>();
-    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<RecoveryRequest> RecoveryRequests => Set<RecoveryRequest>();
+    public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+    public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
+    public DbSet<AuthorizationCode> AuthorizationCodes => Set<AuthorizationCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -17,4 +21,5 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
+
 }

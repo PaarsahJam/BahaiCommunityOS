@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Host\CommunityOS.Host\CommunityOS.Host.csproj" />
+    <ProjectReference Include="..\..\..\src\Host\CommunityOS.Host\CommunityOS.Host.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

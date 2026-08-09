@@ -2,5 +2,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Identity\CommunityOS.Identity.Application\CommunityOS.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Identity\CommunityOS.Identity.Domain\CommunityOS.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Identity\CommunityOS.Identity.Infrastructure\CommunityOS.Identity.Infrastructure.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
 </Project>

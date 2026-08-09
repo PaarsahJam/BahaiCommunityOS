@@ -1,8 +1,11 @@
 using CommunityOS.Identity.Application.Interfaces;
 using CommunityOS.Identity.Domain.Repositories;
-using CommunityOS.Identity.Infrastructure.ExternalServices;
+using CommunityOS.Identity.Infrastructure.Integration;
 using CommunityOS.Identity.Infrastructure.Persistence;
 using CommunityOS.Identity.Infrastructure.Repositories;
+using CommunityOS.Identity.Infrastructure.Security;
+using CommunityOS.SharedKernel.Domain.Events;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,9 +23,24 @@ public static class IdentityInfrastructureServiceExtensions
                 npgsql => npgsql.MigrationsAssembly(
                     typeof(IdentityInfrastructureServiceExtensions).Assembly.FullName)));
 
-        services.AddScoped<IMemberRepository, MemberRepository>();
+        // Repositories
+        services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
+        services.AddScoped<IRecoveryRequestRepository, RecoveryRequestRepository>();
+        services.AddScoped<ISecurityEventRepository, SecurityEventRepository>();
+        services.AddScoped<IOAuthClientRepository, OAuthClientRepository>();
+        services.AddScoped<IAuthorizationCodeRepository, AuthorizationCodeRepository>();
+
+        // Security services
+        services.AddSingleton<RsaSigningKeyProvider>();
+        services.AddSingleton<ISigningKeyProvider>(sp => sp.GetRequiredService<RsaSigningKeyProvider>());
+        services.AddSingleton<OidcDiscoveryDocument>();
         services.AddScoped<ITokenService, JwtTokenService>();
-        services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<IPasswordHasher>(sp => new Pbkdf2PasswordHasher(config.GetSection("PasswordHashing")));
+        services.AddSingleton<ITotpService, TotpService>();
+
+        // Domain event -> integration event forwarding onto the message bus
+        services.AddScoped<INotificationHandler<IDomainEvent>, IdentityIntegrationEventPublisher>();
 
         return services;
     }

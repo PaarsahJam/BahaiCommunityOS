@@ -30,5 +30,6 @@ internal static class WebApplicationExtensions
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         await db.Database.MigrateAsync();
+        await OAuthClientSeeder.SeedDevelopmentClientsAsync(db);
     }
 }

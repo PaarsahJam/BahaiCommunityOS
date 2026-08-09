@@ -1,4 +1,5 @@
 using CommunityOS.Community.Domain.Aggregates;
+using Community = CommunityOS.Community.Domain.Aggregates.Community;
 
 namespace CommunityOS.Community.Domain.Repositories;
 

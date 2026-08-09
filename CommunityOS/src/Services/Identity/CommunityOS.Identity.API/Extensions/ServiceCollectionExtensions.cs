@@ -1,9 +1,11 @@
 using Asp.Versioning;
+using CommunityOS.EventBus;
 using CommunityOS.Identity.Application;
 using CommunityOS.Identity.Infrastructure;
+using CommunityOS.Identity.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 
 namespace CommunityOS.Identity.API.Extensions;
 
@@ -14,7 +16,8 @@ internal static class ServiceCollectionExtensions
     {
         services
             .AddIdentityApplication()
-            .AddIdentityInfrastructure(config);
+            .AddIdentityInfrastructure(config)
+            .AddCommunityOSEventBus(config);
 
         services
             .AddControllers()
@@ -37,23 +40,40 @@ internal static class ServiceCollectionExtensions
         services.AddSwaggerGen();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(opts =>
-            {
-                opts.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer           = true,
-                    ValidateAudience         = true,
-                    ValidateLifetime         = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer              = config["Jwt:Issuer"],
-                    ValidAudience            = config["Jwt:Audience"],
-                    IssuerSigningKey         = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(config["Jwt:Secret"]!))
-                };
-            });
+            .AddJwtBearer();
+
+        services.AddSingleton<IConfigureNamedOptions<JwtBearerOptions>,
+            ConfigureJwtBearerOptions>();
 
         services.AddAuthorization();
 
         return services;
     }
+}
+
+internal sealed class ConfigureJwtBearerOptions(
+    RsaSigningKeyProvider signingKeyProvider,
+    IConfiguration config) : IConfigureNamedOptions<JwtBearerOptions>
+{
+    public void Configure(string? name, JwtBearerOptions options)
+    {
+        if (name != JwtBearerDefaults.AuthenticationScheme)
+            return;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ValidateTokenReplay      = true,
+            ClockSkew                = TimeSpan.FromSeconds(30),
+            ValidIssuer              = config["Jwt:Issuer"] ?? "CommunityOS.Identity",
+            ValidAudience            = config["Jwt:Audience"] ?? "CommunityOS",
+            IssuerSigningKey         = signingKeyProvider.SecurityKey
+        };
+    }
+
+    public void Configure(JwtBearerOptions options) =>
+        Configure(JwtBearerDefaults.AuthenticationScheme, options);
 }

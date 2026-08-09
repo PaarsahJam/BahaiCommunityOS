@@ -45,7 +45,7 @@ public sealed class Event : AggregateRoot<Guid>
         Guard.NotDefault(organiserId, nameof(organiserId));
         var @event = new Event(Guid.NewGuid(), title, description, schedule,
             location, capacity, localUnitId, organiserId);
-        @event.RaiseDomainEvent(new EventCreatedEvent(@event.Id, title.Value));
+        @event.RaiseDomainEvent(new EventCreatedEvent(title.Value));
         return @event;
     }
 
@@ -57,7 +57,7 @@ public sealed class Event : AggregateRoot<Guid>
         if (_attendances.Any(a => a.MemberId == memberId)) return;
         var attendance = Attendance.Record(memberId);
         _attendances.Add(attendance);
-        RaiseDomainEvent(new AttendanceRecordedEvent(Id, memberId));
+        RaiseDomainEvent(new AttendanceRecordedEvent(memberId));
     }
 
     public void Cancel(string reason)
@@ -65,13 +65,13 @@ public sealed class Event : AggregateRoot<Guid>
         Guard.NotNullOrWhiteSpace(reason, nameof(reason));
         if (IsCancelled) throw new EventAlreadyCancelledException(Id);
         IsCancelled = true;
-        RaiseDomainEvent(new EventCancelledEvent(Id, reason));
+        RaiseDomainEvent(new EventCancelledEvent(reason));
     }
 
     public void Reschedule(DateTimeRange newSchedule)
     {
         Guard.NotNull(newSchedule, nameof(newSchedule));
         Schedule = newSchedule;
-        RaiseDomainEvent(new EventRescheduledEvent(Id, newSchedule.Start, newSchedule.End));
+        RaiseDomainEvent(new EventRescheduledEvent(newSchedule.Start, newSchedule.End));
     }
 }

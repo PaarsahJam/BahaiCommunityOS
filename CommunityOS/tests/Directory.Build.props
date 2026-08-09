@@ -22,6 +22,13 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
 
+    <!--
+      Copy all NuGet package assemblies to the test output directory. With a
+      custom BaseOutputPath, the default copy-local behaviour can omit package
+      DLLs from the output, which makes the testhost fail to resolve them.
+    -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
     <!-- Namespace root -->
     <RootNamespace>CommunityOS</RootNamespace>
 
@@ -34,6 +41,7 @@
   <ItemGroup>
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Bogus" />

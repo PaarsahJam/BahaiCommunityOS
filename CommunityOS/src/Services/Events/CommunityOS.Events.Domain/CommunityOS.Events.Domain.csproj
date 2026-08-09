@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>CommunityOS.Events.Domain</AssemblyName>
+    <!-- 'Event' is the intentional aggregate name in this bounded context;
+         it conflicts with the C# 'event' keyword under CA1716. -->
+    <NoWarn>$(NoWarn);CA1716</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj" />

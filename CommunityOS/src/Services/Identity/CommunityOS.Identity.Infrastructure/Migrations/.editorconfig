@@ -1,0 +1,7 @@
+# Generated EF Core migration files are machine-authored and regenerated.
+# Analyzer/style rules that conflict with the generated shape are disabled here.
+root = false
+
+[*.cs]
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none

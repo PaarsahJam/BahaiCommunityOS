@@ -25,8 +25,7 @@ public sealed class MediaAttachment : Entity<Guid>
         Guard.NotNullOrWhiteSpace(fileName, nameof(fileName));
         Guard.NotNullOrWhiteSpace(mimeType, nameof(mimeType));
         Guard.NotNullOrWhiteSpace(storageUri, nameof(storageUri));
-        if (sizeBytes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(sizeBytes));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sizeBytes);
         return new MediaAttachment(Guid.NewGuid(), fileName.Trim(), mimeType.Trim(),
             sizeBytes, storageUri.Trim());
     }

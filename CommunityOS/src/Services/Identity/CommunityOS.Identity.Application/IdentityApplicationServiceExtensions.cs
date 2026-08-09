@@ -1,3 +1,4 @@
+using CommunityOS.Identity.Application.Authentication;
 using CommunityOS.Identity.Application.Validators;
 using FluentValidation;
 using MediatR;
@@ -12,10 +13,12 @@ public static class IdentityApplicationServiceExtensions
         services.AddMediatR(cfg =>
             cfg.RegisterServicesFromAssembly(typeof(IdentityApplicationServiceExtensions).Assembly));
 
-        services.AddValidatorsFromAssemblyContaining<RegisterMemberCommandValidator>();
+        services.AddValidatorsFromAssemblyContaining<RegisterCommandValidator>();
 
         services.AddTransient(typeof(IPipelineBehavior<,>),
             typeof(ValidationPipelineBehavior<,>));
+
+        services.AddScoped<IAccountAuthenticator, AccountAuthenticator>();
 
         return services;
     }
