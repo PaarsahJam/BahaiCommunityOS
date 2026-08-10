@@ -1,7 +1,6 @@
 using CommunityOS.Identity.Domain.Aggregates;
 using CommunityOS.Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
 namespace CommunityOS.Identity.Infrastructure.Persistence;
 
@@ -21,5 +20,4 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
     }
-
 }

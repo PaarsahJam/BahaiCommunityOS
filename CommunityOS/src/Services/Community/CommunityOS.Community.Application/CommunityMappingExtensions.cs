@@ -1,12 +1,13 @@
 using CommunityOS.Community.Application.DTOs;
 using CommunityOS.Community.Domain.Aggregates;
 using CommunityOS.Community.Domain.Entities;
+using CommunityAggregate = CommunityOS.Community.Domain.Aggregates.Community;
 
 namespace CommunityOS.Community.Application;
 
 internal static class CommunityMappingExtensions
 {
-    internal static CommunityDto ToDto(this Community c) =>
+    internal static CommunityDto ToDto(this CommunityAggregate c) =>
         new(c.Id,
             c.Name.Value,
             c.Area.Country,

@@ -27,8 +27,8 @@ public sealed class OAuthClientConfiguration : IEntityTypeConfiguration<OAuthCli
         builder.Property(x => x.CreatedOn).HasColumnName("created_on").IsRequired();
         builder.Property(x => x.ClientSecretHash).HasColumnName("client_secret_hash").HasMaxLength(256);
 
-        builder.PrimitiveCollection(x => x.RedirectUris).HasField("_redirectUris");
-        builder.PrimitiveCollection(x => x.AllowedGrantTypes).HasField("_grantTypes");
-        builder.PrimitiveCollection(x => x.AllowedScopes).HasField("_allowedScopes");
+        builder.PrimitiveCollection(x => x.RedirectUris).HasColumnName("redirect_uris").HasField("_redirectUris");
+        builder.PrimitiveCollection(x => x.AllowedGrantTypes).HasColumnName("allowed_grant_types").HasField("_grantTypes");
+        builder.PrimitiveCollection(x => x.AllowedScopes).HasColumnName("allowed_scopes").HasField("_allowedScopes");
     }
 }

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CommunityOS.Authorization.Infrastructure</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CommunityOS.Authorization.Application\CommunityOS.Authorization.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Infrastructure.Common\CommunityOS.Infrastructure.Common.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.EventBus\CommunityOS.EventBus.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+</Project>

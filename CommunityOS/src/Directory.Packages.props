@@ -24,6 +24,7 @@
     <PackageVersion Include="FluentValidation.AspNetCore"                     Version="11.3.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions"  Version="11.11.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions"        Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options"                     Version="9.0.0" />
   </ItemGroup>
 
   <!-- Mapping -->

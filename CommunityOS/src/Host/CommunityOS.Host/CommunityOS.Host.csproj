@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\Services\Notifications\CommunityOS.Notifications.Infrastructure\CommunityOS.Notifications.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Services\Reporting\CommunityOS.Reporting.Application\CommunityOS.Reporting.Application.csproj" />
     <ProjectReference Include="..\..\Services\Reporting\CommunityOS.Reporting.Infrastructure\CommunityOS.Reporting.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Services\Authorization\CommunityOS.Authorization.Application\CommunityOS.Authorization.Application.csproj" />
+    <ProjectReference Include="..\..\Services\Authorization\CommunityOS.Authorization.Infrastructure\CommunityOS.Authorization.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

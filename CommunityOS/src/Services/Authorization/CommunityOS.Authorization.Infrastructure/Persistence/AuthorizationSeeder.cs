@@ -1,0 +1,106 @@
+using CommunityOS.Authorization.Domain.Aggregates;
+using CommunityOS.Authorization.Domain.ValueObjects;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+
+namespace CommunityOS.Authorization.Infrastructure.Persistence;
+
+/// <summary>
+/// Seeds development-only role catalog entries and an optional bootstrap
+/// global administrator. Roles are deployment configuration: business logic
+/// must never hard-code decisions around a specific role code. The bootstrap
+/// assignment is only created when
+/// <c>Authorization:BootstrapGlobalAdminSubjectId</c> is explicitly set in
+/// configuration and is itself a normal, auditable role assignment.
+/// </summary>
+public static class AuthorizationSeeder
+{
+    private static readonly IReadOnlyList<(string Code, string DisplayName, string[] Permissions)> RoleCatalog =
+    [
+        ("GlobalAdministrator", "Global Administrator",
+        [
+            "authz.check",
+            "authz.role.list", "authz.role.create", "authz.role.update", "authz.role.assign", "authz.role.revoke",
+            "authz.relationship.write", "authz.relationship.read",
+            "authz.delegation.grant", "authz.delegation.revoke",
+            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list"
+        ]),
+        ("PlatformService", "Platform Service Principal",
+        [
+            "authz.check", "authz.relationship.write", "authz.relationship.read"
+        ]),
+        ("NationalAdministrator", "National Administrator",
+        [
+            "authz.check",
+            "authz.role.list", "authz.role.assign", "authz.role.revoke",
+            "authz.relationship.write", "authz.relationship.read",
+            "authz.delegation.grant", "authz.delegation.revoke",
+            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list"
+        ]),
+        ("LocalAdministrator", "Local Administrator",
+        [
+            "authz.role.list", "authz.role.assign", "authz.role.revoke",
+            "authz.relationship.read",
+            "authz.delegation.grant",
+            "authz.breakglass.approve"
+        ]),
+        ("CommitteeMember", "Committee Member",
+        [
+            "authz.relationship.read"
+        ]),
+        ("Volunteer", "Volunteer", []),
+        ("Member", "Member", []),
+        ("Guest", "Guest", [])
+    ];
+
+    public static async Task SeedDevelopmentRolesAsync(
+        AuthorizationDbContext db,
+        IConfiguration config,
+        CancellationToken ct = default)
+    {
+        foreach (var (code, displayName, permissions) in RoleCatalog)
+        {
+            if (await db.Roles.AnyAsync(x => x.Code == code, ct))
+                continue;
+
+            db.Roles.Add(Role.Create(code, displayName, null, permissions, isSystem: true));
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        await SeedBootstrapGlobalAdministratorAsync(db, config, ct);
+    }
+
+    private static async Task SeedBootstrapGlobalAdministratorAsync(
+        AuthorizationDbContext db,
+        IConfiguration config,
+        CancellationToken ct)
+    {
+        var bootstrap = config["Authorization:BootstrapGlobalAdminSubjectId"];
+        if (!Guid.TryParse(bootstrap, out var subjectId))
+            return;
+
+        var role = await db.Roles.FirstOrDefaultAsync(x => x.Code == "GlobalAdministrator", ct);
+        if (role is null)
+            return;
+
+        var alreadyAssigned = await db.RoleAssignments.AnyAsync(
+            x => x.SubjectId == subjectId && x.RoleId == role.Id && !x.IsRevoked, ct);
+        if (alreadyAssigned)
+            return;
+
+        var now = DateTime.UtcNow;
+        db.RoleAssignments.Add(RoleAssignment.Create(
+            subjectId,
+            role.Id,
+            role.Code,
+            AuthorizationScope.Global(),
+            grantedBy: subjectId,
+            grantedAt: now,
+            effectiveFrom: null,
+            effectiveUntil: null,
+            reason: "Bootstrap global administrator (see Authorization:BootstrapGlobalAdminSubjectId)."));
+
+        await db.SaveChangesAsync(ct);
+    }
+}

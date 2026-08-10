@@ -1,3 +1,4 @@
+using CommunityOS.Community.Application.Logging;
 using CommunityOS.Community.Domain.Exceptions;
 using FluentValidation;
 using System.Text.Json;
@@ -16,7 +17,7 @@ internal sealed class ExceptionHandlingMiddleware(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception: {Message}", ex.Message);
+            logger.UnhandledException(ex, ex.Message);
             await WriteErrorAsync(ctx, ex);
         }
     }

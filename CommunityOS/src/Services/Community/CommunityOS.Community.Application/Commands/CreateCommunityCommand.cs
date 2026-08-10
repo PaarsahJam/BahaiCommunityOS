@@ -2,6 +2,7 @@ using CommunityOS.Community.Application.DTOs;
 using CommunityOS.Community.Domain.Aggregates;
 using CommunityOS.Community.Domain.Repositories;
 using CommunityOS.Community.Domain.ValueObjects;
+using CommunityAggregate = CommunityOS.Community.Domain.Aggregates.Community;
 using MediatR;
 
 namespace CommunityOS.Community.Application.Commands;
@@ -25,7 +26,7 @@ internal sealed class CreateCommunityCommandHandler(ICommunityRepository communi
         var area  = GeographicArea.Create(cmd.Country, cmd.Region, cmd.City, cmd.Latitude, cmd.Longitude);
         var level = HierarchyLevel.FromId(cmd.HierarchyLevelId);
 
-        var community = Community.Create(name, area, level, cmd.ParentId);
+        var community = CommunityAggregate.Create(name, area, level, cmd.ParentId);
 
         await communities.AddAsync(community, ct);
         return community.ToDto();

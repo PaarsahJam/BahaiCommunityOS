@@ -1,14 +1,15 @@
 using CommunityOS.Community.Domain.Aggregates;
 using CommunityOS.Community.Domain.Entities;
 using CommunityOS.Community.Domain.ValueObjects;
+using CommunityAggregate = CommunityOS.Community.Domain.Aggregates.Community;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CommunityOS.Community.Infrastructure.Persistence.Configurations;
 
-internal sealed class CommunityConfiguration : IEntityTypeConfiguration<Community>
+internal sealed class CommunityConfiguration : IEntityTypeConfiguration<CommunityAggregate>
 {
-    public void Configure(EntityTypeBuilder<Community> builder)
+    public void Configure(EntityTypeBuilder<CommunityAggregate> builder)
     {
         builder.ToTable("communities");
         builder.HasKey(c => c.Id);
