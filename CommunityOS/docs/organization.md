@@ -74,6 +74,16 @@ access token. See `docs/api/organization.md` for the full endpoint reference.
   `organization_references` / `organization_unit_references` tables via
   `OrganizationIntegrationEventConsumer` so Community can reference
   organization facts without owning them (`ADR-016`).
+
+  The projection is **eventually consistent**: it converges when events are
+  processed, and the read model may be temporarily stale while the consumer is
+  unavailable. Stale projections never influence authorization decisions —
+  authorization is resolved live by the Authorization service over the
+  Organization `/covers` endpoint. Consumers that miss a unit event are
+  self-healing for organizations (updates create the reference when missing)
+  but skip updates for organization units whose reference is not yet present;
+  a lost `OrganizationUnitCreated` therefore leaves the unit unreferenced until
+  a later event.
 - **Authorization** — the Organization service never reads the Authorization
   database. `AuthorizationGuard` is bound to an HTTP evaluator
   (`HttpAuthorizationEvaluator`) that calls the Authorization service's check

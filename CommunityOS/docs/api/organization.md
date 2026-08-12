@@ -177,3 +177,10 @@ application-layer permission check (avoiding a request cycle with
 Authorization) and is protected by the `X-Client-Id` header matching
 `Organization:InternalClientId`. Unknown clients are rejected with
 `403 Forbidden`.
+
+The `X-Client-Id` header is an **identification/routing signal, not an
+authorization credential** (it is a plain, spoofable header). The endpoint is
+still behind `[Authorize]`, so a valid bearer token is always required. The
+header only tells the Organization service *which* trusted caller is invoking
+the fact endpoint; it grants no privileges beyond that already granted by
+authentication.

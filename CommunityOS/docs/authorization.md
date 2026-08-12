@@ -85,6 +85,12 @@ Clients never send roles or permissions in a check; they send only context
   (`HttpOrganizationContextProvider`), presented as the internal client
   `communityos-authorization`. The exact-match-only default is used only when
   the HTTP integration is not registered. Fail-closed on any error.
+
+  Trust is carried by the **bearer access token** configured in
+  `OrganizationService:AccessToken` (validated by the Organization service's
+  `[Authorize]`); the `X-Client-Id` header is an identification/routing signal
+  only and is not an authorization credential. `HttpOrganizationContextProvider`
+  returns `false` (deny) on any transport, authentication or validation failure.
 - **Identity** — access tokens are validated with the Identity service's
   signing key (`Jwt:SigningPrivateKey` / `Jwt:SigningKeyXml` /
   `Jwt:SigningKeyBase64`). Without configuration a dev-only ephemeral key is
