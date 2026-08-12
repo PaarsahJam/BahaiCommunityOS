@@ -11,7 +11,9 @@ namespace CommunityOS.EventBus;
 public static class EventBusServiceExtensions
 {
     public static IServiceCollection AddCommunityOSEventBus(
-        this IServiceCollection services, IConfiguration config)
+        this IServiceCollection services,
+        IConfiguration config,
+        Action<IRegistrationConfigurator>? configureConsumers = null)
     {
         var host = config["RabbitMq:Host"] ?? "localhost";
         var port = ushort.TryParse(config["RabbitMq:Port"], out var parsed) ? parsed : (ushort)5672;
@@ -20,6 +22,8 @@ public static class EventBusServiceExtensions
 
         services.AddMassTransit(bus =>
         {
+            configureConsumers?.Invoke(bus);
+
             bus.SetKebabCaseEndpointNameFormatter();
 
             bus.UsingRabbitMq((ctx, cfg) =>

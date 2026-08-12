@@ -9,7 +9,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-001 | Modular Monolith as initial deployment    | Accepted |
 | ADR-002 | Clean Architecture per bounded context    | Accepted |
 | ADR-003 | MediatR for in-process CQRS              | Accepted |
-| ADR-004 | MassTransit + RabbitMQ for async events   | Accepted |
+| ADR-004 | Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future) | Accepted |
 | ADR-005 | Flutter for all client applications       | Accepted |
 | ADR-006 | PostgreSQL as primary data store          | Accepted |
 | ADR-007 | Central Package Management (CPM)          | Accepted |
@@ -20,6 +20,33 @@ This directory contains ADRs for CommunityOS.
 | ADR-012 | Relationship tuples for per-object access | Accepted |
 | ADR-013 | Delegation constrained to held authority  | Accepted |
 | ADR-014 | Break-glass requires approval and expiry  | Accepted |
+| ADR-015 | Reliable event publication via transactional outbox | Accepted |
+| ADR-016 | Organization bounded context and Community boundary | Accepted |
+| ADR-017 | Bounded context implementation sequence | Accepted |
+| ADR-018 | Authentication and authorization ownership boundary | Accepted |
+| ADR-019 | Community security corrections | Accepted |
+| ADR-020 | Repository specifications as source of truth | Accepted |
+
+## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
+
+**Status:** Accepted (ratified at architecture reconciliation).
+
+CommunityOS architecture is transport-independent. Domain and integration
+contracts are transport-agnostic and must never depend on a specific broker,
+queueing topology or serialization technology.
+
+- **Current implementation:** MassTransit with the RabbitMQ transport
+  (`CommunityOS.EventBus`). RabbitMQ remains the implementation transport for
+  the current development phase.
+- **NATS** is not required to be introduced immediately. It remains an
+  evaluated future transport option.
+- **Kafka** remains a future option for high-scale and event-analytics
+  requirements.
+- Transport selection must remain isolated to the event-bus registration and
+  configuration; changing transport must not require changes to contracts or
+  handlers.
+
+This supersedes the earlier "MassTransit + RabbitMQ for async events" decision.
 
 ## ADR-009 — Authorization as a bounded context
 
@@ -79,3 +106,141 @@ Emergency access is an explicit, reason-required, narrowly-scoped request that
 must be approved by a different subject, cannot be global, and automatically
 expires. Break-glass grants never silently bypass normal authorization and emit
 high-priority audit events.
+
+## ADR-015 — Reliable event publication via transactional outbox
+
+**Status:** Accepted (documented decision; implementation deferred).
+
+CommunityOS requires reliable event publication. Any domain change that raises
+domain/integration events must not lose those events if the message broker is
+unavailable or the publish fails. The intended architecture:
+
+```
+Database transaction
+        ↓
+Domain state + Outbox message
+        ↓
+Commit
+        ↓
+Outbox dispatcher
+        ↓
+MassTransit
+        ↓
+RabbitMQ
+```
+
+Domain state and the outbox message commit in the same database transaction; a
+dispatcher reads committed outbox rows and publishes them onto the bus via
+MassTransit. Implementation is deferred until the first cross-service consumers
+require guaranteed delivery; the MassTransit EF Core outbox is the intended
+mechanism. Until then, publishers remain best-effort in-process delivery, and
+this limitation is tracked for removal.
+
+## ADR-016 — Organization bounded context and Community boundary
+
+**Status:** Accepted (ratified at architecture reconciliation).
+
+The Organization bounded context owns:
+
+- organizations
+- organization units
+- organizational hierarchy
+- institutions
+- committees
+- teams
+- appointments
+- appointment terms
+- jurisdiction
+- organizational delegation facts
+- effective-dated organizational history
+
+The Community bounded context owns:
+
+- persons
+- households
+- family relationships
+- contact information
+- community membership
+- activities
+- events
+- meetings
+- participation
+
+The existing Community organizational hierarchy (National / Regional / Cluster /
+Local Unit) is considered premature implementation. It is not deleted; it will
+be relocated and refactored as part of the Organization implementation
+(Prompt 04).
+
+Organization will own its own database, `communityos_organization`. There is no
+shared database with Community, Identity or Authorization.
+
+## ADR-017 — Bounded context implementation sequence
+
+**Status:** Accepted (ratified at architecture reconciliation).
+
+The ratified implementation sequence for CommunityOS is:
+
+1. Solution Foundation
+2. Identity
+3. Authorization
+4. Organization
+5. Community
+6. Documents
+7. Records
+8. Workflow
+9. Notifications
+10. Search
+11. Audit
+12. Knowledge
+13. Correspondence
+14. Localization
+15. AI Platform
+16. Integrations
+17. Finance
+18. Communications / VoIP
+19. Analytics
+
+## ADR-018 — Authentication and authorization ownership boundary
+
+**Status:** Accepted (ratified at architecture reconciliation; extends ADR-009).
+
+The Identity bounded context owns authentication: accounts, credentials, MFA,
+sessions, devices, and recovery.
+
+The Authorization bounded context owns authorization: roles, permissions,
+policies, relationship tuples, authorization decisions, authorization
+delegation, and break-glass authorization.
+
+The Organization bounded context owns organizational facts. The Community
+bounded context owns person/community facts.
+
+No service may access another service's database. All cross-service data access
+is via the owning service's API or integration events.
+
+## ADR-019 — Community security corrections
+
+**Status:** Accepted (recorded; implementation deferred to the Community
+re-scope).
+
+The following Community service issues are recorded for correction during the
+Community re-scope:
+
+- HMAC JWT validation must be replaced by validation of Identity-issued RS256
+  tokens using the appropriate public key / JWKS mechanism.
+- `[Authorize(Roles = "...")]` must not be used for Community authorization
+  decisions.
+- Community must use the existing Authorization service/guard mechanism for
+  authorization decisions.
+
+These corrections are not implemented during the reconciliation phase; they are
+recorded to prevent regression.
+
+## ADR-020 — Repository specifications as source of truth
+
+**Status:** Accepted (ratified at architecture reconciliation).
+
+The `/specifications` directory in this repository is the authoritative
+architectural baseline for CommunityOS implementation work. Files marked
+PLACEHOLDER are pending import of their authoritative source documents; they do
+not invent requirements and must be replaced before being relied upon.
+Ratified decisions are recorded in this ADR document.

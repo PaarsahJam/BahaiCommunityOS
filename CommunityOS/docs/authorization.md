@@ -42,7 +42,8 @@ Key rules:
   organization or resource context — it never grants access to a specific
   resource.
 - Organization hierarchy (an ancestor grant covering a descendant org unit) is
-  supplied by `IOrganizationContextProvider` and defaults to exact-match only.
+  supplied by `IOrganizationContextProvider`; the provider is bound to the
+  Organization service's HTTP covers endpoint and fails closed on any error.
 - A delegator cannot delegate more than it holds, and cannot escape its scope.
 - A break-glass request cannot be global, cannot be self-approved, and expires.
 
@@ -79,7 +80,11 @@ Clients never send roles or permissions in a check; they send only context
   `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`,
   `BreakGlassRevoked`).
 - **Organization** — the Organization service owns hierarchy; Authorization
-  consumes it through `IOrganizationContextProvider` (fail-closed until wired).
+  resolves organization-scoped grants by calling the Organization service's
+  `/api/v1/orgunits/{id}/covers` endpoint over HTTP
+  (`HttpOrganizationContextProvider`), presented as the internal client
+  `communityos-authorization`. The exact-match-only default is used only when
+  the HTTP integration is not registered. Fail-closed on any error.
 - **Identity** — access tokens are validated with the Identity service's
   signing key (`Jwt:SigningPrivateKey` / `Jwt:SigningKeyXml` /
   `Jwt:SigningKeyBase64`). Without configuration a dev-only ephemeral key is
@@ -104,6 +109,14 @@ Clients never send roles or permissions in a check; they send only context
 | `MaxDelegationDurationDays` | 30 | Max delegation length |
 | `MaxDelegatedPermissions` | 25 | Max permissions per delegation |
 | `BootstrapGlobalAdminSubjectId` | *(empty)* | Subject to bootstrap as GlobalAdministrator |
+
+### Configuration (`OrganizationService` section)
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `BaseUrl` | *(required)* | Base URL of the Organization service API |
+| `AccessToken` | *(empty)* | Service token presented to the Organization service |
+| `ClientId` | `communityos-authorization` | `X-Client-Id` header sent to the covers endpoint |
 
 ## Testing
 

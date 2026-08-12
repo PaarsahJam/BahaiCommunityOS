@@ -1,4 +1,5 @@
 using CommunityOS.Community.Domain.Repositories;
+using CommunityOS.Community.Infrastructure.Integration.Organization;
 using CommunityOS.Community.Infrastructure.Persistence;
 using CommunityOS.Community.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,8 @@ public static class CommunityInfrastructureServiceExtensions
                     typeof(CommunityInfrastructureServiceExtensions).Assembly.FullName)));
 
         services.AddScoped<ICommunityRepository, CommunityRepository>();
+        services.AddScoped<IOrganizationReferenceRepository, OrganizationReferenceRepository>();
+        services.AddScoped<OrganizationIntegrationEventConsumer>();
 
         return services;
     }

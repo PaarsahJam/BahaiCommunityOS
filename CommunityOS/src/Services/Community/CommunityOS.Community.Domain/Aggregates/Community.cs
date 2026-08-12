@@ -18,6 +18,13 @@ public sealed class Community : AggregateRoot<Guid>
 
     public IReadOnlyList<LocalUnit> LocalUnits => _localUnits.AsReadOnly();
 
+    private Community() : base(Guid.Empty)
+    {
+        Name = null!;
+        Area = null!;
+        Level = null!;
+    }
+
     private Community(Guid id, CommunityName name, GeographicArea area,
         HierarchyLevel level, Guid? parentId) : base(id)
     {

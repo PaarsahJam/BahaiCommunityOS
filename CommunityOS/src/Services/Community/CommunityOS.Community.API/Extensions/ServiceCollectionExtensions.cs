@@ -1,6 +1,8 @@
 using Asp.Versioning;
 using CommunityOS.Community.Application;
 using CommunityOS.Community.Infrastructure;
+using CommunityOS.Community.Infrastructure.Integration.Organization;
+using CommunityOS.EventBus;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -15,6 +17,10 @@ internal static class ServiceCollectionExtensions
         services
             .AddCommunityApplication()
             .AddCommunityInfrastructure(config);
+
+        services.AddCommunityOSEventBus(
+            config,
+            bus => bus.AddConsumer<OrganizationIntegrationEventConsumer>());
 
         services
             .AddControllers()

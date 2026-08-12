@@ -10,6 +10,12 @@ public sealed class Cluster : Entity<Guid>
     public GeographicArea Area { get; private set; }
     public Guid RegionId { get; private set; }
 
+    private Cluster() : base(Guid.Empty)
+    {
+        Name = null!;
+        Area = null!;
+    }
+
     private Cluster(Guid id, CommunityName name, GeographicArea area, Guid regionId) : base(id)
     {
         Name = name;

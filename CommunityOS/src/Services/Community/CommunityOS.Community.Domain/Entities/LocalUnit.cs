@@ -11,6 +11,12 @@ public sealed class LocalUnit : Entity<Guid>
     public Guid ClusterId { get; private set; }
     public bool IsActive { get; private set; }
 
+    private LocalUnit() : base(Guid.Empty)
+    {
+        Name = null!;
+        Area = null!;
+    }
+
     private LocalUnit(Guid id, CommunityName name, GeographicArea area, Guid clusterId) : base(id)
     {
         Name = name;

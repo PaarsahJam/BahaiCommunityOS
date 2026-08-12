@@ -11,6 +11,8 @@ public sealed class CommunityDbContext(DbContextOptions<CommunityDbContext> opti
     public DbSet<CommunityAggregate> Communities => Set<CommunityAggregate>();
     public DbSet<LocalUnit> LocalUnits  => Set<LocalUnit>();
     public DbSet<Cluster>   Clusters    => Set<Cluster>();
+    public DbSet<OrganizationReference> OrganizationReferences => Set<OrganizationReference>();
+    public DbSet<OrganizationUnitReference> OrganizationUnitReferences => Set<OrganizationUnitReference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

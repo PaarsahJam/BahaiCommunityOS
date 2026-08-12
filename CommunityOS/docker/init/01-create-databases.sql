@@ -9,3 +9,4 @@ CREATE DATABASE communityos_community;
 CREATE DATABASE communityos_enrollment;
 CREATE DATABASE communityos_reporting;
 CREATE DATABASE communityos_authorization;
+CREATE DATABASE communityos_organization;
