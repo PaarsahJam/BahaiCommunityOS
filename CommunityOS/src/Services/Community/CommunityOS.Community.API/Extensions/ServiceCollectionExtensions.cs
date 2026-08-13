@@ -1,11 +1,10 @@
 using Asp.Versioning;
+using CommunityOS.Community.API.Security;
 using CommunityOS.Community.Application;
 using CommunityOS.Community.Infrastructure;
 using CommunityOS.Community.Infrastructure.Integration.Organization;
 using CommunityOS.EventBus;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 
 namespace CommunityOS.Community.API.Extensions;
 
@@ -43,20 +42,7 @@ internal static class ServiceCollectionExtensions
         services.AddSwaggerGen();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(opts =>
-            {
-                opts.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer           = true,
-                    ValidateAudience         = true,
-                    ValidateLifetime         = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer              = config["Jwt:Issuer"],
-                    ValidAudience            = config["Jwt:Audience"],
-                    IssuerSigningKey         = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(config["Jwt:Secret"]!))
-                };
-            });
+            .AddJwtBearer(opts => CommunityJwtValidation.Configure(opts, config));
 
         services.AddAuthorization();
 

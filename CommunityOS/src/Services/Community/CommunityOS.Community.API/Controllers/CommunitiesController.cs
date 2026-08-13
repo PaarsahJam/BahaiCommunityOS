@@ -36,7 +36,6 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,NationalAdmin")]
     [ProducesResponseType<CommunityDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(
@@ -47,7 +46,6 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin,NationalAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(
@@ -58,7 +56,6 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/local-units")]
-    [Authorize(Roles = "Admin,NationalAdmin,RegionalCoordinator")]
     [ProducesResponseType<LocalUnitDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddLocalUnit(
@@ -69,7 +66,6 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     }
 
     [HttpPatch("{id:guid}/parent")]
-    [Authorize(Roles = "Admin,NationalAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ChangeParent(
@@ -80,7 +76,6 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)

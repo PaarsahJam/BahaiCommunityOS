@@ -74,7 +74,9 @@ dotnet ef migrations has-pending-model-changes \
 | Key | Example | Notes |
 |-----|---------|-------|
 | `ConnectionStrings:CommunityDb` | `Host=localhost;Port=5432;Database=communityos_community;Username=communityos;Password=communityos` | PostgreSQL |
-| `Jwt:Issuer` / `Jwt:Audience` / `Jwt:Secret` | *(local)* | Bearer token validation |
+| `Jwt:Authority` / `Jwt:MetadataAddress` | `http://localhost:5001` | Identity OIDC discovery endpoint (JWKS for RS256 token validation) |
+| `Jwt:Issuer` / `Jwt:Audience` | `http://localhost:5001` / `CommunityOS` | Bearer token issuer/audience validated |
+| `Jwt:RequireHttpsMetadata` | `false` *(local)* / `true` *(prod)* | Require HTTPS when fetching the Identity discovery document |
 | `RabbitMq:Host` / `Port` / `Username` / `Password` | `localhost` / `5672` / `guest` / `guest` | MassTransit bus |
 | `AuthorizationService:BaseUrl` | `http://localhost:5007` | Authorization check API base URL |
 | `AuthorizationService:AccessToken` | *(empty in dev)* | Service-principal bearer token |
