@@ -20,6 +20,7 @@ moderator operations, and citation text is always resolved from the Library.
 | GET | `/library/passages?editionId=&from=&to=` | `knowledge.library.read` | List passages of an edition |
 | GET | `/library/passages/{id}` | `knowledge.library.read` | Get a passage (text + reference path) |
 | POST | `/library/passages` | `knowledge.library.import` | Import a passage |
+| POST | `/library/passages/{id}/correct` | `knowledge.library.import` | Publish a passage text correction (new revision) |
 
 **Create work** body:
 
@@ -58,7 +59,8 @@ moderator operations, and citation text is always resolved from the Library.
 
 Only *verified* editions are citable by community content; importing a passage
 for an unverified edition is allowed but references to it are rejected until the
-edition is verified.
+edition is verified. A passage is immutable — `correct` appends a new revision
+record and never mutates the current text in place.
 
 ## Questions — `/questions`
 
@@ -68,7 +70,7 @@ require a moderator grant.
 
 | Method | Path | Capability | Description |
 |--------|------|------------|-------------|
-| GET | `/questions?status=&categoryId=&topicId=&organizationUnitId=&query=` | `knowledge.question.read` | List questions |
+| GET | `/questions?status=&categoryId=&organizationUnitId=&query=` | `knowledge.question.read` | List questions |
 | GET | `/questions/{id}` | `knowledge.question.read` | Get a question with answers/discussion |
 | POST | `/questions` | `knowledge.question.create` | Create a question (Draft) |
 | POST | `/questions/{id}/submit` | `knowledge.question.update` | Submit Draft → Submitted |
@@ -178,6 +180,12 @@ internal endpoints (e.g. passage citation resolution) are protected by
 `X-Client-Id` matching a `Knowledge:InternalClientId` configuration value and
 remain behind `[Authorize]`. The header is an identification/routing signal,
 not an authorization credential (see `docs/api/organization.md` notes).
+
+- `GET /library/passages/{id}/citation` (`knowledge.library.read`,
+  `X-Client-Id: communityos-authorization`) — resolves a passage id to its
+  authoritative text so reading UIs can render citations from the Library. No
+  Authorization-service round-trip is made, so the Authorization service can
+  safely resolve citation text without a request cycle.
 
 ## Error handling
 

@@ -28,7 +28,7 @@ is never produced or arbitrated by AI.
   corrections create a new revision record.
 - **Translation** — multilingual text attached to a Work/Edition/Passage.
   Always carries its source edition so translations are attributable and
-  verifiable.
+  verifiable. *Deferred from the first implementation cut (see Deviations).*
 - **Category / Topic / Tag** — controlled and free-form organization of
   questions and answers. Categories are configurable; tags are user-assigned.
 
@@ -149,20 +149,27 @@ through the Community API.
 | `AiSuggestionRequested` | An AI draft is requested | `SuggestionId`, `QuestionId`, `ModelId` |
 | `AiSuggestionReviewed` | A suggestion is accepted/rejected | `SuggestionId`, `QuestionId`, `Outcome` |
 | `CategoryCreated` / `CategoryUpdated` | Category managed | `CategoryId`, `Name` |
+| `TopicCreated` / `TopicUpdated` | Topic managed | `TopicId`, `Name` |
 
 Consumers in the ADR-017 sequence (Workflow reviews, Notifications digests,
 Search indexing, Documents import, AI) subscribe by contract name and never by
 database.
 
+`WorkUpdated`, `TopicCreated` and `TopicUpdated` are raised internally but are
+deliberately **not exported** onto the bus (works are reference-only to other
+services, and topic updates carry no consumer-relevant state change).
+
 ## Data
 
 - Database: `communityos_knowledge` (PostgreSQL), schema `knowledge`.
 - Tables: `works`, `editions`, `passages`, `passage_revisions`,
-  `translations`, `categories`, `topics`, `tags`, `questions`,
+  `categories`, `topics`, `tags`, `questions`,
   `question_lifecycle_events`, `answers`, `answer_revisions`,
   `discussions`, `comments`, `references`, `moderation_flags`,
   `ai_suggestions`, `organization_unit_references`.
-- Schema is managed by EF Core migrations.
+  (`translations` is deferred from the first cut — see Deviations.)
+- Schema is managed by EF Core migrations (`InitialCreateKnowledge`,
+  `Persistence/Migrations`).
 
 ## Configuration
 
@@ -176,11 +183,32 @@ database.
 ## Testing
 
 - **Unit tests** (`tests/Unit/CommunityOS.Knowledge.Tests`) — domain invariants
-  (passage immutability, reference validity, question lifecycle transitions,
-  canonicalization rules, AI-suggestion review requirements) and application
-  service behaviour through the MediatR pipeline with substitute persistence.
-- **Security regression tests** — fail-closed authorization, moderator gating,
-  AI-suggestions-never-authoritative enforcement.
+  (passage immutability, question lifecycle transitions, one-accepted-answer,
+  merge/canonicalize immutability, AI-suggestion human review) and security
+  regression tests (fail-closed authorization, org-scoped question/answer/AI/
+  discussion guards, JWT RS256-only validation).
 - **Integration tests** (`tests/Integration/CommunityOS.Knowledge.IntegrationTests`)
-  — EF mapping and migrations against a real PostgreSQL via Testcontainers
-  (requires Docker).
+  — EF mapping and the `InitialCreateKnowledge` migration against a real
+  PostgreSQL via Testcontainers (requires Docker).
+
+## Deviations
+
+Two additions and two deferrals were agreed during implementation. They are
+deliberate and documented so future readers are not surprised:
+
+- **Passage correction endpoint** — `POST /library/passages/{id}/correct`
+  (`knowledge.library.import`). The ratified event set includes
+  `PassageCorrected`, but the API contract had no endpoint to raise it. This
+  is the sanctioned entry point that appends a passage revision.
+- **Citation resolution endpoint** — `GET /library/passages/{id}/citation`
+  (`knowledge.library.read`). It returns the authoritative text for a passage
+  id so reading UIs can resolve citations from the Library (as required by
+  "community content never embeds authoritative text"). It is protected by the
+  `X-Client-Id` internal-header pattern and performs no Authorization-service
+  round-trip to avoid a request cycle with the Authorization service.
+- **`topicId` filter dropped from question listing** — the ratified model has
+  no question↔topic join table (a question carries only `categoryId` and
+  tags), so `GET /questions` does not accept a `topicId` query parameter.
+- **`translations` deferred** — the `Translation` entity, its table and any
+  translation API/events are not part of this first implementation cut. The
+  model and contracts remain reserved for a follow-up.

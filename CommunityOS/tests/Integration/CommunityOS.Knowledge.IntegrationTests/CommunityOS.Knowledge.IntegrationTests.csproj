@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.Application\CommunityOS.Knowledge.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.Domain\CommunityOS.Knowledge.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.Infrastructure\CommunityOS.Knowledge.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

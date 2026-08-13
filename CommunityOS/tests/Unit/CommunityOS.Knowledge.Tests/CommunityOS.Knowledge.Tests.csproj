@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Authorization\CommunityOS.Authorization.Application\CommunityOS.Authorization.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.API\CommunityOS.Knowledge.API.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.Application\CommunityOS.Knowledge.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Knowledge\CommunityOS.Knowledge.Domain\CommunityOS.Knowledge.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>
