@@ -1,4 +1,6 @@
+using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Community.Application.DTOs;
+using CommunityOS.Community.Application.Permissions;
 using CommunityOS.Community.Domain.Entities;
 using CommunityOS.Community.Domain.Exceptions;
 using CommunityOS.Community.Domain.Repositories;
@@ -8,6 +10,7 @@ using MediatR;
 namespace CommunityOS.Community.Application.Commands;
 
 public sealed record AddLocalUnitCommand(
+    Guid ActorId,
     Guid CommunityId,
     string Name,
     string Country,
@@ -15,11 +18,16 @@ public sealed record AddLocalUnitCommand(
     string? City,
     Guid ClusterId) : IRequest<LocalUnitDto>;
 
-internal sealed class AddLocalUnitCommandHandler(ICommunityRepository communities)
+internal sealed class AddLocalUnitCommandHandler(
+    ICommunityRepository communities,
+    AuthorizationGuard guard)
     : IRequestHandler<AddLocalUnitCommand, LocalUnitDto>
 {
     public async Task<LocalUnitDto> Handle(AddLocalUnitCommand cmd, CancellationToken ct)
     {
+        await guard.RequireAsync(cmd.ActorId, CommunityPermissions.CommunityHierarchyCreate,
+            new AuthorizationContext(ResourceType: "community", ResourceId: cmd.CommunityId), ct);
+
         var community = await communities.GetByIdAsync(cmd.CommunityId, ct)
             ?? throw new CommunityNotFoundException(cmd.CommunityId);
 

@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Services\Community\CommunityOS.Community.API\CommunityOS.Community.API.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Community\CommunityOS.Community.Application\CommunityOS.Community.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Community\CommunityOS.Community.Domain\CommunityOS.Community.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Community\CommunityOS.Community.Infrastructure\CommunityOS.Community.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Testcontainers.RabbitMq" />
   </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
 </Project>

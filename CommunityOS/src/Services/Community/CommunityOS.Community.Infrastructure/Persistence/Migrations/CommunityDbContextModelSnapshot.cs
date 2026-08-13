@@ -23,6 +23,75 @@ namespace CommunityOS.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Activity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_online");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("OnlineUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("online_url");
+
+                    b.Property<Guid?>("OrganizationUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_unit_id");
+
+                    b.Property<Guid?>("OrganizerPersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organizer_person_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Visibility")
+                        .HasColumnType("integer")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationUnitId");
+
+                    b.ToTable("activities", "community");
+                });
+
             modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Community", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48,6 +117,231 @@ namespace CommunityOS.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("communities", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.CommunityEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTime?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_online");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("OnlineUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("online_url");
+
+                    b.Property<Guid?>("OrganizationUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_unit_id");
+
+                    b.Property<Guid?>("OrganizerPersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organizer_person_id");
+
+                    b.Property<bool>("RegistrationOpen")
+                        .HasColumnType("boolean")
+                        .HasColumnName("registration_open");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("time_zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Visibility")
+                        .HasColumnType("integer")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationUnitId");
+
+                    b.ToTable("community_events", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.FamilyRelationship", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonIdA")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id_a");
+
+                    b.Property<Guid>("PersonIdB")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id_b");
+
+                    b.Property<int>("RelationshipType")
+                        .HasColumnType("integer")
+                        .HasColumnName("relationship_type");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonIdA", "PersonIdB");
+
+                    b.ToTable("family_relationships", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Household", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("households", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Meeting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTime?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("Minutes")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("minutes");
+
+                    b.Property<Guid?>("OrganizationUnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_unit_id");
+
+                    b.Property<Guid?>("OrganizerPersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organizer_person_id");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("time_zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Visibility")
+                        .HasColumnType("integer")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationUnitId");
+
+                    b.ToTable("meetings", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Membership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("WithdrawnOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_on");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId")
+                        .IsUnique();
+
+                    b.ToTable("memberships", "community");
                 });
 
             modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.OrganizationReference", b =>
@@ -129,6 +423,103 @@ namespace CommunityOS.Persistence.Migrations
                     b.ToTable("organization_unit_references", "community");
                 });
 
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Participation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id");
+
+                    b.Property<DateTime>("RecordedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_on");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("role");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<int>("TargetType")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_type");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("TargetType", "TargetId");
+
+                    b.ToTable("participations", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Person", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on");
+
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("date_of_birth");
+
+                    b.Property<string>("FormalName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("formal_name");
+
+                    b.Property<Guid?>("IdentityAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_account_id");
+
+                    b.Property<DateTime?>("IdentityLinkedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("identity_linked_on");
+
+                    b.Property<DateTime?>("IdentityUnlinkedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("identity_unlinked_on");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("preferred_language");
+
+                    b.Property<string>("PreferredName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("preferred_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("persons", "community");
+                });
+
             modelBuilder.Entity("CommunityOS.Community.Domain.Entities.Cluster", b =>
                 {
                     b.Property<Guid>("Id")
@@ -164,6 +555,33 @@ namespace CommunityOS.Persistence.Migrations
                     b.HasIndex("community_id");
 
                     b.ToTable("local_units", "community");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Activity", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.DateTimeRange", "Schedule", b1 =>
+                        {
+                            b1.Property<Guid>("ActivityId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime?>("EndsAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("ends_at");
+
+                            b1.Property<DateTime>("StartsAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("starts_at");
+
+                            b1.HasKey("ActivityId");
+
+                            b1.ToTable("activities", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ActivityId");
+                        });
+
+                    b.Navigation("Schedule")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Community", b =>
@@ -228,6 +646,423 @@ namespace CommunityOS.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Name")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.FamilyRelationship", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.EffectivePeriod", "Period", b1 =>
+                        {
+                            b1.Property<Guid>("FamilyRelationshipId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime>("EffectiveFrom")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_from");
+
+                            b1.Property<DateTime?>("EffectiveUntil")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_until");
+
+                            b1.HasKey("FamilyRelationshipId");
+
+                            b1.ToTable("family_relationships", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FamilyRelationshipId");
+                        });
+
+                    b.Navigation("Period")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Household", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.PostalAddress", "Address", b1 =>
+                        {
+                            b1.Property<Guid>("HouseholdId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("City")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("address_city");
+
+                            b1.Property<string>("Country")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("address_country");
+
+                            b1.Property<string>("Line1")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("address_line1");
+
+                            b1.Property<string>("Line2")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("address_line2");
+
+                            b1.Property<string>("PostalCode")
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("address_postal_code");
+
+                            b1.Property<string>("Region")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("address_region");
+
+                            b1.HasKey("HouseholdId");
+
+                            b1.ToTable("households", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("HouseholdId");
+                        });
+
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.HouseholdMember", "Members", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("PersonId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("person_id");
+
+                            b1.Property<int>("Role")
+                                .HasColumnType("integer")
+                                .HasColumnName("role");
+
+                            b1.Property<Guid>("household_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("household_id");
+
+                            b1.ToTable("household_members", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("household_id");
+
+                            b1.OwnsOne("CommunityOS.Community.Domain.ValueObjects.EffectivePeriod", "Period", b2 =>
+                                {
+                                    b2.Property<Guid>("HouseholdMemberId")
+                                        .HasColumnType("uuid");
+
+                                    b2.Property<DateTime>("EffectiveFrom")
+                                        .HasColumnType("timestamp with time zone")
+                                        .HasColumnName("effective_from");
+
+                                    b2.Property<DateTime?>("EffectiveUntil")
+                                        .HasColumnType("timestamp with time zone")
+                                        .HasColumnName("effective_until");
+
+                                    b2.HasKey("HouseholdMemberId");
+
+                                    b2.ToTable("household_members", "community");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("HouseholdMemberId");
+                                });
+
+                            b1.Navigation("Period")
+                                .IsRequired();
+                        });
+
+                    b.Navigation("Address");
+
+                    b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Meeting", b =>
+                {
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.MeetingAction", "Actions", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid?>("AssigneePersonId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("assignee_person_id");
+
+                            b1.Property<DateTime?>("CompletedOn")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("completed_on");
+
+                            b1.Property<string>("Description")
+                                .IsRequired()
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("description");
+
+                            b1.Property<DateTime?>("DueDate")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("due_date");
+
+                            b1.Property<bool>("IsCompleted")
+                                .HasColumnType("boolean")
+                                .HasColumnName("is_completed");
+
+                            b1.Property<Guid>("meeting_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("meeting_id");
+
+                            b1.ToTable("meeting_actions", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("meeting_id");
+                        });
+
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.MeetingAgendaItem", "AgendaItems", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Description")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("description");
+
+                            b1.Property<bool>("IsCompleted")
+                                .HasColumnType("boolean")
+                                .HasColumnName("is_completed");
+
+                            b1.Property<int>("Order")
+                                .HasColumnType("integer")
+                                .HasColumnName("order");
+
+                            b1.Property<string>("Title")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("title");
+
+                            b1.Property<Guid>("meeting_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("meeting_id");
+
+                            b1.ToTable("meeting_agenda_items", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("meeting_id");
+                        });
+
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.MeetingParticipant", "Participants", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Attendance")
+                                .HasColumnType("integer")
+                                .HasColumnName("attendance");
+
+                            b1.Property<Guid>("PersonId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("person_id");
+
+                            b1.Property<string>("Role")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("role");
+
+                            b1.Property<Guid>("meeting_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("meeting_id");
+
+                            b1.ToTable("meeting_participants", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("meeting_id");
+                        });
+
+                    b.Navigation("Actions");
+
+                    b.Navigation("AgendaItems");
+
+                    b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Membership", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.EffectivePeriod", "Period", b1 =>
+                        {
+                            b1.Property<Guid>("MembershipId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime>("EffectiveFrom")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_from");
+
+                            b1.Property<DateTime?>("EffectiveUntil")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_until");
+
+                            b1.HasKey("MembershipId");
+
+                            b1.ToTable("memberships", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MembershipId");
+                        });
+
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.MembershipPeriod", "PeriodHistory", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Status")
+                                .HasColumnType("integer")
+                                .HasColumnName("status");
+
+                            b1.Property<Guid>("membership_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("membership_id");
+
+                            b1.ToTable("membership_periods", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("membership_id");
+
+                            b1.OwnsOne("CommunityOS.Community.Domain.ValueObjects.EffectivePeriod", "Period", b2 =>
+                                {
+                                    b2.Property<Guid>("MembershipPeriodId")
+                                        .HasColumnType("uuid");
+
+                                    b2.Property<DateTime>("EffectiveFrom")
+                                        .HasColumnType("timestamp with time zone")
+                                        .HasColumnName("effective_from");
+
+                                    b2.Property<DateTime?>("EffectiveUntil")
+                                        .HasColumnType("timestamp with time zone")
+                                        .HasColumnName("effective_until");
+
+                                    b2.HasKey("MembershipPeriodId");
+
+                                    b2.ToTable("membership_periods", "community");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("MembershipPeriodId");
+                                });
+
+                            b1.Navigation("Period")
+                                .IsRequired();
+                        });
+
+                    b.Navigation("Period")
+                        .IsRequired();
+
+                    b.Navigation("PeriodHistory");
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Participation", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.EffectivePeriod", "Period", b1 =>
+                        {
+                            b1.Property<Guid>("ParticipationId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime>("EffectiveFrom")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_from");
+
+                            b1.Property<DateTime?>("EffectiveUntil")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("effective_until");
+
+                            b1.HasKey("ParticipationId");
+
+                            b1.ToTable("participations", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ParticipationId");
+                        });
+
+                    b.Navigation("Period")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CommunityOS.Community.Domain.Aggregates.Person", b =>
+                {
+                    b.OwnsOne("CommunityOS.Community.Domain.ValueObjects.PrivacyPreferences", "Privacy", b1 =>
+                        {
+                            b1.Property<Guid>("PersonId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("ContactVisibility")
+                                .HasColumnType("integer")
+                                .HasColumnName("contact_visibility");
+
+                            b1.Property<int>("DateOfBirthVisibility")
+                                .HasColumnType("integer")
+                                .HasColumnName("date_of_birth_visibility");
+
+                            b1.Property<int>("ProfileVisibility")
+                                .HasColumnType("integer")
+                                .HasColumnName("profile_visibility");
+
+                            b1.HasKey("PersonId");
+
+                            b1.ToTable("persons", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PersonId");
+                        });
+
+                    b.OwnsMany("CommunityOS.Community.Domain.Entities.ContactMethod", "ContactMethods", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool>("IsPreferred")
+                                .HasColumnType("boolean")
+                                .HasColumnName("is_preferred");
+
+                            b1.Property<int>("Type")
+                                .HasColumnType("integer")
+                                .HasColumnName("type");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(320)
+                                .HasColumnType("character varying(320)")
+                                .HasColumnName("value");
+
+                            b1.Property<int>("Visibility")
+                                .HasColumnType("integer")
+                                .HasColumnName("visibility");
+
+                            b1.Property<Guid>("person_id")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("person_id");
+
+                            b1.ToTable("contact_methods", "community");
+
+                            b1.WithOwner()
+                                .HasForeignKey("person_id");
+                        });
+
+                    b.Navigation("ContactMethods");
+
+                    b.Navigation("Privacy")
                         .IsRequired();
                 });
 

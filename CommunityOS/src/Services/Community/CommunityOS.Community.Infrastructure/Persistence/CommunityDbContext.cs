@@ -14,6 +14,15 @@ public sealed class CommunityDbContext(DbContextOptions<CommunityDbContext> opti
     public DbSet<OrganizationReference> OrganizationReferences => Set<OrganizationReference>();
     public DbSet<OrganizationUnitReference> OrganizationUnitReferences => Set<OrganizationUnitReference>();
 
+    public DbSet<Person> Persons => Set<Person>();
+    public DbSet<Household> Households => Set<Household>();
+    public DbSet<FamilyRelationship> FamilyRelationships => Set<FamilyRelationship>();
+    public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<Activity> Activities => Set<Activity>();
+    public DbSet<CommunityEvent> CommunityEvents => Set<CommunityEvent>();
+    public DbSet<Meeting> Meetings => Set<Meeting>();
+    public DbSet<Participation> Participations => Set<Participation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("community");

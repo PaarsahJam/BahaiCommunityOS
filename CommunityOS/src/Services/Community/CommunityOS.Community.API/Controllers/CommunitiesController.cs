@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using CommunityOS.Community.API.Extensions;
 using CommunityOS.Community.Application.Commands;
 using CommunityOS.Community.Application.DTOs;
 using CommunityOS.Community.Application.Queries;
@@ -14,12 +15,14 @@ namespace CommunityOS.Community.API.Controllers;
 [Authorize]
 public sealed class CommunitiesController(ISender sender) : ControllerBase
 {
+    private Guid ActorId => User.GetSubjectId();
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType<CommunityDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
-        var result = await sender.Send(new GetCommunityByIdQuery(id), ct);
+        var result = await sender.Send(new GetCommunityByIdQuery(ActorId, id), ct);
         return Ok(result);
     }
 
@@ -28,7 +31,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetByParent(
         [FromQuery] Guid parentId, CancellationToken ct)
     {
-        var result = await sender.Send(new GetCommunitiesByParentQuery(parentId), ct);
+        var result = await sender.Send(new GetCommunitiesByParentQuery(ActorId, parentId), ct);
         return Ok(result);
     }
 
@@ -39,7 +42,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     public async Task<IActionResult> Create(
         [FromBody] CreateCommunityCommand cmd, CancellationToken ct)
     {
-        var result = await sender.Send(cmd, ct);
+        var result = await sender.Send(cmd with { ActorId = ActorId }, ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -50,7 +53,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     public async Task<IActionResult> Update(
         Guid id, [FromBody] UpdateCommunityCommand cmd, CancellationToken ct)
     {
-        await sender.Send(cmd with { CommunityId = id }, ct);
+        await sender.Send(cmd with { ActorId = ActorId, CommunityId = id }, ct);
         return NoContent();
     }
 
@@ -61,7 +64,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     public async Task<IActionResult> AddLocalUnit(
         Guid id, [FromBody] AddLocalUnitCommand cmd, CancellationToken ct)
     {
-        var result = await sender.Send(cmd with { CommunityId = id }, ct);
+        var result = await sender.Send(cmd with { ActorId = ActorId, CommunityId = id }, ct);
         return CreatedAtAction(nameof(GetById), new { id }, result);
     }
 
@@ -72,7 +75,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     public async Task<IActionResult> ChangeParent(
         Guid id, [FromBody] ChangeCommunityParentCommand cmd, CancellationToken ct)
     {
-        await sender.Send(cmd with { CommunityId = id }, ct);
+        await sender.Send(cmd with { ActorId = ActorId, CommunityId = id }, ct);
         return NoContent();
     }
 
@@ -82,7 +85,7 @@ public sealed class CommunitiesController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
     {
-        await sender.Send(new DeactivateCommunityCommand(id), ct);
+        await sender.Send(new DeactivateCommunityCommand(ActorId, id), ct);
         return NoContent();
     }
 }
