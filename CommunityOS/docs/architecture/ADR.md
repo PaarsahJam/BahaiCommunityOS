@@ -26,6 +26,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-018 | Authentication and authorization ownership boundary | Accepted |
 | ADR-019 | Community security corrections | Accepted |
 | ADR-020 | Repository specifications as source of truth | Accepted |
+| ADR-021 | Knowledge bounded context and Library boundary | Accepted |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -244,3 +245,42 @@ architectural baseline for CommunityOS implementation work. Files marked
 PLACEHOLDER are pending import of their authoritative source documents; they do
 not invent requirements and must be replaced before being relied upon.
 Ratified decisions are recorded in this ADR document.
+
+## ADR-021 — Knowledge bounded context and Library boundary
+
+**Status:** Accepted (ratified at architecture reconciliation; positions the
+Knowledge service in the ADR-017 sequence).
+
+The Knowledge bounded context owns:
+
+- the Library: authoritative source material (Works, Editions, Passages) with
+  provenance, verification status and multilingual translations
+- community questions (a lifecycle: Draft → Submitted → Published → Under
+  Review → Merged / Canonicalized / Archived)
+- answers and structured discussions attached to questions
+- references and citations from community content to Library passages
+- categories / topics / tags used to organize questions and answers
+- moderation flags and review state
+- AI-assist boundaries: AI-generated suggestions are first-class, clearly
+  marked, non-authoritative artifacts that require human review before
+  publication (see ADR-021 boundary rules below)
+
+The Knowledge service is positioned in the implementation sequence (ADR-017)
+after Search and before Correspondence. It depends on the platform services
+Authorization, Search, AI, Documents, Workflow and Notifications; it never owns
+persons, organization units, search indices, AI model behavior or notification
+delivery — it only references them through APIs and integration events.
+
+The following boundary rules are mandatory:
+
+- Authoritative religious text must never be produced, edited or arbitrated by
+  AI. AI-generated content is always a *suggestion* artifact with a distinct
+  provenance, never a Library entry and never the canonical answer.
+- The Library is the single source of truth for citation text. Community
+  answers and discussions cite Library passages by stable passage id; they never
+  embed authoritative text as their own content.
+- Knowledge owns its own database, `communityos_knowledge`. There is no shared
+  database with Community, Organization, Identity, Authorization or AI.
+- All cross-service access (person authors, organization-unit scoping, AI
+  suggestions, search indexing, notifications, workflow reviews) is via the
+  owning service's API or integration events (`ADR-018`).
