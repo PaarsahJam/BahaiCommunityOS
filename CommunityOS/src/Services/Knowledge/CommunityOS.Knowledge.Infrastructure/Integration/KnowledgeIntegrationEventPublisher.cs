@@ -13,10 +13,11 @@ namespace CommunityOS.Knowledge.Infrastructure.Integration;
 /// authors through the Community API. AI output is exported only as a
 /// suggestion review record, never as authoritative content.
 /// </summary>
-public sealed class KnowledgeIntegrationEventPublisher(IPublishEndpoint publishEndpoint)
-    : INotificationHandler<IDomainEvent>
+public sealed class KnowledgeIntegrationEventPublisher<TDomainEvent>(IPublishEndpoint publishEndpoint)
+    : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent
 {
-    public async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
+    public async Task Handle(TDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         switch (domainEvent)
         {

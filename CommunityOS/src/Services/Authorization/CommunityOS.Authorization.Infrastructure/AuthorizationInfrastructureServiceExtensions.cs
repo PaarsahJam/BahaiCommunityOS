@@ -5,7 +5,6 @@ using CommunityOS.Authorization.Infrastructure.Integration;
 using CommunityOS.Authorization.Infrastructure.Integration.Organization;
 using CommunityOS.Authorization.Infrastructure.Persistence;
 using CommunityOS.Authorization.Infrastructure.Repositories;
-using CommunityOS.SharedKernel.Domain.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -34,8 +33,11 @@ public static class AuthorizationInfrastructureServiceExtensions
         services.AddScoped<IDelegationRepository, DelegationRepository>();
         services.AddScoped<IBreakGlassRequestRepository, BreakGlassRequestRepository>();
 
-        // Domain event -> integration event forwarding onto the message bus
-        services.AddScoped<INotificationHandler<IDomainEvent>, AuthorizationIntegrationEventPublisher>();
+        // Domain event -> integration event forwarding onto the message bus.
+        // Registered as an open generic so MediatR 12.4.1 (which dispatches by
+        // the runtime type of the notification) resolves the closed publisher for
+        // each concrete domain event.
+        services.AddScoped(typeof(INotificationHandler<>), typeof(AuthorizationIntegrationEventPublisher<>));
 
         // Organization context integration: the Authorization service never reads
         // the Organization database. Organization-scoped grants are resolved by

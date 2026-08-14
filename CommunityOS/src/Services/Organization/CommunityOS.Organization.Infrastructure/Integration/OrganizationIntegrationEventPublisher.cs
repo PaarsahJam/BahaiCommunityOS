@@ -13,10 +13,11 @@ namespace CommunityOS.Organization.Infrastructure.Integration;
 /// MediatR pipeline after the originating command has been handled. Person
 /// identity is carried only as a stable id — never PII.
 /// </summary>
-public sealed class OrganizationIntegrationEventPublisher(IPublishEndpoint publishEndpoint)
-    : INotificationHandler<IDomainEvent>
+public sealed class OrganizationIntegrationEventPublisher<TDomainEvent>(IPublishEndpoint publishEndpoint)
+    : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent
 {
-    public async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
+    public async Task Handle(TDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         switch (domainEvent)
         {

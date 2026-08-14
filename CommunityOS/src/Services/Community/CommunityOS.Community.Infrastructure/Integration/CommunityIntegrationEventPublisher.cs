@@ -12,10 +12,11 @@ namespace CommunityOS.Community.Infrastructure.Integration;
 /// are placed on the bus — PII (names, contact details, dates of birth) is
 /// never exported; consumers read profile data through the Community API.
 /// </summary>
-public sealed class CommunityIntegrationEventPublisher(IPublishEndpoint publishEndpoint)
-    : INotificationHandler<IDomainEvent>
+public sealed class CommunityIntegrationEventPublisher<TDomainEvent>(IPublishEndpoint publishEndpoint)
+    : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent
 {
-    public async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
+    public async Task Handle(TDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         switch (domainEvent)
         {

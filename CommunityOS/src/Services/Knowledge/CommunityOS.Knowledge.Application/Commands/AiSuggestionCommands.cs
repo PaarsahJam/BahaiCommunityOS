@@ -116,6 +116,14 @@ internal sealed class AcceptAiSuggestionCommandHandler(
 
         await answers.AddAsync(answer, ct);
         await suggestions.UpdateAsync(suggestion, ct);
+
+        // The accepted suggestion materializes a normal authoritative Answer
+        // (source = "ai") that follows the same lifecycle and emits the same
+        // AnswerAdded integration event as the member-authored path, so
+        // consumers (search indexing, notifications, read models) observe it.
+        // Acceptance was the explicit human-governed step; the AI never
+        // publishes an answer by itself.
+        await DomainEvents.PublishAsync(answer, mediator, ct);
         await DomainEvents.PublishAsync(suggestion, mediator, ct);
 
         return suggestion.ToDto();

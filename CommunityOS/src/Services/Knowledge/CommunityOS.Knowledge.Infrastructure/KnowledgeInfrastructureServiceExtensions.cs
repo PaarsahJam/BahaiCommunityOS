@@ -6,7 +6,6 @@ using CommunityOS.Knowledge.Infrastructure.Integration.Authorization;
 using CommunityOS.Knowledge.Infrastructure.Integration.Organization;
 using CommunityOS.Knowledge.Infrastructure.Persistence;
 using CommunityOS.Knowledge.Infrastructure.Repositories;
-using CommunityOS.SharedKernel.Domain.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -43,8 +42,11 @@ public static class KnowledgeInfrastructureServiceExtensions
         services.AddScoped<IOrganizationUnitReferenceRepository, OrganizationUnitReferenceRepository>();
         services.AddScoped<OrganizationIntegrationEventConsumer>();
 
-        // Domain event -> integration event forwarding onto the message bus
-        services.AddScoped<INotificationHandler<IDomainEvent>, KnowledgeIntegrationEventPublisher>();
+        // Domain event -> integration event forwarding onto the message bus.
+        // Registered as an open generic so MediatR 12.4.1 (which dispatches by
+        // the runtime type of the notification) resolves the closed publisher for
+        // each concrete domain event, e.g. INotificationHandler<AnswerAddedEvent>.
+        services.AddScoped(typeof(INotificationHandler<>), typeof(KnowledgeIntegrationEventPublisher<>));
 
         // Authorization integration: the Knowledge service never reads the
         // Authorization database. Every decision is delegated to the

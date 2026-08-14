@@ -6,7 +6,6 @@ using CommunityOS.Community.Infrastructure.Integration.Authorization;
 using CommunityOS.Community.Infrastructure.Integration.Organization;
 using CommunityOS.Community.Infrastructure.Persistence;
 using CommunityOS.Community.Infrastructure.Repositories;
-using CommunityOS.SharedKernel.Domain.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -40,8 +39,11 @@ public static class CommunityInfrastructureServiceExtensions
         services.AddScoped<IMeetingRepository, MeetingRepository>();
         services.AddScoped<IParticipationRepository, ParticipationRepository>();
 
-        // Domain event -> integration event forwarding onto the message bus
-        services.AddScoped<INotificationHandler<IDomainEvent>, CommunityIntegrationEventPublisher>();
+        // Domain event -> integration event forwarding onto the message bus.
+        // Registered as an open generic so MediatR 12.4.1 (which dispatches by
+        // the runtime type of the notification) resolves the closed publisher for
+        // each concrete domain event.
+        services.AddScoped(typeof(INotificationHandler<>), typeof(CommunityIntegrationEventPublisher<>));
 
         // Authorization integration: the Community service never reads the
         // Authorization database. Every decision is delegated to the

@@ -4,7 +4,6 @@ using CommunityOS.Identity.Infrastructure.Integration;
 using CommunityOS.Identity.Infrastructure.Persistence;
 using CommunityOS.Identity.Infrastructure.Repositories;
 using CommunityOS.Identity.Infrastructure.Security;
-using CommunityOS.SharedKernel.Domain.Events;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -39,8 +38,11 @@ public static class IdentityInfrastructureServiceExtensions
         services.AddScoped<IPasswordHasher>(sp => new Pbkdf2PasswordHasher(config.GetSection("PasswordHashing")));
         services.AddSingleton<ITotpService, TotpService>();
 
-        // Domain event -> integration event forwarding onto the message bus
-        services.AddScoped<INotificationHandler<IDomainEvent>, IdentityIntegrationEventPublisher>();
+        // Domain event -> integration event forwarding onto the message bus.
+        // Registered as an open generic so MediatR 12.4.1 (which dispatches by
+        // the runtime type of the notification) resolves the closed publisher for
+        // each concrete domain event.
+        services.AddScoped(typeof(INotificationHandler<>), typeof(IdentityIntegrationEventPublisher<>));
 
         return services;
     }

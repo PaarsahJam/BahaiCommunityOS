@@ -13,10 +13,11 @@ namespace CommunityOS.Authorization.Infrastructure.Integration;
 /// command has been handled. No sensitive authorization internals or PII are
 /// placed on the bus.
 /// </summary>
-public sealed class AuthorizationIntegrationEventPublisher(IPublishEndpoint publishEndpoint)
-    : INotificationHandler<IDomainEvent>
+public sealed class AuthorizationIntegrationEventPublisher<TDomainEvent>(IPublishEndpoint publishEndpoint)
+    : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent
 {
-    public async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
+    public async Task Handle(TDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         switch (domainEvent)
         {

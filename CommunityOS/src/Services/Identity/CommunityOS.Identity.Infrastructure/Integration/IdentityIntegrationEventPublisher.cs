@@ -12,10 +12,11 @@ namespace CommunityOS.Identity.Infrastructure.Integration;
 /// audit, etc.). Runs inside the MediatR pipeline after the originating
 /// command has been handled.
 /// </summary>
-public sealed class IdentityIntegrationEventPublisher(
-    IPublishEndpoint publishEndpoint) : INotificationHandler<IDomainEvent>
+public sealed class IdentityIntegrationEventPublisher<TDomainEvent>(
+    IPublishEndpoint publishEndpoint) : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent
 {
-    public async Task Handle(IDomainEvent domainEvent, CancellationToken cancellationToken)
+    public async Task Handle(TDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         switch (domainEvent)
         {
