@@ -27,6 +27,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-019 | Community security corrections | Accepted |
 | ADR-020 | Repository specifications as source of truth | Accepted |
 | ADR-021 | Knowledge bounded context and Library boundary | Accepted |
+| ADR-022 | Documents bounded context and artifact boundary | Proposed |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -284,3 +285,80 @@ The following boundary rules are mandatory:
 - All cross-service access (person authors, organization-unit scoping, AI
   suggestions, search indexing, notifications, workflow reviews) is via the
   owning service's API or integration events (`ADR-018`).
+
+## ADR-022 — Documents bounded context and artifact boundary
+
+**Status:** Proposed (pending ratification at the Prompt 07A gate).
+
+The Documents bounded context owns document *artifacts* and their metadata. It
+is positioned in the implementation sequence (ADR-017) at slot 6 — after
+Community, before Records — and is the foundational artifact service for
+Records, Workflow, Correspondence, Finance and Administration/Ticketing.
+
+The Documents context owns:
+
+- **Document** — the aggregate root: a named, versioned sequence of immutable
+  binary-content snapshots plus the metadata that governs security,
+  classification, scope, retention and lifecycle.
+- **DocumentVersion** — an immutable content snapshot (content hash, object key,
+  MIME type, size, filename, uploader, timestamp, source). Versions are
+  append-only; a new upload creates a new version and moves the current-version
+  pointer; no version is ever mutated (scan status is the sole mutable field).
+- **DocumentClassificationMetadata** — security metadata: classification code
+  (reserved for the ratified classification model), sensitive flag, retention
+  category reference, and legal/administrative hold references.
+- **DocumentOrganizationScope** — one or more organization-unit scopes; access
+  is delegated to Authorization at any of the document's scopes.
+- **DocumentReference** — the attachment/evidence link used by other contexts
+  (Workflow tasks, Records, Correspondence, Finance, Tickets) to reference a
+  document without owning storage.
+- The **Organization read-model projection** (consumed unit events, mirroring
+  Community and Knowledge; ADR-016).
+
+The Documents context does **not** own: official records, workflow state,
+correspondence lifecycle, financial meaning, organizational hierarchy, member
+identity, authorization policy, notification delivery, or AI decisions. It
+never absorbs responsibilities belonging to Records, Workflow, Correspondence,
+Knowledge, Finance or Administration.
+
+Boundary rules (mandatory):
+
+- A document artifact is never an Official Record; Records references documents
+  as evidence and owns record lifecycle, retention schedules and holds.
+- A document is never a Workflow task; Workflow references documents as
+  artifacts under review.
+- A document is never a Correspondence letter lifecycle; Correspondence
+  materializes its submitted letters as immutable document versions and owns
+  the draft/confirm/submit/track lifecycle.
+- A document is never Knowledge Library content; Knowledge remains the
+  authority for passages and citation text and may reference source documents.
+- Documents carries retention/hold *references* only; it enforces a
+  deactivation-protection rule when a hold is present but never invents
+  retention schedules.
+- Documents never holds roles, permissions or decisions; every guarded
+  operation calls the Authorization service through `AuthorizationGuard`
+  (fail-closed; ADR-009/010/011/018/019). No `[Authorize(Roles = "...")]`.
+
+Storage topology (Proposed): PostgreSQL holds all authoritative metadata;
+binary content lives in S3-compatible object storage behind an
+`IDocumentObjectStorage` abstraction. MinIO is the concrete self-hosted
+deployment; any S3-compatible provider (AWS S3, Cloudflare R2, etc.) is a
+configuration change. Object keys are content-addressed by SHA-256
+(`documents/{sha256}`), which supports integrity verification and optional
+deduplication. Metadata storage and binary content storage are therefore
+decoupled: the database is the authority for the version → object mapping, and
+the object store is treated as immutable, addressable content.
+
+Data: Documents owns its own database, `communityos_documents` (schema
+`documents`). There is no shared database with any other service (ADR-018).
+
+Integration: domain events are forwarded as integration events onto the bus via
+MassTransit under `CommunityOS.Contracts.Documents`; payloads carry identifiers
+and minimal metadata only — never binary content, never secrets, never
+filenames, never names. Documents consumes Organization unit events into its
+read-model projection. ADR-015 (transactional outbox) remains deferred.
+
+Open decisions pending ratification (recorded in `docs/documents.md`):
+permission matrix, sensitivity gating, download-audit event for sensitive
+content, retention/hold hooks and deactivation-protection rule, and the
+malware-scanning extension point.
