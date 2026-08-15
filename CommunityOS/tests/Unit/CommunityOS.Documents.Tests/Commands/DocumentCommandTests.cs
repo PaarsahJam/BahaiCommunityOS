@@ -210,7 +210,7 @@ public class DocumentCommandTests
         await act.Should().ThrowAsync<DocumentIntegrityViolationException>();
     }
 
-    [Fact]
+[Fact]
     public async Task Download_of_a_scan_blocking_version_is_forbidden()
     {
         var h = new Harness { VerifyHashOnRead = false };
@@ -227,6 +227,57 @@ public class DocumentCommandTests
 
         await act.Should().ThrowAsync<ContentNotDownloadableException>();
         await h.Repos.Storage.DidNotReceiveWithAnyArgs().GetAsync(default!, default);
+    }
+
+    // --- M-1 regression: person-owned documents (OrganizationUnitId == null) ---
+
+    [Fact]
+    public async Task Create_person_owned_document_maps_to_dto_without_throwing()
+    {
+        var h = new Harness { VerifyHashOnRead = false };
+        h.AllowAll();
+
+        var dto = await h.Sender.Send(new CreateDocumentCommand(
+            ActorId, "Personal Notes", null, "person", ActorId, OrganizationUnitId: null, IsSensitive: false));
+
+        dto.Id.Should().NotBe(Guid.Empty);
+        dto.OrganizationUnitId.Should().BeNull();
+        dto.OrganizationScopes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Get_person_owned_document_maps_to_dto_and_keeps_its_scopes()
+    {
+        var h = new Harness { VerifyHashOnRead = false };
+        h.AllowAll();
+        var scopeA = Guid.NewGuid();
+        var scopeB = Guid.NewGuid();
+        var doc = Document.Create("Personal Notes", null, organizationUnitId: null, "person", ActorId, ActorId, DateTime.UtcNow);
+        doc.AddOrganizationScope(scopeA, ActorId, DateTime.UtcNow);
+        doc.AddOrganizationScope(scopeB, ActorId, DateTime.UtcNow);
+        h.Repos.Documents.GetByIdAsync(doc.Id, Arg.Any<CancellationToken>()).Returns(doc);
+
+        var dto = await h.Sender.Send(new GetDocumentQuery(ActorId, doc.Id));
+
+        dto.OrganizationUnitId.Should().BeNull();
+        dto.OrganizationScopes.Should().BeEquivalentTo(new[] { scopeA, scopeB });
+    }
+
+    [Fact]
+    public async Task Get_organization_owned_document_excludes_the_primary_unit_from_scopes()
+    {
+        var h = new Harness { VerifyHashOnRead = false };
+        h.AllowAll();
+        var primary = Guid.NewGuid();
+        var extra = Guid.NewGuid();
+        var doc = Document.Create("Feast Agenda", "Draft", primary, "person", ActorId, ActorId, DateTime.UtcNow);
+        doc.AddOrganizationScope(extra, ActorId, DateTime.UtcNow);
+        h.Repos.Documents.GetByIdAsync(doc.Id, Arg.Any<CancellationToken>()).Returns(doc);
+
+        var dto = await h.Sender.Send(new GetDocumentQuery(ActorId, doc.Id));
+
+        dto.OrganizationUnitId.Should().Be(primary);
+        dto.OrganizationScopes.Should().BeEquivalentTo(new[] { extra });
     }
 }
 

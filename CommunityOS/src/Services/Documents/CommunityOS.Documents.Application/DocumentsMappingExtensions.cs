@@ -14,7 +14,10 @@ internal static class DocumentsMappingExtensions
                 ? new OwnerReferenceDto(ownerType, ownerId)
                 : null,
             d.OrganizationUnitId,
-            d.AllOrganizationUnitIds.Except(new[] { d.OrganizationUnitId!.Value })
+            d.AllOrganizationUnitIds.Except(
+                    d.OrganizationUnitId is { } organizationUnitId
+                        ? new[] { organizationUnitId }
+                        : Array.Empty<Guid>())
                 .ToArray()
                 .AsReadOnly(),
             new DocumentClassificationDto(

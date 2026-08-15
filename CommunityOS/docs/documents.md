@@ -324,7 +324,7 @@ Identity (authN)     │  └── Events ──►  Audit / Search / Workflow 
 ## Data
 
 - Database: `communityos_documents` (PostgreSQL), schema `documents`.
-- Tables: `documents`, `document_versions`, `document_organization_scopes`,
+- Tables: `documents`, `document_versions`, `document_scopes`,
   `document_references`, `organization_unit_references`.
 - Schema is managed by EF Core migrations (created at implementation time).
 - Binary content is **not** stored in the database; it lives in object storage
