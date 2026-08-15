@@ -28,6 +28,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-020 | Repository specifications as source of truth | Accepted |
 | ADR-021 | Knowledge bounded context and Library boundary | Accepted |
 | ADR-022 | Documents bounded context and artifact boundary | Accepted |
+| ADR-023 | Records bounded context and official-record boundary | Accepted |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -425,3 +426,234 @@ Superseded decisions: none. The prior "Open decisions pending ratification"
 list (permission matrix, sensitivity gating, download-audit event, retention/
 hold hooks and deactivation-protection rule, malware-scanning extension point)
 is resolved by items 1–13 above.
+
+## ADR-023 — Records bounded context and official-record boundary
+
+**Status:** Accepted (ratified at the Prompt 08A-R gate).
+
+The Records bounded context owns **official records** and their lifecycle. It
+is positioned in the implementation sequence (`ADR-017`) at slot 7 — after
+Documents, before Workflow. It is the authoritative service for the community's
+record-of-truth: the official record of births, marriages, deaths, membership,
+appointments, community facts and administrative facts, together with the
+verification, versioning, retention, hold and evidence semantics that make a
+record authoritative and durable.
+
+The Records context owns:
+
+- **Record** — the aggregate root: an official record with a category, subject
+  references (person, household, organization unit, or an external/other
+  subject), organization scopes, classification metadata, a current-version
+  pointer, a lifecycle status, evidence references to documents, and hold
+  references.
+- **RecordVersion** — an immutable snapshot of the authoritative record facts.
+  Facts are never mutated in place once a record is Verified; a correction
+  appends a new superseding version and moves the current-version pointer.
+- **RecordCategory** — the category catalog (birth, marriage, death, membership,
+  appointment, official community, administrative) as stable string codes that
+  remain open for the ratified classification model — never a fixed enum.
+- **RetentionSchedule / RetentionRule / RetentionPeriod** — retention policy
+  owned by Records: a schedule per category, rules expressing the retention
+  period and its start trigger, and disposition policy. Retention expiry raises
+  a review flag; it never hard-destroys.
+- **RecordHold (legal / administrative)** — the hold lifecycle owned by Records.
+  An active hold freezes disposition and protects both the record and referenced
+  documents (through the Documents hold-reference hook).
+- **RecordEvidenceReference** — the Records-side link from a record to specific
+  document versions used as evidence (mirror of the Documents `DocumentReference`
+  with `SourceContext = records.record`).
+- The **Organization read-model projection** (consumed unit events, mirroring
+  Community, Knowledge and Documents; ADR-016).
+
+The Records context does **not** own: document artifacts, person identity or
+households, organizational hierarchy, workflow/task state, notification
+delivery, AI decisions, correspondence lifecycle, Knowledge/Library content, or
+financial meaning. It never stores person data (names, contact details); subject
+references are stable ids and names are resolved through the Community API at
+read time. It never reads another service's database (`ADR-018`).
+
+Boundary rules (mandatory):
+
+- **A record is never a document.** Records references documents as evidence and
+  owns record lifecycle, retention schedules and holds; Documents owns the
+  artifacts and honors retention/hold *references* only (`ADR-022`). Documents
+  never invents retention or legal policy; Records never stores or serves binary
+  content.
+- **A record is never a Workflow task.** Workflow (future) may drive
+  verification/review assignments, but task state stays in Workflow and record
+  authority stays in Records.
+- **A record is never a Correspondence letter.** Correspondence owns its
+  draft/confirm/submit/track lifecycle; Records may reference letters only as
+  evidence.
+- **Verified facts are immutable.** After `Verified`, corrections append a
+  superseding `RecordVersion`; history is preserved. No in-place mutation of
+  authoritative facts.
+- **No irreversible destruction** through normal application operations.
+  Deactivation is a soft-delete that preserves data; retention expiry never
+  destroys; disposition is review-flagged and requires a ratified override
+  process.
+- **Holds protect.** An active legal/administrative hold blocks deactivation of
+  the record and blocks deactivation of referenced held documents (Documents
+  honors the hold reference and its own deactivation-protection rule).
+- **Separation of duties.** The subject who creates a record cannot be the
+  subject who verifies it; the subject who places a hold cannot be the subject
+  who releases it; deactivation of a held record requires an explicitly
+  authorized administrative override (`records.record.admin`) with a reason.
+- **Centralized authorization.** Every guarded operation calls the Authorization
+  service through `AuthorizationGuard` (fail-closed; ADR-009/010/011/018/019).
+  No `[Authorize(Roles = "...")]`, no local RBAC, no direct Authorization
+  database access. Resource-level authorization is mandatory
+  (`resourceType = "record"`); unauthorized enumeration is prevented with
+  equivalent not-found behavior for missing and unauthorized resources.
+- **Organization scoping follows ADR-016.** Records consumes
+  `OrganizationUnitCreated/Updated/ParentChanged` into a read-model projection;
+  a record may carry a primary scope plus additional scopes; access succeeds when
+  the caller holds the permission at any of the record's scopes.
+- **AI is advisory only.** AI never verifies, corrects, rejects, holds, changes
+  retention or authorizes disposition of a record. Any AI assist is a clearly
+  marked, non-authoritative suggestion with provenance that requires human
+  review (mirroring the Knowledge `AiSuggestion` pattern).
+
+Storage topology (Accepted): PostgreSQL holds all authoritative record data.
+Database `communityos_records`, schema `records`. There is no shared database
+with any other service (ADR-018).
+
+Integration: domain events are forwarded as integration events onto the bus via
+MassTransit under `CommunityOS.Contracts.Records`; payloads carry identifiers
+and minimal lifecycle metadata only — never binary, never secrets, never names,
+never sensitive field values, never hold reasons. Records consumes Organization
+unit events (projection) and `DocumentDeactivated` / `DocumentRestored` for
+hold/evidence reconciliation. Records writes hold references onto documents
+through the Documents classify API (command), never by database.
+
+**Outbox gate (ratified; amends ADR-022's gate note).** ADR-015 (transactional
+outbox) remains deferred for services with no cross-service consumer requiring
+guaranteed delivery. Records creates the earliest mandatory gate:
+
+1. Records consumes `DocumentDeactivated` / `DocumentRestored` to reconcile the
+   protection of held/evidence documents — guaranteed delivery required before
+   that consumer is enabled (`docs/documents.md`).
+2. Audit (slot 11) will subscribe to Records compliance events
+   (`RecordVerified`, `RecordCorrected`, `RecordHoldPlaced/Released`,
+   `RecordClassified`, `RecordDeactivated/Restored`, `RecordRetentionChanged`).
+3. Workflow (slot 8) will rely on `RecordSubmitted` / `RecordVerified` for
+   verification-task reconciliation.
+
+Therefore the transactional outbox (MassTransit EF Core outbox) is a hard
+prerequisite for the Documents↔Records hold-reconciliation consumer and for any
+Audit/Workflow subscription, and must be implemented and enabled at the Records
+integration gate — **not** deferred past Records to the Correspondence/Audit
+gate. Best-effort in-process publication remains acceptable only for Records
+events with no live consumer during initial operation.
+
+Ratified decisions (Prompt 08A-R):
+
+1. **Ownership** — Records owns official records, lifecycle, verification,
+   retention schedules/rules/periods, the hold lifecycle, evidence references,
+   corrections and supersession.
+2. **Taxonomy** — the category catalog uses stable string codes
+   (`birth`, `marriage`, `death`, `membership`, `appointment`,
+   `official-community`, `administrative`); it is configuration, never a hard
+   enum, and remains open to the ratified classification model.
+3. **Lifecycle** — `Draft → Submitted → Under Review → Verified → Archived |
+   Deactivated`, plus `Rejected` (from Under Review). `Verified` is the
+   authoritative state; all transitions are guarded and audited.
+4. **Versioning** — `RecordVersion` is immutable once written; corrections after
+   verification append a superseding version and move the current-version
+   pointer; evidence references pin specific document versions.
+5. **Retention** — retention schedules, rules and periods are owned by Records;
+   expiry flags a review disposition and never auto-destroys; there is no
+   irreversible destruction through normal operations.
+6. **Holds** — the legal/administrative hold lifecycle is owned by Records; an
+   active hold freezes disposition and blocks deactivation of the record and of
+   referenced held documents; release requires a subject different from the
+   placer.
+7. **Document integration** — Records↔Documents is bidirectional: Records
+   attaches evidence through `DocumentReference`/`RecordEvidenceReference`, and
+   consumes `DocumentDeactivated`/`DocumentRestored` for protection
+   reconciliation; guaranteed delivery is required (see outbox gate).
+8. **Authorization** — the `records.*` permission matrix (below) is adopted;
+   centralized and fail-closed; resource-level (`resourceType = "record"`);
+   separation of duties is enforced by the application layer and audited.
+9. **Organization scoping** — ADR-016 read-model projection and multi-scope
+   records are adopted; person/household records may also be resource-scoped via
+   Authorization relationship tuples.
+10. **AI** — advisory-only boundary; AI is never a subject and never has
+    authority over verification, correction, holds, retention or disposition.
+11. **Events** — the event catalog below is adopted; compliance-critical events
+    require guaranteed delivery before Audit/Workflow subscribe.
+12. **Outbox** — ADR-015 must be implemented and enabled at the Records
+    integration gate (see outbox gate), amending the later gate noted in
+    ADR-022.
+13. **Data** — own database `communityos_records`, schema `records`; no shared
+    database (ADR-018).
+14. **Audit** — Records is a compliance-critical context; lifecycle,
+    correction, classification, hold, retention and sensitive-read actions emit
+    audit-targeted events and never leak PII, secrets, filenames or hold
+    reasons into events or logs.
+
+### Records permission matrix (ratified)
+
+| Permission | Purpose | Typical holder |
+|------------|---------|----------------|
+| `records.record.create` | Create a Draft record | clerks / services |
+| `records.record.read` | List and read non-sensitive record metadata/fields | authorized readers |
+| `records.record.read.sensitive` | Read sensitive record fields | higher-privilege readers |
+| `records.record.update` | Update non-authoritative fields of a Draft/Under-Review record | clerks |
+| `records.record.submit` | `Draft → Submitted` | clerks |
+| `records.record.verify` | `Submitted → Under Review` and `Under Review → Verified`; `→ Rejected` (separation of duties: not the creator) | verifiers / institutions |
+| `records.record.correct` | Apply a post-verification correction (new superseding version) | verifiers / administrators |
+| `records.record.archive` | `Verified → Archived` | administrators |
+| `records.record.deactivate` | `→ Deactivated` (soft-delete; blocked by active holds) | administrators |
+| `records.record.restore` | Restore from `Archived`/`Deactivated` | administrators |
+| `records.record.classify` | Set classification, sensitive flag, retention schedule reference | classifiers / Records service |
+| `records.record.evidence.manage` | Attach/remove document evidence references | clerks / verifiers |
+| `records.retention.manage` | Manage retention schedules, rules and periods | administrators |
+| `records.hold.manage` | Place/release legal or administrative holds | administrators / legal officer |
+| `records.category.manage` | Manage the category catalog | administrators |
+| `records.record.admin` | Administrative overrides (hold-protected deactivation, forensics) | operators |
+
+Scope semantics follow `ADR-011`: data permissions are organization-scoped; a
+grant at a national scope covers descendant units via the Organization `/covers`
+hierarchy resolution. A global grant of a data permission only applies to checks
+with no organization context. Per-record access composes through Authorization
+relationship tuples; Records never evaluates grants itself. `records.record.ai.review`
+is reserved for the future AI-assist feature and is not part of the core matrix
+(AI Platform, slot 15).
+
+### Records integration events (`CommunityOS.Contracts.Records`)
+
+Names and payloads below are the ratified baseline; each record carries a
+trailing `DateTime OccurredOn`. Only stable ids and minimal lifecycle metadata
+are exported — no binary, no secrets, no names, no sensitive field values, no
+hold reasons.
+
+| Event | Raised when | Key fields |
+|-------|-------------|-----------|
+| `RecordCreated` | A Draft record is created | `RecordId`, `Category`, `Status`, `SubjectType`, `SubjectId`, `OrganizationUnitId`, `CreatedBy` |
+| `RecordSubmitted` | `Draft → Submitted` | `RecordId`, `Status` |
+| `RecordUnderReview` | `Submitted → Under Review` | `RecordId`, `ReviewerId` |
+| `RecordVerified` | `Under Review → Verified` | `RecordId`, `VerifiedBy` |
+| `RecordRejected` | `Under Review → Rejected` | `RecordId`, `RejectedBy` |
+| `RecordCorrected` | A post-verification correction is applied | `RecordId`, `VersionNumber`, `SupersedesVersionNumber`, `CorrectedBy` |
+| `RecordArchived` | `Verified → Archived` | `RecordId` |
+| `RecordDeactivated` | `→ Deactivated` | `RecordId` |
+| `RecordRestored` | Restored from `Archived`/`Deactivated` | `RecordId`, `Status` |
+| `RecordClassified` | Classification/sensitivity/retention/hold assignment | `RecordId`, `ClassificationCode`, `IsSensitive` |
+| `RecordHoldPlaced` | A legal/administrative hold is placed | `HoldId`, `RecordId`, `HoldType`, `PlacedBy` |
+| `RecordHoldReleased` | A hold is released | `HoldId`, `RecordId`, `HoldType`, `ReleasedBy` |
+| `RecordRetentionChanged` | Retention schedule/period changes | `RecordId`, `RetentionScheduleCode`, `RetentionPeriod` |
+| `RecordEvidenceAttached` | A document version is attached as evidence | `RecordId`, `DocumentId`, `VersionNumber`, `ReferenceType` |
+| `RecordEvidenceRemoved` | Evidence is removed | `RecordId`, `DocumentId`, `VersionNumber` |
+| `RecordRetentionExpired` | Retention expiry is flagged for review (never destroys) | `RecordId`, `RetentionScheduleCode`, `ExpiredOn` |
+
+Deliberately **not exported**: field-level edits (consumers read fields through
+the API), category catalog changes, hold reasons (sensitive), person names
+(resolved through Community API), and document filenames (resolved through the
+Documents API).
+
+Superseded decisions: none. Records has no prior Proposed baseline; the
+documented-but-unenforced examples in `PermissionCatalog.DocumentedExamples`
+(`records.record.read/create/verify`) are superseded by the ratified matrix
+above and will be registered in the Authorization permission catalog at the
+Prompt 08B implementation gate.
