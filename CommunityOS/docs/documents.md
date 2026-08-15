@@ -411,7 +411,7 @@ hooks only, without inventing legal policy:
 | `AuthorizationService` | `BaseUrl` / `AccessToken` / `ClientId` | *(see runbook)* | Authorization check API configuration |
 | `Documents` | `InternalClientId` | `communityos-authorization` | Trusted in-process caller (reserved) |
 | `Documents:Storage` | `Endpoint` / `AccessKey` / `SecretKey` / `Bucket` / `UseHttp` | MinIO local | S3-compatible object storage |
-| `Documents:Storage` | `EncryptionAtRest` | `false` | Recorded storage-layer encryption status |
+| `Documents:Storage` | `EncryptionAtRest` | `true` | AES256 server-side encryption on write |
 | `Documents:Upload` | `MaxFileSizeBytes` | 52428800 (50 MiB) | Maximum upload size |
 | `Documents:Upload` | `AllowedMimeTypes` | *(allowlist above)* | Allowed content types |
 | `Documents:Integrity` | `VerifyHashOnRead` | `true` | Recompute SHA-256 on download |

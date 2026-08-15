@@ -32,5 +32,30 @@ services:
       - "5341:5341"
       - "8081:80"
 
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: communityos
+      MINIO_ROOT_PASSWORD: communityos
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  # Creates the Documents object-storage bucket on first boot (idempotent).
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 communityos communityos;
+      mc mb --ignore-existing local/communityos-documents;
+      exit 0;
+      "
+
 volumes:
   postgres_data:
+  minio_data:

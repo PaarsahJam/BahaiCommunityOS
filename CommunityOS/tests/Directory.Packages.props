@@ -13,6 +13,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing"                Version="9.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql"                       Version="4.1.0" />
     <PackageVersion Include="Testcontainers.RabbitMq"                         Version="4.1.0" />
+    <PackageVersion Include="Testcontainers.Minio"                            Version="4.1.0" />
     <PackageVersion Include="Bogus"                                           Version="35.6.1" />
     <PackageVersion Include="coverlet.collector"                              Version="6.0.4" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection"         Version="9.0.0" />

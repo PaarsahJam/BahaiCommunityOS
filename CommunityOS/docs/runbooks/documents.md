@@ -1,10 +1,10 @@
 # Documents Service Runbook
 
-> **STATUS: RATIFIED (Prompt 07A-R).** Operational notes for the future
-> Documents service (ADR-022 Accepted, `docs/documents.md` ratified).
-> Implementation-time steps (project scaffolding, database creation, migrations,
-> container additions) are listed here so they are not forgotten, but are
-> **not** performed in this prompt.
+> **STATUS: RATIFIED (Prompt 07A-R); IMPLEMENTED (Prompt 07B).**
+> Operational notes for the Documents service (ADR-022 Accepted,
+> `docs/documents.md` ratified). The implementation-time steps below
+> (project scaffolding, database creation, migrations, container additions)
+> were performed in Prompt 07B.
 
 ## Services
 
@@ -101,7 +101,7 @@ dotnet ef migrations has-pending-model-changes \
   S3-compatible provider is a configuration change. The concrete client is
   **AWSSDK.S3**; only the Infrastructure adapter references it.
 - Object keys are content-addressed: `documents/{sha256}`.
-- Bucket: one per environment (e.g. `communityos-documents-dev`).
+- Bucket: one per environment (e.g. `communityos-documents` in local docker).
 - Enable bucket versioning and (where available) replication for DR.
 
 ### MinIO health and operations
@@ -111,7 +111,7 @@ dotnet ef migrations has-pending-model-changes \
 
   ```sh
   mc alias set minio http://localhost:9000 <access> <secret>
-  mc mirror minio/communityos-documents-dev ./documents-backup
+  mc mirror minio/communityos-documents ./documents-backup
   ```
 
 ## Configuration (ratified)
@@ -128,9 +128,9 @@ dotnet ef migrations has-pending-model-changes \
 | `AuthorizationService:ClientId` | | `communityos-documents` | Audit identifier |
 | `Documents:Storage:Endpoint` | | `localhost:9000` | S3-compatible endpoint |
 | `Documents:Storage:AccessKey` / `SecretKey` | | MinIO credentials | Object storage credentials |
-| `Documents:Storage:Bucket` | | `communityos-documents-dev` | Bucket name |
+| `Documents:Storage:Bucket` | | `communityos-documents` | Bucket name |
 | `Documents:Storage:UseHttp` | | `true` *(local)* / `false` *(prod)* | Secure transport in prod |
-| `Documents:Storage:EncryptionAtRest` | | `false` | Recorded storage-layer encryption status |
+| `Documents:Storage:EncryptionAtRest` | | `true` | AES256 server-side encryption on write |
 | `Documents:Upload:MaxFileSizeBytes` | | `52428800` | Maximum upload size (50 MiB) |
 | `Documents:Upload:AllowedMimeTypes` | | *(allowlist)* | Allowed content types |
 | `Documents:Integrity:VerifyHashOnRead` | | `true` | Recompute SHA-256 on download |

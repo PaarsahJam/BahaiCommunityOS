@@ -48,6 +48,11 @@
     <PackageVersion Include="MassTransit.EntityFrameworkCore"                 Version="8.3.6" />
   </ItemGroup>
 
+  <!-- Object storage -->
+  <ItemGroup>
+    <PackageVersion Include="AWSSDK.S3"                                      Version="3.7.401.2" />
+  </ItemGroup>
+
   <!-- Caching -->
   <ItemGroup>
     <PackageVersion Include="StackExchange.Redis"                             Version="2.8.16" />
@@ -86,6 +91,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing"                Version="9.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql"                       Version="4.1.0" />
     <PackageVersion Include="Testcontainers.RabbitMq"                         Version="4.1.0" />
+    <PackageVersion Include="Testcontainers.Minio"                            Version="4.1.0" />
     <PackageVersion Include="Bogus"                                           Version="35.6.1" />
     <PackageVersion Include="coverlet.collector"                              Version="6.0.4" />
   </ItemGroup>
