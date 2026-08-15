@@ -149,6 +149,19 @@ resolved live by the Authorization service).
   existing version (idempotent), never a duplicate row.
 - Versions reference the content-addressed object key `documents/{sha256}`;
   the database is the authority for the version → object mapping.
+- **Binary content never passes through the API as a payload.** Uploads arrive
+  as `multipart/form-data` streams; downloads are streamed byte responses.
+  Binary content never appears in a JSON request/response, an integration
+  event, a log line, a search index, or an AI pipeline input.
+- **Unauthorized enumeration is prevented.** List/search returns only
+  documents the caller may read (fail-closed filtering at the query boundary);
+  `GET /documents/{id}` returns `404` for both *missing* and *not readable*
+  documents — no existence oracle is exposed to callers who lack read access.
+- **Resource-level authorization is explicit.** Every guarded operation passes
+  `resourceType = "document"` and the document id as resource context to the
+  Authorization check API, so per-document grants (Authorization relationship
+  tuples) and organization-scoped grants compose exactly as in
+  Community/Organization/Knowledge.
 
 ## Privacy and permissions
 
@@ -183,6 +196,28 @@ hierarchy resolution (Organization `/covers`). A global grant of a data
 permission only applies to checks with no organization context. Per-document
 grants use Authorization relationship tuples; Documents never evaluates them
 itself.
+
+### Resource-level authorization
+
+- Every guarded operation calls the Authorization check API with
+  `resourceType = "document"`, the document id as `resourceId`, and the
+  effective organization-unit scope (primary scope by default; access succeeds
+  when the permission is effective at **any** of the document's scopes).
+- Organization-scoped grants and per-document relationship-tuple grants compose
+  through the Authorization service — Documents implements neither.
+- Fail-closed: any inability to establish the grant (unreachable Authorization
+  service, unknown scope, missing tuple) is a Deny (`403`).
+
+### Unauthorized enumeration
+
+- List/search applies fail-closed read filtering: the query returns only rows
+  the caller is authorized to read; it never returns a count or marker of
+  documents the caller cannot read.
+- `GET /documents/{id}` and all version/content lookups return `404` for
+  missing **and** unauthorized documents alike (no existence oracle).
+- Download attempts on sensitive documents without
+  `documents.document.content.read.sensitive` are denied without revealing that
+  the document exists.
 
 ### Metadata exposure
 
@@ -240,6 +275,51 @@ exported — no binary content, no secrets, no filenames, no names.
 
 Deliberately **not exported** as separate events: file name changes (filename is
 sensitive metadata; consumers resolve it through the API) and per-title edits.
+
+### Event delivery and outbox readiness
+
+Publication is best-effort in-process today (ADR-015 outbox deferred). For
+Documents this is **safe for every event at implementation time**, because no
+Documents event has a live consumer yet — a dropped event today can only delay
+a future read model, never corrupt authoritative state.
+
+| Consumer | Guaranteed delivery required | When |
+|----------|------------------------------|------|
+| Search indexing | No — best-effort; re-index reconciles | always safe |
+| Workflow task reconciliation | No (recommended later) — workflow can re-query the Documents API | safe best-effort now |
+| Notifications | No — notification loss is tolerable | safe best-effort now |
+| **Audit (compliance trail)** | **Yes** — `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded` (sensitive reads), `DocumentScanCompleted` (rejected scans) must not be lost | required before Audit is implemented (outbox gate) |
+| **Records (hold/retention reconciliation)** | **Yes** — `DocumentDeactivated`/`DocumentRestored` protect held documents | required before Records integration |
+| **Correspondence (letter submission)** | **Yes** — the immutable submitted-letter version event must be reliable at submission time | required before Correspondence is implemented |
+
+Conclusion: no Documents event requires guaranteed delivery for the service
+itself; the outbox (ADR-015) becomes mandatory at the Correspondence/Audit
+gate, consistent with the platform roadmap.
+
+## Dependency map
+
+```
+Community ──┐   (person refs: creators/owners; never owns persons)
+Organization ─┼──►  Documents  ──►  (event consumers, future)
+Authorization ─┘     ▲  │              │
+Identity (authN)     │  └── Events ──►  Audit / Search / Workflow /
+                     │                   Notifications / Records / Correspondence
+                     │  ◄── consumes OrganizationUnitCreated/Updated/ParentChanged
+                     │      (read-model projection, ADR-016)
+                     └── resolves names via Community API (read time)
+```
+
+- **Depends on (existing):** Identity (authentication), Authorization
+  (AuthorizationGuard over the check API), Organization (unit events + scope
+  references), Community (person-id references resolved at read time).
+- **Does not depend on (yet):** Knowledge, Search, Workflow, Notifications,
+  Records, Correspondence, Finance, Administration, AI — Documents is a leaf
+  service today.
+- **Provides for (future):** Records (evidence via `DocumentReference`),
+  Workflow (artifacts under review), Correspondence (immutable letter
+  versions), Finance/Ticketing (receipts/attachments), Audit (event stream),
+  Search (indexing), AI Platform (metadata + extracted text only, never
+  binary, never authoritative).
 
 ## Data
 

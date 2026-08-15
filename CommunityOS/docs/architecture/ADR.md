@@ -356,7 +356,12 @@ Integration: domain events are forwarded as integration events onto the bus via
 MassTransit under `CommunityOS.Contracts.Documents`; payloads carry identifiers
 and minimal metadata only — never binary content, never secrets, never
 filenames, never names. Documents consumes Organization unit events into its
-read-model projection. ADR-015 (transactional outbox) remains deferred.
+read-model projection. ADR-015 (transactional outbox) remains deferred: no
+Documents event requires guaranteed delivery at implementation time (no live
+consumers), but guaranteed delivery becomes mandatory for the compliance-
+critical subset (classification/deactivation/restore/sensitive-download/scan
+events) once Audit, Records and Correspondence subscribe. The outbox therefore
+must land at the Correspondence/Audit gate, not before Documents.
 
 Open decisions pending ratification (recorded in `docs/documents.md`):
 permission matrix, sensitivity gating, download-audit event for sensitive
