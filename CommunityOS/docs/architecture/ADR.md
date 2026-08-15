@@ -139,6 +139,28 @@ require guaranteed delivery; the MassTransit EF Core outbox is the intended
 mechanism. Until then, publishers remain best-effort in-process delivery, and
 this limitation is tracked for removal.
 
+**Amendment (Prompt 08A-R2):** the first cross-service consumer requiring
+guaranteed delivery has been identified. Records (ADR-017 slot 7) consumes
+`DocumentDeactivated`/`DocumentRestored` to reconcile the protection of held
+and evidence documents, and its compliance-critical events (`RecordVerified`,
+`RecordCorrected`, `RecordHoldPlaced/Released`, `RecordClassified`,
+`RecordDeactivated/Restored`, `RecordRetentionChanged`, and any event consumed
+by Audit or Workflow) require reliable delivery. The outbox implementation gate
+is therefore pulled forward to the **Records integration gate** — before
+Records begins consuming `DocumentDeactivated`/`DocumentRestored`, and before
+any Audit/Workflow subscription. The resulting rule is unambiguous:
+
+- Best-effort integration events remain acceptable where there is **no**
+  guaranteed-delivery consumer.
+- The transactional outbox is mandatory **before Records begins consuming**
+  `DocumentDeactivated`/`DocumentRestored`.
+- The outbox must also protect Records events that require guaranteed delivery
+  to Audit, Workflow and any future consumer.
+- This amendment does **not** implement the outbox; implementation is scheduled
+  at the Records integration gate (Prompt 08B). This supersedes the earlier
+  "Correspondence/Audit gate" phrasing in ADR-022 and `docs/documents.md`,
+  which are amended below.
+
 ## ADR-016 — Organization bounded context and Community boundary
 
 **Status:** Accepted (ratified at architecture reconciliation).
@@ -365,8 +387,10 @@ read-model projection. ADR-015 (transactional outbox) remains deferred: no
 Documents event requires guaranteed delivery at implementation time (no live
 consumers), but guaranteed delivery becomes mandatory for the compliance-
 critical subset (classification/deactivation/restore/sensitive-download/scan
-events) once Audit, Records and Correspondence subscribe. The outbox therefore
-must land at the Correspondence/Audit gate, not before Documents.
+events) once Audit, Records and Correspondence subscribe. Per the ADR-015
+amendment (Prompt 08A-R2), the outbox therefore must land at the **Records
+integration gate** — the earliest guaranteed-delivery consumer — not before
+Documents.
 
 Ratified decisions (Prompt 07A-R):
 
@@ -408,7 +432,9 @@ Ratified decisions (Prompt 07A-R):
 10. **Event delivery** — the existing open-generic integration-event publisher
     pattern is used; the transactional outbox is not implemented (ADR-015
     remains deferred); guaranteed delivery is documented as a requirement for
-    Audit, Records and Correspondence before those consumers are introduced.
+    Audit, Records and Correspondence before those consumers are introduced,
+    with the outbox gate pulled forward to the Records integration gate
+    (ADR-015 amendment, Prompt 08A-R2).
 11. **Object-storage SDK** — **AWSSDK.S3** is the concrete S3-compatible client;
     MinIO is the initial deployment target; application/domain layers depend
     only on `IDocumentObjectStorage`.
@@ -526,9 +552,10 @@ unit events (projection) and `DocumentDeactivated` / `DocumentRestored` for
 hold/evidence reconciliation. Records writes hold references onto documents
 through the Documents classify API (command), never by database.
 
-**Outbox gate (ratified; amends ADR-022's gate note).** ADR-015 (transactional
-outbox) remains deferred for services with no cross-service consumer requiring
-guaranteed delivery. Records creates the earliest mandatory gate:
+**Outbox gate (ratified; consistent with the ADR-015 amendment, Prompt
+08A-R2).** ADR-015 (transactional outbox) remains deferred for services with
+no cross-service consumer requiring guaranteed delivery. Records creates the
+earliest mandatory gate:
 
 1. Records consumes `DocumentDeactivated` / `DocumentRestored` to reconcile the
    protection of held/evidence documents — guaranteed delivery required before
@@ -546,6 +573,13 @@ integration gate — **not** deferred past Records to the Correspondence/Audit
 gate. Best-effort in-process publication remains acceptable only for Records
 events with no live consumer during initial operation.
 
+The guaranteed-delivery rule is **non-exhaustive by design**: any Records
+integration event consumed by a guaranteed-delivery consumer (Audit, Workflow,
+or any future consumer) is outbox-protected whether or not its name appears in
+a delivery table. A future implementation must never publish a
+compliance-critical event best-effort merely because its name is absent from
+the table.
+
 Ratified decisions (Prompt 08A-R):
 
 1. **Ownership** — Records owns official records, lifecycle, verification,
@@ -557,7 +591,10 @@ Ratified decisions (Prompt 08A-R):
    enum, and remains open to the ratified classification model.
 3. **Lifecycle** — `Draft → Submitted → Under Review → Verified → Archived |
    Deactivated`, plus `Rejected` (from Under Review). `Verified` is the
-   authoritative state; all transitions are guarded and audited.
+   authoritative state; all transitions are guarded and audited. Non-
+   authoritative fields remain editable in `Draft`, `Submitted` and `Under
+   Review`; from `Verified` onward field changes require the `correct`
+   operation (new superseding version), never in-place mutation.
 4. **Versioning** — `RecordVersion` is immutable once written; corrections after
    verification append a superseding version and move the current-version
    pointer; evidence references pin specific document versions.
@@ -583,8 +620,8 @@ Ratified decisions (Prompt 08A-R):
 11. **Events** — the event catalog below is adopted; compliance-critical events
     require guaranteed delivery before Audit/Workflow subscribe.
 12. **Outbox** — ADR-015 must be implemented and enabled at the Records
-    integration gate (see outbox gate), amending the later gate noted in
-    ADR-022.
+    integration gate (see outbox gate), consistent with the ADR-015 amendment
+    (Prompt 08A-R2) and superseding the later gate noted in ADR-022.
 13. **Data** — own database `communityos_records`, schema `records`; no shared
     database (ADR-018).
 14. **Audit** — Records is a compliance-critical context; lifecycle,
@@ -599,7 +636,7 @@ Ratified decisions (Prompt 08A-R):
 | `records.record.create` | Create a Draft record | clerks / services |
 | `records.record.read` | List and read non-sensitive record metadata/fields | authorized readers |
 | `records.record.read.sensitive` | Read sensitive record fields | higher-privilege readers |
-| `records.record.update` | Update non-authoritative fields of a Draft/Under-Review record | clerks |
+| `records.record.update` | Update non-authoritative fields of a Draft/Submitted/Under-Review record | clerks |
 | `records.record.submit` | `Draft → Submitted` | clerks |
 | `records.record.verify` | `Submitted → Under Review` and `Under Review → Verified`; `→ Rejected` (separation of duties: not the creator) | verifiers / institutions |
 | `records.record.correct` | Apply a post-verification correction (new superseding version) | verifiers / administrators |
@@ -607,6 +644,7 @@ Ratified decisions (Prompt 08A-R):
 | `records.record.deactivate` | `→ Deactivated` (soft-delete; blocked by active holds) | administrators |
 | `records.record.restore` | Restore from `Archived`/`Deactivated` | administrators |
 | `records.record.classify` | Set classification, sensitive flag, retention schedule reference | classifiers / Records service |
+| `records.record.scope.manage` | Add/remove organization scopes (changes effective audience) | administrators |
 | `records.record.evidence.manage` | Attach/remove document evidence references | clerks / verifiers |
 | `records.retention.manage` | Manage retention schedules, rules and periods | administrators |
 | `records.hold.manage` | Place/release legal or administrative holds | administrators / legal officer |
@@ -651,6 +689,12 @@ Deliberately **not exported**: field-level edits (consumers read fields through
 the API), category catalog changes, hold reasons (sensitive), person names
 (resolved through Community API), and document filenames (resolved through the
 Documents API).
+
+**Hold coverage (resolve via API):** `RecordHoldPlaced`/`RecordHoldReleased`
+intentionally carry no document references. Consumers that need document-level
+hold coverage must resolve the hold's document scope through the Records API
+(`GET /holds/{id}`) rather than expecting those references in the integration
+event. No PII or unnecessary document metadata is added to the events.
 
 Superseded decisions: none. Records has no prior Proposed baseline; the
 documented-but-unenforced examples in `PermissionCatalog.DocumentedExamples`

@@ -52,7 +52,9 @@ legal/administrative hold lifecycle); Documents carries only retention/hold
   applied uniformly.
 - **Lifecycle** — `Draft → Submitted → Under Review → Verified → Archived |
   Deactivated`, plus `Rejected` (from `Under Review`). `Verified` is the
-  authoritative state.
+  authoritative state. Non-authoritative fields remain editable in `Draft`,
+  `Submitted` and `Under Review`; from `Verified` onward field changes require
+  the `correct` operation (new superseding version), never in-place mutation.
 - **Subject references** — `SubjectType` (`Person` | `Household` |
   `OrganizationUnit` | `Other`) and `SubjectId`. Person/household ids are stable
   references resolved through the Community API; never names or PII stored
@@ -176,6 +178,10 @@ Authorization service).
 - **A verified record is immutable.** After `Verified`, facts are never mutated
   in place; a correction appends a superseding `RecordVersion` and moves the
   current-version pointer.
+- **Working fields stay editable until verification.** Non-authoritative fields
+  may be updated in `Draft`, `Submitted` and `Under Review`
+  (`records.record.update`). Once `Verified`, field changes require the
+  `correct` operation with a change reason — never an in-place update.
 - **Metadata changes do not create versions.** Only authoritative fact changes
   create versions; classification, scopes, retention and hold changes mutate the
   record and are audited through events.
@@ -224,7 +230,7 @@ Authorization database access (`ADR-009/018/019`).
 | `records.record.create` | Create a Draft record | clerks / services |
 | `records.record.read` | List and read non-sensitive record metadata/fields | authorized readers |
 | `records.record.read.sensitive` | Read sensitive record fields | higher-privilege readers |
-| `records.record.update` | Update non-authoritative fields of a Draft/Under-Review record | clerks |
+| `records.record.update` | Update non-authoritative fields of a Draft/Submitted/Under-Review record | clerks |
 | `records.record.submit` | `Draft → Submitted` | clerks |
 | `records.record.verify` | `Submitted → Under Review` and `Under Review → Verified`; `→ Rejected` (separation of duties: not the creator) | verifiers / institutions |
 | `records.record.correct` | Apply a post-verification correction (new superseding version) | verifiers / administrators |
@@ -232,6 +238,7 @@ Authorization database access (`ADR-009/018/019`).
 | `records.record.deactivate` | `→ Deactivated` (soft-delete; blocked by active holds) | administrators |
 | `records.record.restore` | Restore from `Archived`/`Deactivated` | administrators |
 | `records.record.classify` | Set classification, sensitive flag, retention schedule reference | classifiers / Records service |
+| `records.record.scope.manage` | Add/remove organization scopes (changes effective audience) | administrators |
 | `records.record.evidence.manage` | Attach/remove document evidence references | clerks / verifiers |
 | `records.retention.manage` | Manage retention schedules, rules and periods | administrators |
 | `records.hold.manage` | Place/release legal or administrative holds | administrators / legal officer |
@@ -313,7 +320,11 @@ exposed; DTOs are returned.
   reference/classify surface (`SourceContext = records.record`) and consumes
   `DocumentDeactivated`/`DocumentRestored` to reconcile the protection of
   held/evidence documents. Guaranteed delivery is required for that consumer
-  (see Outbox gate). Records never reads the Documents database.
+  (see Outbox gate). Records never reads the Documents database. **Note:
+  `POST /documents/{id}/classify` is a full-replacement operation** — when
+  Records places or releases a hold it must read and resubmit the document's
+  existing classification/sensitive/retention values alongside the changed hold
+  reference, or those values would be overwritten (see the runbook).
 - **Authorization** — Records never reads the Authorization database.
   `AuthorizationGuard` is bound to the same HTTP evaluator
   (`HttpAuthorizationEvaluator`) as every other service, calling the
@@ -353,6 +364,13 @@ the API), category catalog changes, hold reasons (sensitive), person names
 (resolved through Community API), and document filenames (resolved through the
 Documents API).
 
+**Hold coverage (resolve via API):** `RecordHoldPlaced`/`RecordHoldReleased`
+intentionally carry no document references. Consumers that need document-level
+hold coverage (e.g. which documents a hold protects) must resolve the hold's
+document scope through the Records API (`GET /holds/{id}`) rather than
+expecting those references in the integration event. No PII or unnecessary
+document metadata is added to the events.
+
 ### Event delivery and outbox gate
 
 Publication is best-effort in-process today (ADR-015 outbox deferred). For
@@ -370,9 +388,16 @@ consumers create a hard guaranteed-delivery prerequisite:
 **Ratified decision:** the transactional outbox (ADR-015; MassTransit EF Core
 outbox) is a hard prerequisite for the Documents↔Records hold-reconciliation
 consumer and for any Audit/Workflow subscription, and must be implemented and
-enabled at the Records integration gate — not deferred past Records. This
-amends the later Correspondence/Audit gate noted in ADR-022, because Records
-(slot 7) is the earliest service with a guaranteed-delivery consumer.
+enabled at the Records integration gate — not deferred past Records. This is
+consistent with the ADR-015 amendment (Prompt 08A-R2) and supersedes the later
+Correspondence/Audit gate noted in ADR-022, because Records (slot 7) is the
+earliest service with a guaranteed-delivery consumer.
+
+The table above is **non-exhaustive by design**: any Records integration event
+consumed by a guaranteed-delivery consumer (Audit, Workflow, or any future
+consumer) is outbox-protected whether or not its name appears in the table. A
+future implementation must never publish a compliance-critical event
+best-effort merely because its name is absent from the table.
 
 ## Dependency map
 

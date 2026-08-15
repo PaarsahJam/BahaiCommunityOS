@@ -29,9 +29,10 @@
    `HttpAuthorizationEvaluator` + `AuthorizationGuard`, and the open-generic
    `INotificationHandler<>` integration publisher — following the existing
    wiring exactly.
-5. Register the ratified `records.*` permission matrix in the Authorization
-   permission catalog (supersedes the `records.record.read/create/verify`
-   documented examples).
+5. Register the ratified `records.*` permission matrix (17 permissions,
+   including `records.record.scope.manage`) in the Authorization permission
+   catalog (supersedes the `records.record.read/create/verify` documented
+   examples).
 6. Implement the `OrganizationUnitCreated/Updated/ParentChanged` consumer into
    `organization_unit_references` (ADR-016 pattern).
 7. Implement the `DocumentDeactivated`/`DocumentRestored` consumer for
@@ -40,6 +41,16 @@
 8. Configure the `DocumentsService` section so Records can command the
    Documents reference/classify surface as the `communityos-records` service
    principal (evidence attachment, hold references).
+
+> **Classify is a full-replacement operation (implementation note).**
+> `POST /documents/{id}/classify` replaces the document's entire classification
+> metadata (classification code, sensitive flag, retention category, and both
+> hold references) in a single write. When Records places or releases a hold
+> through that API, it must first read the document's current classification
+> metadata and resubmit the existing classification/sensitive/retention values
+> alongside the changed hold reference — otherwise those values are
+> unintentionally overwritten with defaults. This is a Prompt 08B Records-side
+> implementation concern; the Documents contract itself is correct.
 
 ## Outbox gate (ADR-015)
 
@@ -50,9 +61,14 @@ The transactional outbox is a **hard prerequisite** before:
   consumer, and
 - any Audit or Workflow subscription to `CommunityOS.Contracts.Records`.
 
-The MassTransit EF Core outbox is the intended mechanism (ADR-015). Records is
-the earliest service with a guaranteed-delivery consumer, so the outbox lands at
-the Records integration gate — not deferred to the Correspondence/Audit gate.
+The MassTransit EF Core outbox is the intended mechanism (ADR-015, amended at
+Prompt 08A-R2). Records is the earliest service with a guaranteed-delivery
+consumer, so the outbox lands at the Records integration gate — not deferred
+to the Correspondence/Audit gate. The outbox-protected set is **non-exhaustive
+by design**: any Records event consumed by a guaranteed-delivery consumer
+(Audit, Workflow, or any future consumer) is protected whether or not it is
+listed in `docs/records.md`; never publish a compliance-critical event
+best-effort merely because its name is absent from the table.
 
 ## Local development
 

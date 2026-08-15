@@ -293,8 +293,9 @@ a future read model, never corrupt authoritative state.
 | **Correspondence (letter submission)** | **Yes** — the immutable submitted-letter version event must be reliable at submission time | required before Correspondence is implemented |
 
 Conclusion: no Documents event requires guaranteed delivery for the service
-itself; the outbox (ADR-015) becomes mandatory at the Correspondence/Audit
-gate, consistent with the platform roadmap.
+itself. Per the ADR-015 amendment (Prompt 08A-R2), the outbox (ADR-015) becomes
+mandatory at the **Records integration gate** — the earliest guaranteed-delivery
+consumer — not at the Correspondence/Audit gate.
 
 ## Dependency map
 

@@ -20,7 +20,7 @@ Documents API.
 | GET | `/records/{id}` | `records.record.read` | Get record metadata, current version descriptors, evidence and hold references (non-sensitive fields) |
 | GET | `/records/{id}/sensitive` | `records.record.read.sensitive` | Get the sensitive fields of the record |
 | POST | `/records` | `records.record.create` | Create a Draft record |
-| PUT | `/records/{id}/fields` | `records.record.update` | Update non-authoritative fields of a Draft/Under-Review record |
+| PUT | `/records/{id}/fields` | `records.record.update` | Update non-authoritative fields of a Draft/Submitted/Under-Review record |
 | POST | `/records/{id}/submit` | `records.record.submit` | Transition `Draft → Submitted` |
 | POST | `/records/{id}/under-review` | `records.record.verify` | Transition `Submitted → Under Review` |
 | POST | `/records/{id}/verify` | `records.record.verify` | Transition `Under Review → Verified` (creator excluded) |
@@ -30,8 +30,8 @@ Documents API.
 | POST | `/records/{id}/archive` | `records.record.archive` | Transition `Verified → Archived` |
 | POST | `/records/{id}/deactivate` | `records.record.deactivate` | Transition to `Deactivated` (soft-delete; blocked by active holds) |
 | POST | `/records/{id}/restore` | `records.record.restore` | Restore from `Archived`/`Deactivated` |
-| POST | `/records/{id}/scopes` | `records.record.classify` | Add an organization scope |
-| DELETE | `/records/{id}/scopes/{organizationUnitId}` | `records.record.classify` | Remove an organization scope |
+| POST | `/records/{id}/scopes` | `records.record.scope.manage` | Add an organization scope |
+| DELETE | `/records/{id}/scopes/{organizationUnitId}` | `records.record.scope.manage` | Remove an organization scope |
 
 **Create** body:
 
@@ -48,9 +48,10 @@ Documents API.
 }
 ```
 
-The record is created in `Draft`. Only `Draft`/`Submitted`/`Under Review`
-records accept field updates; a `Verified` record requires the `correct`
-endpoint.
+The record is created in `Draft`. Non-authoritative fields remain editable in
+`Draft`, `Submitted` and `Under Review` (`records.record.update`); a `Verified`
+record requires the `correct` endpoint, which appends a superseding version and
+never mutates the authoritative baseline in place.
 
 **Classify** body:
 
@@ -149,6 +150,10 @@ its own deactivation-protection rule.
 `records.hold.manage`; it is never exported in events or logs. Deactivating a
 record with an active hold returns `409` unless the actor holds
 `records.record.admin` and supplies a reason.
+
+`RecordHoldPlaced`/`RecordHoldReleased` intentionally carry no document
+references. Consumers needing document-level hold coverage resolve it through
+this endpoint (`GET /holds/{id}`), not through the integration events.
 
 ## Retention — `/retention`
 
