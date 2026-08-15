@@ -1,10 +1,10 @@
 # Documents Service
 
-> **STATUS: ARCHITECTURE PROPOSED (Prompt 07A).** This document is the proposed
-> specification for the Documents bounded context. It has **not** been
-> implemented. Items marked **[PROPOSED]** are architectural decisions awaiting
-> ratification before implementation (Prompt 07B). No source code exists for
-> this service.
+> **STATUS: RATIFIED (Prompt 07A-R).** The architectural decisions for the
+> Documents bounded context have been ratified in ADR-022 (Accepted) and
+> recorded in this document. The service itself is **not yet implemented**;
+> implementation proceeds in Prompt 07B. Decisions are binding unless a later
+> ratified ADR amends them.
 
 The Documents bounded context owns document **artifacts** and their metadata:
 the named, versioned, immutable binary content that other bounded contexts
@@ -88,8 +88,8 @@ code, not a fixed enum.
   classification level code. No fixed allowed set until the model is ratified.
 - **IsSensitive** — `bool` (default `false`). Operational gate: when `true`,
   content downloads require `documents.document.content.read.sensitive` and
-  emit a download-audit event [PROPOSED]. This is an operational primitive, not
-  a classification level.
+  emit the `DocumentContentDownloaded` audit event (ratified). This is an
+  operational primitive, not a classification level.
 - **RetentionCategory** — nullable string reference to a future Records
   retention category. Documents does not enforce schedules.
 - **LegalHoldReference / AdministrativeHoldReference** — nullable references to
@@ -171,7 +171,7 @@ service through `AuthorizationGuard` (fail-closed). No `[Authorize(Roles =
 "...")]`, no local RBAC, no direct Authorization database access
 (`ADR-009/018/019`).
 
-### Permission matrix [PROPOSED]
+### Permission matrix (ratified)
 
 | Permission | Purpose | Typical holder |
 |------------|---------|----------------|
@@ -271,7 +271,7 @@ exported — no binary content, no secrets, no filenames, no names.
 | `DocumentDeactivated` | `Active/Archived → Deactivated` | `DocumentId` |
 | `DocumentRestored` | `Deactivated/Archived → Active` | `DocumentId`, `Status` |
 | `DocumentScanCompleted` | A scan finishes (only when scanning enabled) | `DocumentId`, `VersionId`, `ScanStatus` |
-| `DocumentContentDownloaded` | [PROPOSED] Sensitive content downloaded | `DocumentId`, `VersionId`, `ActorId` |
+| `DocumentContentDownloaded` | Ratified. Sensitive content downloaded | `DocumentId`, `VersionId`, `ActorId` |
 
 Deliberately **not exported** as separate events: file name changes (filename is
 sensitive metadata; consumers resolve it through the API) and per-title edits.
@@ -336,8 +336,11 @@ Identity (authN)     │  └── Events ──►  Audit / Search / Workflow 
 - **Binary content storage** — S3-compatible object storage behind an
   `IDocumentObjectStorage` abstraction. MinIO is the concrete self-hosted
   deployment; any S3-compatible provider is a configuration change
-  (ADR-022). **No domain or infrastructure coupling to a specific vendor.**
+  (ADR-022). The concrete client is **AWSSDK.S3**; application/domain layers
+  depend only on `IDocumentObjectStorage`, never on the SDK.
 - **Object keys** — content-addressed: `documents/{sha256}`.
+- **Integrity** — SHA-256 computed on upload and stored; verified on download
+  when configured (default on).
 - **Encryption at rest** — handled at the storage layer (SSE); the service
   records whether storage-layer encryption is enabled. Not a per-document
   decision.
@@ -347,7 +350,7 @@ Identity (authN)     │  └── Events ──►  Audit / Search / Workflow 
 - **Download flow** — resolve current (or requested) version → object key →
   stream with content-type/length; verify hash on read when configured
   (default on).
-- **Limits [PROPOSED]** — maximum file size 50 MiB (configurable); MIME allowlist
+- **Limits (ratified)** — maximum file size 50 MiB (configurable); MIME allowlist
   configurable (default: `application/pdf`, `text/plain`, `text/markdown`,
   `text/csv`, `application/json`, `application/msword`,
   `application/vnd.openxmlformats-officedocument.wordprocessingml.document`,
@@ -369,7 +372,11 @@ Uploaded → Quarantined → Scanning → Clean | Rejected
   layer depends on an `IDocumentScanService`; when no scanner is configured
   (`Documents:MalwareScanning:Enabled=false`) versions are created with
   `ScanStatus = NotScanned` — an explicit opt-out, never an illusion that
-  scanning happened.
+  scanning happened. A no-op development implementation ships with the service
+  and is replaceable by a real scanner later.
+- **Active-before-scan (explicit):** a document may become `Active` while its
+  versions are still `NotScanned`/`Scanning`. Scanning does not gate the
+  document lifecycle; it gates **download** only.
 - **Download policy (fail closed):** when scanning is enabled, content whose
   version is `Scanning`, `Quarantined` or `Rejected` is **not downloadable**;
   only `Clean` (or `NotScanned` when scanning is disabled) is downloadable.
@@ -384,17 +391,17 @@ hooks only, without inventing legal policy:
   category. Documents does not enforce schedules.
 - **LegalHoldReference / AdministrativeHoldReference** — nullable references to
   future hold records.
-- **Deactivation protection [PROPOSED]:** when any hold reference is present,
+- **Deactivation protection (ratified):** when any hold reference is present,
   deactivating the document is rejected (`409`) unless the actor holds
   `documents.document.admin` and supplies a reason. Releasing a hold happens in
   Records and updates the reference through `documents.document.classify`.
-- **Who can override deletion [PROPOSED]:** `documents.document.admin` holders
+- **Who can override deletion (ratified):** `documents.document.admin` holders
   and, in future, the Records service principal.
 - Relationship to Records: Records creates a record snapshot that references
   specific document versions; Records owns the retention schedule and hold
   lifecycle; Documents only honors the references.
 
-## Configuration [PROPOSED]
+## Configuration (ratified)
 
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
@@ -424,6 +431,7 @@ hooks only, without inventing legal policy:
 
 ## Deviations
 
-No deviations yet — this specification is the proposed baseline awaiting
-ratification. Decisions marked [PROPOSED] are consolidated in the Prompt 07A
-final report for explicit confirmation before Prompt 07B.
+No deviations yet. This specification and ADR-022 were ratified at the Prompt
+07A-R gate; future deviations require a ratified ADR amendment. The
+`DocumentContentDownloaded` read-audit event and the `documents.*` permission
+matrix, previously flagged, are now part of the ratified baseline.

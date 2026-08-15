@@ -27,7 +27,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-019 | Community security corrections | Accepted |
 | ADR-020 | Repository specifications as source of truth | Accepted |
 | ADR-021 | Knowledge bounded context and Library boundary | Accepted |
-| ADR-022 | Documents bounded context and artifact boundary | Proposed |
+| ADR-022 | Documents bounded context and artifact boundary | Accepted |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -288,7 +288,8 @@ The following boundary rules are mandatory:
 
 ## ADR-022 — Documents bounded context and artifact boundary
 
-**Status:** Proposed (pending ratification at the Prompt 07A gate).
+**Status:** Accepted (ratified at the Prompt 07A-R gate; supersedes the Proposed
+baseline recorded at the Prompt 07A gate).
 
 The Documents bounded context owns document *artifacts* and their metadata. It
 is positioned in the implementation sequence (ADR-017) at slot 6 — after
@@ -339,15 +340,18 @@ Boundary rules (mandatory):
   operation calls the Authorization service through `AuthorizationGuard`
   (fail-closed; ADR-009/010/011/018/019). No `[Authorize(Roles = "...")]`.
 
-Storage topology (Proposed): PostgreSQL holds all authoritative metadata;
+Storage topology (Accepted): PostgreSQL holds all authoritative metadata;
 binary content lives in S3-compatible object storage behind an
 `IDocumentObjectStorage` abstraction. MinIO is the concrete self-hosted
 deployment; any S3-compatible provider (AWS S3, Cloudflare R2, etc.) is a
-configuration change. Object keys are content-addressed by SHA-256
+configuration change. The concrete S3-compatible client is **AWSSDK.S3**;
+application and domain layers depend only on `IDocumentObjectStorage`, never
+on the SDK. Object keys are content-addressed by SHA-256
 (`documents/{sha256}`), which supports integrity verification and optional
 deduplication. Metadata storage and binary content storage are therefore
 decoupled: the database is the authority for the version → object mapping, and
-the object store is treated as immutable, addressable content.
+the object store is treated as immutable, addressable content. Content
+integrity is verified on upload and on download where practical.
 
 Data: Documents owns its own database, `communityos_documents` (schema
 `documents`). There is no shared database with any other service (ADR-018).
@@ -363,7 +367,61 @@ critical subset (classification/deactivation/restore/sensitive-download/scan
 events) once Audit, Records and Correspondence subscribe. The outbox therefore
 must land at the Correspondence/Audit gate, not before Documents.
 
-Open decisions pending ratification (recorded in `docs/documents.md`):
-permission matrix, sensitivity gating, download-audit event for sensitive
-content, retention/hold hooks and deactivation-protection rule, and the
-malware-scanning extension point.
+Ratified decisions (Prompt 07A-R):
+
+1. **Storage topology** — PostgreSQL metadata + S3-compatible object storage;
+   MinIO initial deployment; `IDocumentObjectStorage` abstraction; portable to
+   other S3-compatible providers.
+2. **Content addressing** — SHA-256 content hashes; content-addressed object
+   keys `documents/{sha256}`; integrity verified on upload and on download
+   where practical.
+3. **Versioning** — `DocumentVersion` is immutable and append-only; a new
+   upload creates a new version and moves the current-version pointer; metadata
+   changes do not create versions.
+4. **Deletion** — no hard delete through normal application operations;
+   deactivation preserves content and is reversible; legal/administrative
+   holds prevent deactivation unless an explicitly authorized administrative
+   override is used.
+5. **Classification** — no classification levels are invented; a reserved
+   `ClassificationCode` string plus an `IsSensitive` operational gate are used
+   until the authoritative Data Classification Model is ratified.
+6. **Authorization** — the `documents.*` permission matrix is adopted;
+   authorization remains centralized in the Authorization service via
+   `AuthorizationGuard`, fail-closed; no local RBAC, no direct Authorization
+   database access; resource-level authorization is mandatory
+   (`resourceType = "document"`); unauthorized enumeration is prevented with
+   equivalent not-found behavior for missing and unauthorized resources.
+7. **Organization scoping** — multi-scope document organization references and
+   the Organization read-model approach of ADR-016 are adopted.
+8. **`DocumentContentDownloaded`** — adopted. Documents owns the fact that
+   protected (sensitive) document content was downloaded; the event targets
+   security/audit consumers; ordinary metadata reads are never published; the
+   payload carries no binary content, secrets or unnecessary personal
+   information. A future Audit service may consume it; Documents does not
+   depend directly on Audit.
+9. **Malware scanning** — `IDocumentScanService` extension point with a no-op
+   development implementation; replaceable by a real scanner later. A version
+   may exist in `NotScanned` state while its document becomes `Active`;
+   download policy fails closed on non-clean versions when scanning is
+   enabled.
+10. **Event delivery** — the existing open-generic integration-event publisher
+    pattern is used; the transactional outbox is not implemented (ADR-015
+    remains deferred); guaranteed delivery is documented as a requirement for
+    Audit, Records and Correspondence before those consumers are introduced.
+11. **Object-storage SDK** — **AWSSDK.S3** is the concrete S3-compatible client;
+    MinIO is the initial deployment target; application/domain layers depend
+    only on `IDocumentObjectStorage`.
+12. **Future Correspondence** — Documents stores document artifacts and
+    immutable versions; it does **not** own correspondence lifecycle,
+    recipient selection, institutional routing, submission workflow, AI letter
+    drafting, translation workflow or institutional responses.
+13. **AI** — Documents is not an AI service. AI assistance may provide
+    non-authoritative suggestions for classification, metadata extraction, OCR,
+    translation, summarization and discovery; AI must never independently
+    modify, publish, delete, submit or authorize a document; binary document
+    content is never sent directly to AI.
+
+Superseded decisions: none. The prior "Open decisions pending ratification"
+list (permission matrix, sensitivity gating, download-audit event, retention/
+hold hooks and deactivation-protection rule, malware-scanning extension point)
+is resolved by items 1–13 above.

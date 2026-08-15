@@ -1,8 +1,8 @@
 # Documents Service API
 
-> **STATUS: PROPOSED (Prompt 07A).** Contract for the future Documents service.
-> Not implemented. Endpoint names, permissions and payloads are subject to
-> ratification before Prompt 07B.
+> **STATUS: RATIFIED (Prompt 07A-R).** Contract for the future Documents service,
+> aligned with ratified ADR-022 and `docs/documents.md`. Not implemented;
+> implementation proceeds in Prompt 07B.
 
 All endpoints are versioned under `/api/v1/documents`, require a valid access
 token (`[Authorize]`), and return DTOs — **EF entities are never exposed**.
@@ -83,7 +83,9 @@ Responses are streamed with `Content-Type` (from version MIME), `Content-Length`
 (from version size) and `Content-Disposition: attachment; filename=...`. When
 scanning is enabled, versions that are `Scanning`, `Quarantined` or `Rejected`
 are **not** downloadable (fail closed). Sensitive downloads emit a
-`DocumentContentDownloaded` audit event [PROPOSED].
+`DocumentContentDownloaded` audit event (ratified; targeted at future security/
+audit consumers; never binary content, secrets or unnecessary personal
+information).
 
 ## References — `/documents/{id}/references`
 

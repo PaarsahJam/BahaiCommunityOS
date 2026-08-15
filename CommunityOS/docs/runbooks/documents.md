@@ -1,9 +1,10 @@
 # Documents Service Runbook
 
-> **STATUS: PROPOSED (Prompt 07A).** Operational notes for the future Documents
-> service. Implementation-time steps (project scaffolding, database creation,
-> migrations, container additions) are listed here so they are not forgotten,
-> but are **not** performed in this prompt.
+> **STATUS: RATIFIED (Prompt 07A-R).** Operational notes for the future
+> Documents service (ADR-022 Accepted, `docs/documents.md` ratified).
+> Implementation-time steps (project scaffolding, database creation, migrations,
+> container additions) are listed here so they are not forgotten, but are
+> **not** performed in this prompt.
 
 ## Services
 
@@ -27,10 +28,15 @@
    `communityos-documents` bucket (created by an init script or the service
    bootstrap).
 4. Create the initial EF Core migration (`InitialCreateDocuments`).
-5. Wire `AddCommunityOSEventBus`, `ConfigureAuthorizationService` +
+5. Add `AWSSDK.S3` to the Infrastructure project and implement the
+   `IDocumentObjectStorage` S3 adapter (MinIO-compatible endpoint via
+   `Documents:Storage:*`); domain/application layers must never reference the
+   SDK directly.
+6. Wire `AddCommunityOSEventBus`, `ConfigureAuthorizationService` +
    `HttpAuthorizationEvaluator` + `AuthorizationGuard`, and the open-generic
    `INotificationHandler<>` integration publisher — all following the existing
-   Knowledge wiring exactly.
+   Knowledge wiring exactly. Publish `DocumentContentDownloaded` on sensitive
+   content downloads (ratified).
 
 ## Local development
 
@@ -92,7 +98,8 @@ dotnet ef migrations has-pending-model-changes \
 
 - Binary content lives in S3-compatible object storage behind an
   `IDocumentObjectStorage` abstraction. MinIO is the self-hosted default; any
-  S3-compatible provider is a configuration change.
+  S3-compatible provider is a configuration change. The concrete client is
+  **AWSSDK.S3**; only the Infrastructure adapter references it.
 - Object keys are content-addressed: `documents/{sha256}`.
 - Bucket: one per environment (e.g. `communityos-documents-dev`).
 - Enable bucket versioning and (where available) replication for DR.
@@ -107,7 +114,7 @@ dotnet ef migrations has-pending-model-changes \
   mc mirror minio/communityos-documents-dev ./documents-backup
   ```
 
-## Configuration [PROPOSED]
+## Configuration (ratified)
 
 | Section | Key | Example | Notes |
 |---------|-----|---------|-------|
