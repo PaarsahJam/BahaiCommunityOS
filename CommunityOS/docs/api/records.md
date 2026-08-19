@@ -33,6 +33,12 @@ Documents API.
 | POST | `/records/{id}/scopes` | `records.record.scope.manage` | Add an organization scope |
 | DELETE | `/records/{id}/scopes/{organizationUnitId}` | `records.record.scope.manage` | Remove an organization scope |
 
+`query=` performs a case-insensitive free-text substring match over the record's
+current non-sensitive field values (the current verified version's fields, or
+the working field set before verification). Sensitive field values are never
+searched, so list search cannot reveal sensitive data; records matching only
+through sensitive fields are not returned.
+
 **Create** body:
 
 ```json
@@ -198,7 +204,7 @@ retention for records governed by the rule and must be a valid ISO-8601 duration
 |--------|------|------------|-------------|
 | GET | `/categories` | `records.record.read` | List the category catalog |
 | POST | `/categories` | `records.category.manage` | Add a category code |
-| PUT | `/categories/{code}` | `records.category.manage` | Update category metadata / default retention |
+| PUT | `/categories/{code}` | `records.category.manage` | Update category metadata (display name, description) |
 
 The baseline catalog is `birth`, `marriage`, `death`, `membership`,
 `appointment`, `official-community`, `administrative`. Codes are stable strings,

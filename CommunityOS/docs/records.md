@@ -96,8 +96,10 @@ prior versions are never mutated.
 ### RecordCategory (catalog)
 
 Stable string codes (baseline): `birth`, `marriage`, `death`, `membership`,
-`appointment`, `official-community`, `administrative`. Each category may carry a
-default sensitivity and a default `RetentionScheduleCode`. The catalog is
+`appointment`, `official-community`, `administrative`. Categories carry
+`DisplayName`/`Description` metadata and can be retired (soft state) but are
+never deleted. Classification and retention are set per record
+(`records.record.classify`), never derived from the category. The catalog is
 configuration, not a hard enum, and remains open to the ratified Data
 Classification Model (`specifications/06`, currently PLACEHOLDER).
 

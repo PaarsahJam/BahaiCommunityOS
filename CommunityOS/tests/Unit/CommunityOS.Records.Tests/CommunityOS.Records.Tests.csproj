@@ -10,6 +10,12 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\Services\Records\CommunityOS.Records.API\appsettings.json"
+          Link="Config\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\src\Services\Records\CommunityOS.Records.API\appsettings.Production.json"
+          Link="Config\appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <PropertyGroup>
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>

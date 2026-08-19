@@ -48,6 +48,7 @@ internal sealed class ListRecordsQueryHandler(
             .Where(r => query.HouseholdId is null ||
                 (string.Equals(r.SubjectType, RecordSubjectTypes.Household, StringComparison.OrdinalIgnoreCase) &&
                  r.SubjectId == query.HouseholdId))
+            .Where(r => string.IsNullOrWhiteSpace(query.Query) || MatchesQuery(r, query.Query))
             .ToList();
 
         // Fail-closed read filtering at the query boundary: only records the
@@ -81,6 +82,19 @@ internal sealed class ListRecordsQueryHandler(
             .Select(r => r.ToSummaryDto())
             .ToList()
             .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Free-text match over the record's current non-sensitive field values
+    /// (current version fields once verified, working fields otherwise).
+    /// Sensitive values are never searched, so the list search cannot reveal
+    /// sensitive data (fail-closed).
+    /// </summary>
+    private static bool MatchesQuery(Record record, string queryText)
+    {
+        var fields = record.CurrentVersion?.Fields ?? record.WorkingFields;
+        return fields.Any(f => !f.IsSensitive &&
+            f.FieldValue.Contains(queryText, StringComparison.OrdinalIgnoreCase));
     }
 }
 
