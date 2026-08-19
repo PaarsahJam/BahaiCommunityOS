@@ -23,7 +23,14 @@ public static class AuthorizationSeeder
             "authz.role.list", "authz.role.create", "authz.role.update", "authz.role.assign", "authz.role.revoke",
             "authz.relationship.write", "authz.relationship.read",
             "authz.delegation.grant", "authz.delegation.revoke",
-            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list"
+            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list",
+
+            "records.record.create", "records.record.read", "records.record.read.sensitive",
+            "records.record.update", "records.record.submit", "records.record.verify",
+            "records.record.correct", "records.record.archive", "records.record.deactivate",
+            "records.record.restore", "records.record.classify", "records.record.scope.manage",
+            "records.record.evidence.manage", "records.retention.manage", "records.hold.manage",
+            "records.category.manage", "records.record.admin"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -35,7 +42,14 @@ public static class AuthorizationSeeder
             "authz.role.list", "authz.role.assign", "authz.role.revoke",
             "authz.relationship.write", "authz.relationship.read",
             "authz.delegation.grant", "authz.delegation.revoke",
-            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list"
+            "authz.breakglass.approve", "authz.breakglass.revoke", "authz.breakglass.list",
+
+            "records.record.create", "records.record.read", "records.record.read.sensitive",
+            "records.record.update", "records.record.submit", "records.record.verify",
+            "records.record.correct", "records.record.archive", "records.record.deactivate",
+            "records.record.restore", "records.record.classify", "records.record.scope.manage",
+            "records.record.evidence.manage", "records.retention.manage", "records.hold.manage",
+            "records.category.manage", "records.record.admin"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [

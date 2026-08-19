@@ -1,8 +1,8 @@
 # Records Service API
 
-> **STATUS: RATIFIED (Prompt 08A-R).** Contract for the future Records service,
-> aligned with ratified ADR-023 and `docs/records.md`. Not implemented;
-> implementation proceeds in Prompt 08B.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 08B).** Contract for the Records
+> service, aligned with ratified ADR-023 and `docs/records.md`. Implemented in
+> Prompt 08B (Domain, Application, Infrastructure, API, EF migration, tests).
 
 All endpoints are versioned under `/api/v1/records`, require a valid access
 token (`[Authorize]`), and return DTOs — **EF entities are never exposed**.
@@ -38,11 +38,12 @@ Documents API.
 ```json
 {
   "category": "birth",
-  "subject": { "subjectType": "person", "subjectId": "00000000-0000-0000-0000-000000000001" },
+  "subjectType": "person",
+  "subjectId": "00000000-0000-0000-0000-000000000001",
   "organizationUnitId": "00000000-0000-0000-0000-000000000002",
   "fields": [
-    { "fieldKey": "name", "value": "...", "isSensitive": false },
-    { "fieldKey": "dateOfBirth", "value": "1970-01-01", "isSensitive": false }
+    { "fieldKey": "name", "fieldValue": "...", "isSensitive": false },
+    { "fieldKey": "dateOfBirth", "fieldValue": "1970-01-01", "isSensitive": false }
   ],
   "isSensitive": false
 }
@@ -120,6 +121,14 @@ service principal; Records never reads the Documents database. Evidence on a
 deactivated document is flagged for reconciliation via
 `DocumentDeactivated`/`DocumentRestored`.
 
+**Removal is Records-side only (implementation note):** `DELETE
+/records/{id}/evidence/{evidenceId}` removes only the Records-side evidence
+reference. The Documents contract has no reference-deletion endpoint, so the
+mirrored `DocumentReference` (`SourceContext = records.record`) is **not**
+removed; stale references are reconciled by the
+`DocumentDeactivated`/`DocumentRestored` consumer. This is a ratified-contract
+deviation recorded in the Prompt 08B report.
+
 ## Holds — `/holds`
 
 Holds freeze disposition. An active hold on a record blocks deactivation, and a
@@ -172,14 +181,16 @@ this endpoint (`GET /holds/{id}`), not through the integration events.
   "code": "administrative-7y",
   "categoryCodes": ["administrative"],
   "rules": [
-    { "retentionPeriod": "P7Y", "startTrigger": "recordDate", "disposition": "review" }
+    { "retentionPeriod": "P7Y", "startTrigger": "recordDate", "disposition": "review", "maximumPeriod": "P20Y" }
   ]
 }
 ```
 
 `disposition` is `review` only in this prompt: retention expiry never destroys
 data; it flags the record for a ratified disposition review and raises
-`RecordRetentionExpired`.
+`RecordRetentionExpired`. `maximumPeriod` is optional; when present it caps total
+retention for records governed by the rule and must be a valid ISO-8601 duration
+(duplicate rules for the same category are rejected with `409`).
 
 ## Categories — `/categories`
 
@@ -191,7 +202,9 @@ data; it flags the record for a ratified disposition review and raises
 
 The baseline catalog is `birth`, `marriage`, `death`, `membership`,
 `appointment`, `official-community`, `administrative`. Codes are stable strings,
-extensible via configuration.
+extensible via configuration. The baseline is seeded idempotently at migration
+time (`RecordsCatalogSeeder`); a fresh database can create records immediately.
+Creating a category with an existing code returns `409`.
 
 ## DTOs (conceptual)
 
@@ -222,7 +235,7 @@ Errors are returned as JSON with a problem-details body. Common codes:
 | 401 | Missing / invalid access token |
 | 403 | Caller lacks the required capability (fail-closed) |
 | 404 | Record / version / evidence / hold / schedule not found (also for unauthorized reads) |
-| 409 | Invalid transition, field update on a Verified record, creator-as-verifier, hold release by placer, deactivation blocked by hold, duplicate evidence |
+| 409 | Invalid transition, field update on a Verified record, creator-as-verifier, hold release by placer, deactivation blocked by hold, duplicate evidence, duplicate category/schedule code |
 
 ## Service-to-service notes
 

@@ -1,8 +1,8 @@
 # Records Service Runbook
 
-> **STATUS: RATIFIED (Prompt 08A-R); NOT IMPLEMENTED.**
-> Operational notes for the future Records service (ADR-023 Accepted,
-> `docs/records.md` ratified). Implementation proceeds in Prompt 08B.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 08B).**
+> Operational notes for the Records service (ADR-023 Accepted,
+> `docs/records.md` ratified). Implementation completed in Prompt 08B.
 
 ## Services
 
@@ -17,30 +17,38 @@
   the `DocumentDeactivated`/`DocumentRestored` reconciliation consumer is
   enabled in a shared environment. See "Outbox gate" below.
 
-## Implementation-time steps (Prompt 08B)
+## Implementation status (Prompt 08B)
 
-1. Add the service projects under `src/Services/Records/` and reference them in
-   `CommunityOS.sln` (mirror the Knowledge/Documents project structure: Domain /
-   Application / Infrastructure / API).
-2. Add `CREATE DATABASE communityos_records;` to
+All implementation-time steps are complete:
+
+1. Service projects exist under `src/Services/Records/` and are referenced in
+   `CommunityOS.sln` (Domain / Application / Infrastructure / API), plus the
+   unit and integration test projects.
+2. `CREATE DATABASE communityos_records;` is present in
    `docker/init/01-create-databases.sql`.
-3. Create the initial EF Core migration (`InitialCreateRecords`).
-4. Wire `AddCommunityOSEventBus`, `ConfigureAuthorizationService` +
+3. Initial EF Core migration `InitialCreateRecords` created (13 domain tables +
+   the MassTransit outbox tables in the `records` schema).
+4. `AddCommunityOSEventBus` (transactional outbox), `ConfigureAuthorizationService` +
    `HttpAuthorizationEvaluator` + `AuthorizationGuard`, and the open-generic
-   `INotificationHandler<>` integration publisher — following the existing
-   wiring exactly.
-5. Register the ratified `records.*` permission matrix (17 permissions,
-   including `records.record.scope.manage`) in the Authorization permission
-   catalog (supersedes the `records.record.read/create/verify` documented
-   examples).
-6. Implement the `OrganizationUnitCreated/Updated/ParentChanged` consumer into
+   `INotificationHandler<>` integration publisher are wired following the
+   existing pattern.
+5. The ratified `records.*` permission matrix (17 permissions) is registered in
+   the Authorization permission catalog and the development role seeds.
+6. The `OrganizationUnitCreated/Updated/ParentChanged` consumer projects into
    `organization_unit_references` (ADR-016 pattern).
-7. Implement the `DocumentDeactivated`/`DocumentRestored` consumer for
-   hold/evidence reconciliation — **requires the transactional outbox** (see
-   below).
-8. Configure the `DocumentsService` section so Records can command the
+7. The `DocumentDeactivated`/`DocumentRestored` consumer reconciles evidence and
+   hold references — protected by the transactional outbox (see below).
+8. The `DocumentsService` section is configured so Records commands the
    Documents reference/classify surface as the `communityos-records` service
    principal (evidence attachment, hold references).
+9. A second migration `AddRetentionRuleMaximumPeriod` adds the optional
+   `maximum_period` column to `retention_rules`, and the ratified baseline
+   category catalog is seeded idempotently at migration time
+   (`RecordsCatalogSeeder`: `birth`, `marriage`, `death`, `membership`,
+   `appointment`, `official-community`, `administrative`).
+10. `appsettings.json` / `appsettings.Development.json` ship with the API
+    (`RecordsDb`, JWT, RabbitMq, AuthorizationService, DocumentsService
+    sections).
 
 > **Classify is a full-replacement operation (implementation note).**
 > `POST /documents/{id}/classify` replaces the document's entire classification
@@ -49,8 +57,8 @@
 > through that API, it must first read the document's current classification
 > metadata and resubmit the existing classification/sensitive/retention values
 > alongside the changed hold reference — otherwise those values are
-> unintentionally overwritten with defaults. This is a Prompt 08B Records-side
-> implementation concern; the Documents contract itself is correct.
+> unintentionally overwritten with defaults. The Documents contract itself is
+> correct.
 
 ## Outbox gate (ADR-015)
 
@@ -138,7 +146,7 @@ dotnet ef migrations has-pending-model-changes \
 | `AuthorizationService:BaseUrl` | | `http://localhost:5007` | Authorization check API base URL |
 | `AuthorizationService:AccessToken` | | *(empty in dev)* | Service-principal bearer token |
 | `AuthorizationService:ClientId` | | `communityos-records` | Audit identifier |
-| `DocumentsService:BaseUrl` | | *(see Documents runbook)* | Documents API base URL (evidence + hold references) |
+| `DocumentsService:BaseUrl` | | *(empty in dev — must be configured)* | Documents API base URL (evidence + hold references); unset, the Documents client fails closed with a clear message |
 | `DocumentsService:AccessToken` | | *(empty in dev)* | Service token presented to Documents |
 | `DocumentsService:ClientId` | | `communityos-records` | `X-Client-Id` sent to Documents |
 | `Records:Retention:ReviewDispositionEnabled` | | `true` | Expiry flags review instead of destroying |
@@ -156,7 +164,11 @@ misconfigured, every guarded endpoint returns `403 Forbidden` (fail-closed).
 
 ## Testing
 
-Unit and security regression tests do not require Docker:
+Unit and security regression tests do not require Docker (domain invariants,
+multi-scope authorization, fail-closed persistence, no-PII integration events,
+hold-type and ISO-8601 maximum-period validation, baseline catalog,
+`DocumentDeactivated`/`DocumentRestored` reconciliation with substitute
+persistence):
 
 ```sh
 dotnet test tests/Unit/CommunityOS.Records.Tests
@@ -175,6 +187,9 @@ dotnet test tests/Integration/CommunityOS.Records.IntegrationTests
 
 - **`403 Forbidden` on all endpoints** — check `AuthorizationService:BaseUrl`
   and the service token; the guard is fail-closed.
+- **`InvalidOperationException: DocumentsService:BaseUrl is not configured`** —
+  set `DocumentsService:BaseUrl` to the Documents API base URL; Records only
+  needs it when commanding evidence/hold references.
 - **`409` on `verify` for a creator** — separation of duties: the creator
   cannot verify the same record; the action is rejected and audited.
 - **`409` on `deactivate` for a held record** — an active legal/administrative

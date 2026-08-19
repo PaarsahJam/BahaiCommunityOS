@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Records\CommunityOS.Records.Application\CommunityOS.Records.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Records\CommunityOS.Records.Domain\CommunityOS.Records.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Records\CommunityOS.Records.Infrastructure\CommunityOS.Records.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -24,6 +24,29 @@ public static class PermissionCatalog
     public const string AuthzBreakGlassRevoke = "authz.breakglass.revoke";
     public const string AuthzBreakGlassList = "authz.breakglass.list";
 
+    // Records capabilities (records.*, ratified ADR-023). Record lifecycle,
+    // metadata and sensitive-field access are separate capabilities; a
+    // sensitive-field read requires records.record.read.sensitive in addition
+    // to records.record.read. records.record.admin is the administrative
+    // override used when an active hold blocks deactivation.
+    public const string RecordCreate = "records.record.create";
+    public const string RecordRead = "records.record.read";
+    public const string RecordReadSensitive = "records.record.read.sensitive";
+    public const string RecordUpdate = "records.record.update";
+    public const string RecordSubmit = "records.record.submit";
+    public const string RecordVerify = "records.record.verify";
+    public const string RecordCorrect = "records.record.correct";
+    public const string RecordArchive = "records.record.archive";
+    public const string RecordDeactivate = "records.record.deactivate";
+    public const string RecordRestore = "records.record.restore";
+    public const string RecordClassify = "records.record.classify";
+    public const string RecordScopeManage = "records.record.scope.manage";
+    public const string RecordEvidenceManage = "records.record.evidence.manage";
+    public const string RetentionManage = "records.retention.manage";
+    public const string HoldManage = "records.hold.manage";
+    public const string CategoryManage = "records.category.manage";
+    public const string RecordAdmin = "records.record.admin";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global
@@ -40,9 +63,6 @@ public static class PermissionCatalog
     [
         "community.person.read",
         "community.person.update",
-        "records.record.read",
-        "records.record.create",
-        "records.record.verify",
         "documents.document.read",
         "documents.document.upload",
         "documents.document.delete",

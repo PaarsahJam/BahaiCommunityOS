@@ -1,10 +1,10 @@
 # Records Service
 
-> **STATUS: RATIFIED (Prompt 08A-R).** The architectural decisions for the
-> Records bounded context have been ratified in ADR-023 (Accepted) and recorded
-> in this document. The service itself is **not yet implemented**;
-> implementation proceeds in Prompt 08B. Decisions are binding unless a later
-> ratified ADR amends them.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 08B).** The architectural decisions
+> for the Records bounded context were ratified in ADR-023 (Accepted) and recorded
+> in this document, and the service has been implemented in Prompt 08B (Domain,
+> Application, Infrastructure, API, permissions, EF migration, tests). Decisions
+> are binding unless a later ratified ADR amends them.
 
 The Records bounded context owns the community's **official records**: the
 authoritative record of births, marriages, deaths, membership, appointments,
@@ -122,11 +122,13 @@ Retention governance owned by Records.
 - **RetentionSchedule** — named schedule (e.g. `administrative-7y`), linked to
   record categories by default. Contains one or more `RetentionRule` records.
 - **RetentionRule** — expresses a retention window: `RetentionPeriod`
-  (duration), a `StartTrigger` (`recordDate` | `verifiedDate`), and a
-  `Disposition` (`review` — the only disposition in this prompt; no
-  destruction).
-- **RetentionPeriod** — a duration (e.g. `P7Y`) with an optional maximum that
-  caps total retention.
+  (duration), a `StartTrigger` (`recordDate` | `verifiedDate`), a `Disposition`
+  (`review` — the only disposition in this prompt; no destruction), and an
+  optional `MaximumPeriod` (ISO-8601 duration) that caps total retention for
+  records governed by the rule.
+- **RetentionPeriod** — a duration (e.g. `P7Y`) with an optional maximum
+  (`MaximumPeriod`, e.g. `P20Y`) that caps total retention; both are validated
+  as ISO-8601 durations.
 - **Expiry** — when a record's retention period lapses, the record is flagged
   `RetentionExpired → Review` for a ratified disposition review process.
   **Retention expiry never destroys data** through normal operations.
@@ -333,12 +335,12 @@ exposed; DTOs are returned.
   and Finance subscribe to `CommunityOS.Contracts.Records` events; none cross
   the Records database boundary.
 
-### Planned integration events (`CommunityOS.Contracts.Records`)
+### Integration events (`CommunityOS.Contracts.Records`)
 
-Names and payloads below are the **ratified** baseline. Each record carries a
-trailing `DateTime OccurredOn`. Only stable ids and minimal lifecycle metadata
-are exported — no binary, no secrets, no names, no sensitive field values, no
-hold reasons.
+Names and payloads below are the **ratified baseline**, implemented in Prompt
+08B. Each record carries a trailing `DateTime OccurredOn`. Only stable ids and
+minimal lifecycle metadata are exported — no binary, no secrets, no names, no
+sensitive field values, no hold reasons.
 
 | Event | Raised when | Key fields |
 |-------|-------------|-----------|
@@ -429,11 +431,21 @@ Identity (authN)     │  └── Events ──►  Audit / Search / Workflow 
 ## Data
 
 - Database: `communityos_records` (PostgreSQL), schema `records`.
-- Tables: `records`, `record_versions`, `record_field_values`,
-  `record_scopes`, `record_categories`, `retention_schedules`,
-  `retention_rules`, `record_holds`, `record_evidence_references`,
-  `record_lifecycle_events`, `organization_unit_references`.
+- Tables (as migrated, Prompt 08B): `records`, `record_versions`,
+  `record_field_values`, `record_working_fields`, `record_scopes`,
+  `record_categories`, `retention_schedules`, `retention_rules`,
+  `record_holds`, `record_hold_document_references`,
+  `record_evidence_references`, `record_classification`,
+  `organization_unit_references`, plus the MassTransit outbox tables
+  (`InboxState`, `OutboxMessage`, `OutboxState`).
 - Schema is managed by EF Core migrations (created at implementation time).
+- **Implementation deviations (Prompt 08B):** the editable working field set is
+  persisted in its own `record_working_fields` table (frozen into
+  `record_versions` at verification) rather than stored in place on `records`;
+  and the ratified `record_lifecycle_events` table is **not** created — lifecycle
+  transitions are captured as domain/integration events through the transactional
+  outbox instead of a persisted events table. Audit/WF consumers rebuild their
+  read models from the outbox event stream.
 - Records stores **no binary content**; evidence bytes live in Documents object
   storage and are referenced by id/version.
 
@@ -493,21 +505,29 @@ misconfigured, every guarded endpoint returns `403 Forbidden` (fail-closed).
 
 - **Unit tests** (`tests/Unit/CommunityOS.Records.Tests`) — domain invariants
   (lifecycle transitions, verified-fact immutability, superseding versions,
-  sensitive-field gating, retention expiry never destroying, hold
+  sensitive-field gating, hold-type invariant, retention expiry never
+  destroying, ISO-8601 period/maximum-period validation, hold
   protection/deactivation blocking, separation of duties) and security
   regression tests (fail-closed authorization, resource-level record checks,
-  org-scoped multi-scope access, sensitive-read gating, JWT RS256-only
-  validation) through the MediatR pipeline with substitute persistence.
+  org-scoped multi-scope access, sensitive-read gating, no persistence on a
+  denied update/verify/deactivate, no PII or hold reasons in integration
+  events, baseline category catalog, `DocumentDeactivated`/`DocumentRestored`
+  reconciliation, JWT RS256-only validation) through the MediatR pipeline with
+  substitute persistence.
 - **Integration tests** (`tests/Integration/CommunityOS.Records.IntegrationTests`)
-  — EF mapping, migrations, and DocumentDeactivated/DocumentRestored
-  reconciliation against PostgreSQL via Testcontainers (requires Docker; the
-  outbox gate must be in place before these tests are enabled).
+  — EF mapping, both migrations, retention-rule maximum-period roundtrip, and
+  DocumentDeactivated/DocumentRestored reconciliation against PostgreSQL via
+  Testcontainers (requires Docker; the outbox gate must be in place before these
+  tests are enabled).
 
 ## Deviations
 
-No deviations yet. This specification and ADR-023 were ratified at the Prompt
-08A-R gate; future deviations require a ratified ADR amendment. The
-documented-but-unenforced examples in `PermissionCatalog.DocumentedExamples`
+The documented-but-unenforced examples in `PermissionCatalog.DocumentedExamples`
 (`records.record.read/create/verify`) are superseded by the ratified matrix and
-will be registered in the Authorization permission catalog at the Prompt 08B
-implementation gate.
+were registered in the Authorization permission catalog at the Prompt 08B gate.
+Two ratified implementation choices (Prompt 08B) are recorded in the Data
+section above and are binding unless a later ratified ADR amends them: the
+editable working field set is persisted in `record_working_fields` rather than
+in place on `records`, and the ratified `record_lifecycle_events` table is not
+created — lifecycle transitions are captured as domain/integration events
+through the transactional outbox instead of a persisted events table.
