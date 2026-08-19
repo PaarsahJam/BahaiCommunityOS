@@ -29,6 +29,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-021 | Knowledge bounded context and Library boundary | Accepted |
 | ADR-022 | Documents bounded context and artifact boundary | Accepted |
 | ADR-023 | Records bounded context and official-record boundary | Accepted |
+| ADR-024 | Workflow bounded context and task boundary | Accepted |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -224,6 +225,16 @@ The ratified implementation sequence for CommunityOS is:
 17. Finance
 18. Communications / VoIP
 19. Analytics
+
+Implementation-sequence status:
+
+- Slots 1–7 (Foundation, Identity, Authorization, Organization, Community,
+  Documents, Records) are **implemented**; Records (slot 7) completed the full
+  08A→08E gate with the transactional outbox enabled (ADR-015, Prompt 08A-R2).
+- Slot 8 (**Workflow**) is **ratified** (ADR-024, Prompt 09B gate) but **not
+  yet implemented**.
+- Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
+- Slots 9–11 and 13–19 are not started.
 
 ## ADR-018 — Authentication and authorization ownership boundary
 
@@ -701,3 +712,216 @@ documented-but-unenforced examples in `PermissionCatalog.DocumentedExamples`
 (`records.record.read/create/verify`) are superseded by the ratified matrix
 above and will be registered in the Authorization permission catalog at the
 Prompt 08B implementation gate.
+
+## ADR-024 — Workflow bounded context and task boundary
+
+**Status:** Accepted (ratified at the Prompt 09B gate).
+
+The Workflow bounded context owns **task/work-item state** and the task engine
+that routes, assigns, tracks and escalates human review and approval work across
+the platform. It is positioned in the implementation sequence (`ADR-017`) at
+slot 8 — after Records, before Notifications. It is the routing service for
+review/verification work over domain facts owned by Records, Documents and
+Knowledge, and is the authoritative source of task state for Notifications,
+Search and Audit consumers.
+
+The Workflow context owns:
+
+- **TaskDefinition** — the catalog of task types/templates (stable string codes,
+  never hard enums): display name, description, the domain the task works over
+  (record / document / knowledge-question / knowledge-ai-suggestion / general),
+  permitted outcome codes, deadline/SLA policy, active/retired flag, and audit
+  provenance. Definitions are configuration, seeded idempotently and
+  extensible at runtime.
+- **WorkflowTask** — the aggregate root: a task instance referencing a domain
+  entity (stable ids only) or free-standing work, with a lifecycle status, an
+  originator, one or more assignees, organization scopes, deadline/overdue
+  state, escalation state, outcome, and append-only activity history.
+- **TaskAssignment** — the assignment model (assignee, assigner, effective
+  time). Reassignment and escalation are explicit, audited transitions.
+- **TaskActivity** — an append-only history of every transition and note on a
+  task (actor, action, timestamp, outcome). Never exported onto the bus.
+- The **Organization read-model projection** (consumed unit events, mirroring
+  Community, Knowledge, Documents and Records; ADR-016).
+
+The Workflow context does **not** own: official records or record facts,
+document artifacts or document metadata, Knowledge/Library content or
+moderation authority, person identity or households, organizational hierarchy,
+notification delivery, search indexes, audit storage, or AI decisions. It never
+stores binary content, never stores person names/contact data, and never
+reaches into another service's database (`ADR-018`).
+
+Boundary rules (mandatory):
+
+- **Task state is not domain state.** A task never replaces the authoritative
+  lifecycle of a record, document, question or answer. Completing, rejecting or
+  cancelling a task never changes the underlying domain entity; it only records
+  the outcome of human work against that entity.
+- **Workflow is a routing/reconciliation service, not a command path into other
+  contexts.** Workflow consumes domain events (`RecordSubmitted`/`RecordVerified`,
+  Knowledge review events) to create and reconcile tasks; it never invokes the
+  Records, Documents or Knowledge mutation APIs. The domain transition (e.g.
+  verify a record, publish a question) is always performed through the owning
+  service by a human with the owning service's permission.
+- **No cross-service database access** (`ADR-018`). All subject/domain references
+  are stable ids; names and details are resolved through the owning service's
+  API at read time (Community for persons, Documents for documents, Records for
+  records, Knowledge for questions/suggestions).
+- **Centralized authorization.** Every guarded operation calls the Authorization
+  service through `AuthorizationGuard` (fail-closed; ADR-009/010/011/018/019).
+  No `[Authorize(Roles = "...")]`, no local RBAC, no direct Authorization
+  database access. Resource-level authorization is mandatory
+  (`resourceType = "workflow.task"`); unauthorized enumeration is prevented with
+  equivalent not-found behavior for missing and unauthorized resources.
+- **Organization scoping follows ADR-016.** Workflow consumes
+  `OrganizationUnitCreated/Updated/ParentChanged` into a read-model projection; a
+  task carries a primary scope plus additional scopes; access succeeds when the
+  caller holds the permission at **any** of the task's scopes (Records pattern).
+- **AI is advisory only.** Workflow never grants AI authority; an AI suggestion
+  is reviewed through a task, but accepting/rejecting the suggestion is a
+  Knowledge-side governance action performed by a human (ADR-021).
+
+Storage topology (Accepted): PostgreSQL holds all authoritative task data.
+Database `communityos_workflow`, schema `workflow`. There is no shared database
+with any other service (ADR-018).
+
+Integration: domain events are forwarded as integration events onto the bus via
+MassTransit under `CommunityOS.Contracts.Workflow`; payloads carry identifiers
+and minimal lifecycle metadata only — never task notes, never names, never
+filenames, never secrets, never sensitive domain values. Workflow consumes
+Organization unit events (projection), Records events
+(`RecordSubmitted`/`RecordVerified`/`RecordRejected`), and Knowledge review
+events (`QuestionFlagged`/`QuestionUnderReview`/`QuestionMerged`/
+`QuestionArchived`/`AiSuggestionRequested`/`AiSuggestionReviewed`).
+
+**Outbox gate (ratified).** The transactional outbox (ADR-015, MassTransit EF
+Core outbox) is enabled at the **Workflow integration gate** — the same gate
+Records established (Prompt 08A-R2). This is required because:
+
+1. Workflow is itself a guaranteed-delivery **consumer** of Records events
+   (`RecordSubmitted`/`RecordVerified`), which the Records outbox already
+   protects; Workflow must consume with receive-endpoint outbox semantics to
+   reconcile exactly-once.
+2. Workflow's compliance-significant events (`WorkflowTaskCreated`,
+   `WorkflowTaskAssigned`, `WorkflowTaskCompleted`, `WorkflowTaskCancelled`,
+   `WorkflowTaskEscalated`) will be consumed by Audit (slot 11) and are intended
+   for Notifications (slot 9) and Search (slot 10); they must be protected
+   before those consumers subscribe.
+3. Best-effort in-process publication is **not** acceptable for any Workflow
+   integration event at implementation time, because the earliest consumer
+   (Notifications, slot 9) already requires reliable delivery for task-routing
+   digests.
+
+The outbox-protected set is **non-exhaustive by design**: any Workflow event
+consumed by a guaranteed-delivery consumer is protected whether or not its name
+appears in a delivery table.
+
+Ratified decisions (Prompt 09B):
+
+1. **Ownership** — Workflow owns the task engine: definitions, instances,
+   assignment, lifecycle, escalation, overdue tracking, outcome and activity
+   history.
+2. **Taxonomy** — typed task engine over a stable-string task-definition
+   catalog (`record-review`, `document-review`, `knowledge-moderation`,
+   `knowledge-ai-review`, `general` baseline). Task types are configuration,
+   never a hard enum; the baseline is seeded idempotently.
+3. **Lifecycle** — `Created → Assigned → In Progress → Completed | Cancelled`,
+   with explicit `Reassign`, `Escalate`, `Cancel` and (definition-gated)
+   `Reject`/outcome transitions. `Completed` and `Cancelled` are terminal;
+   completed tasks are immutable. No reopen/correction of a completed task;
+   a new task is created if a domain entity re-enters review.
+4. **Idempotency** — task creation is idempotent per (definition, domain
+   entity) via a uniqueness constraint; reconcile consumers are
+   create-if-absent / close-if-open; duplicate events never create duplicate
+   open tasks.
+5. **Deadline/overdue** — tasks carry an optional `DueOn`; overdue is a derived,
+   review-flagged state (never auto-destroys, never auto-escalates without an
+   explicit ratified policy per definition). Escalation is explicit.
+6. **Records boundary** — Workflow consumes `RecordSubmitted` (create a
+   `record-review` task) and `RecordVerified`/`RecordRejected` (complete/close
+   the open task with outcome `verified`/`rejected`). Records owns verification
+   truth; Workflow never verifies or mutates record facts.
+7. **Documents boundary** — Workflow references documents only through the
+   existing `DocumentReference` mechanism (`SourceContext = "workflow.task"`);
+   it never owns document bytes/metadata and needs **no additional Documents API
+   operations**.
+8. **Knowledge boundary** — Workflow consumes `QuestionFlagged`/
+   `QuestionUnderReview` (create/reconcile `knowledge-moderation` tasks) and
+   `AiSuggestionRequested` (create `knowledge-ai-review` tasks); outcomes are
+   advisory and never authorize or complete Knowledge governance actions.
+9. **Community/Organization** — stable person/org-unit ids only; assignee names
+   resolved via the Community API at read time; scoping through the ADR-016
+   read-model projection; multi-scope any-of-grant (Records pattern).
+10. **Authorization** — the `workflow.*` permission matrix below is adopted;
+    centralized and fail-closed; resource-level (`resourceType = "workflow.task"`);
+    404-equivalent for unauthorized reads.
+11. **Events** — the event catalog below is adopted; all exported Workflow
+    events are outbox-protected at the Workflow integration gate.
+12. **Outbox** — ADR-015 is implemented and enabled at the Workflow integration
+    gate (mirroring the Records gate).
+13. **Data** — own database `communityos_workflow`, schema `workflow`; no shared
+    database (ADR-018).
+14. **Audit readiness** — compliance-significant Workflow events
+    (`WorkflowTaskCreated/Completed/Cancelled/Escalated` for record review) are
+    outbox-protected; Audit (slot 11) consumes them later without Workflow
+    changes.
+
+### Workflow permission matrix (ratified)
+
+| Permission | Purpose | Typical holder |
+|------------|---------|----------------|
+| `workflow.task.read` | List and read task metadata (non-sensitive) | all authorized users |
+| `workflow.task.read.sensitive` | Read sensitive task fields/notes | higher-privilege reviewers |
+| `workflow.task.create` | Create a task (directly or via event reconciliation) | clerks / coordinators |
+| `workflow.task.assign` | Assign/reassign assignees | coordinators |
+| `workflow.task.start` | Transition `Assigned → In Progress` | assignees |
+| `workflow.task.complete` | Transition `In Progress → Completed` with outcome | assignees / reviewers |
+| `workflow.task.cancel` | Transition any non-terminal → `Cancelled` | coordinators |
+| `workflow.task.escalate` | Explicit escalation to a different assignee | assignees / coordinators |
+| `workflow.definition.read` | List/read the task-definition catalog | authorized users |
+| `workflow.definition.manage` | Manage the task-definition catalog | administrators |
+| `workflow.task.admin` | Administrative override (reassign/close a blocked task, view restricted activity) | operators |
+
+`workflow.task.admin` is an override permission exercised through the standard
+task endpoints (e.g. reassigning or closing a task the caller is not assigned
+to), mirroring the Records `records.record.admin` override pattern; it does not
+introduce a separate administration endpoint.
+
+Scope semantics follow `ADR-011`: data permissions are organization-scoped; a
+grant at a national scope covers descendant units via the Organization `/covers`
+hierarchy resolution. A global grant of a data permission only applies to checks
+with no organization context. Per-task access composes through Authorization
+relationship tuples; Workflow never evaluates grants itself.
+
+### Workflow integration events (`CommunityOS.Contracts.Workflow`)
+
+Names and payloads below are the ratified baseline; each record carries a
+trailing `DateTime OccurredOn`. Only stable ids and minimal lifecycle metadata
+are exported — no task notes, no names, no filenames, no secrets, no sensitive
+domain values.
+
+| Event | Raised when | Key fields |
+|-------|-------------|-----------|
+| `WorkflowTaskCreated` | A task is created | `TaskId`, `DefinitionCode`, `DomainType`, `DomainEntityId`, `OrganizationUnitId`, `CreatedBy` |
+| `WorkflowTaskAssigned` | Assignee(s) assigned/reassigned | `TaskId`, `AssigneeIds`, `AssignedBy` |
+| `WorkflowTaskStarted` | `Assigned → In Progress` | `TaskId`, `StartedBy` |
+| `WorkflowTaskCompleted` | `In Progress → Completed` (with outcome) | `TaskId`, `Outcome`, `CompletedBy` |
+| `WorkflowTaskCancelled` | Any non-terminal → `Cancelled` | `TaskId`, `CancelledBy` |
+| `WorkflowTaskEscalated` | Explicit escalation | `TaskId`, `EscalatedTo`, `EscalatedBy` |
+
+Deliberately **not exported**: task notes and sensitive fields (resolved through
+the API), assignee names (resolved through Community), document filenames
+(resolved through Documents), record field values (resolved through Records),
+definition-catalog changes (configuration), and internal activity history. The
+completion outcome is carried on `WorkflowTaskCompleted`; completed tasks are
+immutable, so no separate outcome-change event exists.
+
+Consumers of Workflow events: Notifications (slot 9, task-routing digests),
+Search (slot 10, task metadata indexing), Audit (slot 11, compliance trail).
+All are outbox-protected at the Workflow integration gate.
+
+Superseded decisions: none. The pre-existing documented example permissions
+`workflow.task.read` / `workflow.task.complete` in
+`PermissionCatalog.DocumentedExamples` are superseded by the ratified matrix
+above and will be registered in the Authorization permission catalog at the
+Prompt 09C implementation gate.
