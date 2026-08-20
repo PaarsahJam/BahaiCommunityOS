@@ -35,7 +35,12 @@ public static class AuthorizationSeeder
             "workflow.task.read", "workflow.task.read.sensitive",
             "workflow.task.create", "workflow.task.assign", "workflow.task.start",
             "workflow.task.complete", "workflow.task.cancel", "workflow.task.escalate",
-            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin"
+            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin",
+
+            "notifications.notification.read", "notifications.notification.read.sensitive",
+            "notifications.notification.create", "notifications.notification.send",
+            "notifications.notification.admin", "notifications.type.manage",
+            "notifications.template.read", "notifications.preference.manage"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -59,7 +64,12 @@ public static class AuthorizationSeeder
             "workflow.task.read", "workflow.task.read.sensitive",
             "workflow.task.create", "workflow.task.assign", "workflow.task.start",
             "workflow.task.complete", "workflow.task.cancel", "workflow.task.escalate",
-            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin"
+            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin",
+
+            "notifications.notification.read", "notifications.notification.read.sensitive",
+            "notifications.notification.create", "notifications.notification.send",
+            "notifications.notification.admin", "notifications.type.manage",
+            "notifications.template.read", "notifications.preference.manage"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [
@@ -73,7 +83,10 @@ public static class AuthorizationSeeder
             "authz.relationship.read"
         ]),
         ("Volunteer", "Volunteer", []),
-        ("Member", "Member", []),
+        ("Member", "Member",
+        [
+            "notifications.notification.read", "notifications.preference.manage"
+        ]),
         ("Guest", "Guest", [])
     ];
 

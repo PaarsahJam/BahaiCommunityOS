@@ -30,6 +30,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-022 | Documents bounded context and artifact boundary | Accepted |
 | ADR-023 | Records bounded context and official-record boundary | Accepted |
 | ADR-024 | Workflow bounded context and task boundary | Accepted |
+| ADR-025 | Notifications bounded context and delivery boundary | Accepted |
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -234,8 +235,16 @@ Implementation-sequence status:
 - Slot 8 (**Workflow**) is **implemented** (ADR-024, Prompt 09C gate); the
   integration test suite is compile-only because Docker/Testcontainers is not
   available in the implementation environment.
+- Slot 9 (**Notifications**) is **implemented** (ADR-025, Prompt 10C gate);
+  the integration test suite is compile-only because Docker/Testcontainers is
+  not available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
-- Slots 9–11 and 13–19 are not started.
+- Slots 10–11 and 13–19 are not started.
+- The **Content, Enrollment, Events and Reporting** service folders are inert
+  pre-ratification scaffold remnants. They are **not part of the ADR-017
+  sequence**, are not ratified implementation candidates, and must not be
+  extended or treated as ratified. Any future work on these domains requires a
+  new ADR that adds the context to the sequence (ADR-025, decision 15).
 
 ## ADR-018 — Authentication and authorization ownership boundary
 
@@ -927,3 +936,317 @@ Superseded decisions: none. The pre-existing documented example permissions
 `PermissionCatalog.DocumentedExamples` are superseded by the ratified matrix
 above and will be registered in the Authorization permission catalog at the
 Prompt 09C implementation gate.
+
+## ADR-025 — Notifications bounded context and delivery boundary
+
+**Status:** Accepted (ratified at the Prompt 10B gate; **RATIFIED AND
+IMPLEMENTED** at the Prompt 10C gate).
+
+The Notifications bounded context owns **notification records, recipient
+delivery state, channel selection, notification types/templates and delivery
+orchestration**. It is positioned in the implementation sequence (ADR-017) at
+slot 9 — after Workflow, before Search. It is the authoritative record of what
+was notified, to whom (by stable id), on which channel, when, and with what
+delivery outcome; it is the delivery endpoint for the task-routing digests
+Workflow (ADR-024) produces.
+
+The Notifications context owns:
+
+- **Notification** — the aggregate root: a notification instance referencing a
+  triggering domain fact (stable `SourceType` + `SourceId`) or free-standing
+  work, with a notification-type code, a channel, a subject/body template, a
+  primary organization scope plus additional scopes, an optional `ScheduledFor`,
+  a lifecycle status, and a recipient set.
+- **NotificationRecipient** — the per-recipient delivery state (member id,
+  channel, status, delivered/read provenance, failure reason, retry count).
+- **NotificationType** — the catalog of notification types (stable string
+  codes) and their default subject/body templates with `{{var}}` placeholders.
+  Types are configuration: seeded idempotently, extensible at runtime, retired
+  (never deleted).
+- **NotificationPreference** — the per-member opt-in/opt-out rule per type and
+  channel that the dispatch worker applies when deriving recipients.
+- The **Organization read-model projection** (consumed unit events, mirroring
+  Community, Knowledge, Documents, Records and Workflow; ADR-016).
+
+The Notifications context does **not** own: the domain facts that trigger
+notifications (records, tasks, questions, documents, events — referenced by
+stable id only), person identity or contact details (resolved through the
+Community API at dispatch time, never stored), authoritative content (Library
+passages, record facts, task notes — never embedded in bodies), search
+indexes, audit storage, or AI decisions. It never reaches into another
+service's database (ADR-018).
+
+Boundary rules (mandatory):
+
+- **Delivery is orchestration, not domain authority.** A notification never
+  changes the lifecycle of the record, task, question or document it refers to;
+  it only records that people were informed. Notifications never invokes the
+  mutation APIs of other contexts.
+- **No authoritative content, no PII in bodies.** Stored subject/body copy is
+  short operational text with stable-id references and links to the owning
+  context's API. Notifications never embeds record field values, task notes,
+  hold reasons, document filenames, Library passage text or person names in a
+  body. Per-recipient personalization is deferred; any future personalization
+  is resolved at provider-dispatch time and never persisted.
+- **Destinations are resolved, never stored.** Recipients are stable member
+  ids. Channel destinations (email address, phone number, push token) are
+  resolved through the Community API at dispatch time and are never persisted
+  in Notifications. InApp delivery needs no destination resolution (the member
+  id is the destination).
+- **Centralized authorization.** Every guarded operation calls the
+  Authorization service through `AuthorizationGuard` (fail-closed;
+  ADR-009/010/011/018/019). No `[Authorize(Roles = "...")]`, no local RBAC, no
+  direct Authorization database access. Resource-level authorization is
+  mandatory (`resourceType = "notification"`); unauthorized enumeration is
+  prevented with equivalent not-found behavior for missing and unauthorized
+  resources.
+- **Organization scoping follows ADR-016.** A notification carries a primary
+  scope plus additional scopes; access succeeds when the caller holds the
+  permission at **any** of the notification's scopes (Records/Workflow
+  pattern). A member additionally reads their **own** inbox through
+  Authorization relationship tuples (recipient relation); never through scope
+  grants alone for another member's notification.
+- **Sensitive notifications.** A notification flagged `IsSensitive` (e.g.
+  record-hold notifications) is readable only under
+  `notifications.notification.read.sensitive` in addition to
+  `notifications.notification.read`, mirroring the Records/Documents
+  sensitive-field gate.
+- **Channels: domain-owned vs provider-deferred.** InApp is a domain-owned
+  channel implemented by Notifications (persisted inbox, no external provider).
+  Email, SMS and Push are ratified logical channels whose state model is
+  domain-owned but whose concrete sending is a **future provider integration**
+  behind `INotificationChannelDispatcher`; a recipient on a channel with no
+  configured provider fails closed at dispatch time
+  (`Failed`, reason `provider-not-configured`). See decision 5.
+- **No irreversible destruction.** Notifications are never hard-deleted
+  through normal operations. Retention expiry flags a review disposition and
+  never auto-destroys (Records pattern); hard purge requires an explicitly
+  authorized administrative override (`notifications.notification.admin`) with
+  a reason.
+- **Privacy of exports.** Outbound integration events carry identifiers and
+  counts only — **never recipient member ids, never bodies, never names, never
+  delivery failures** (see produced events).
+
+Storage topology (Accepted): PostgreSQL holds all authoritative notification
+data. Database `communityos_notifications`, schema `notifications`. There is no
+shared database with any other service (ADR-018).
+
+Integration: Notifications consumes integration events (below) via
+MassTransit under `CommunityOS.Contracts.Workflow`, `CommunityOS.Contracts.Records`,
+`CommunityOS.Contracts.Knowledge`, `CommunityOS.Contracts.Community` and the
+Organization ADR-016 projection; it produces `NotificationDispatched` under
+`CommunityOS.Contracts.Notifications`. The transactional outbox (ADR-015) is
+enabled at the **Notifications integration gate** (Prompt 10C) — see the outbox
+gate below.
+
+**Outbox gate (ratified).** The transactional outbox and the receive-endpoint
+inbox are enabled at the Notifications integration gate (Prompt 10C), mirroring
+the Records (Prompt 08B) and Workflow (Prompt 09C) gates:
+
+1. Notifications is itself a guaranteed-delivery **consumer** of Workflow
+   events (`WorkflowTaskAssigned`/`WorkflowTaskEscalated`), which the Workflow
+   outbox already protects; Notifications must consume with receive-endpoint
+   outbox semantics to reconcile exactly-once.
+2. Notifications' own `NotificationDispatched` event is consumed by Audit
+   (slot 11) and Analytics (slot 19); it must be outbox-protected before those
+   consumers subscribe.
+3. Best-effort in-process publication is **not** acceptable for any Notifications
+   integration event at implementation time.
+
+The outbox-protected set is **non-exhaustive by design**: any Notifications
+event consumed by a guaranteed-delivery consumer is protected whether or not
+its name appears in a delivery table.
+
+Ratified decisions (Prompt 10B):
+
+1. **Ownership** — Notifications owns notification records, recipient delivery
+   state, channel selection, type/template catalog, preferences and delivery
+   orchestration; never the domain facts that trigger notifications.
+2. **Scaffold disposition** — the pre-existing `Notifications.Domain` scaffold
+   (prototype, `src/Services/Notifications/`) is superseded by this ADR as
+   authoritative. **Retained as-is (reusable):** `MessageTemplate` (subject/
+   body + `{{var}}` rendering), `NotificationChannel` (Email/Push/InApp/SMS)
+   enumeration, the recipient-dedup rule (`AddRecipient` no-op on duplicate),
+   `NotificationNotFoundException`. **Superseded/refined:** `Notification`
+   aggregate (adds parameterized `occurredOn`, lifecycle with terminal guard,
+   source reference, org scopes, `IsSensitive`, type code, `ScheduledFor`;
+   removes hardcoded `DateTime.UtcNow`); `NotificationRecipient` (adds
+   terminal-state guards on `MarkSent`/`MarkDelivered`/`MarkRead`/
+   `MarkFailed`, bounded retry count; removes direct `DateTime.UtcNow` in
+   delivery/read provenance); `NotificationStatus` (replaced by the ratified
+   aggregate lifecycle + recipient status below);
+   `NotificationDispatchedEvent` (kept, extended for integration export);
+   `NotificationDeliveredEvent`/`NotificationReadEvent` (kept as **domain
+   events only**, never exported); `INotificationRepository` (extended for
+   reconcile create-if-absent and inbox queries); `NotificationsDomainExceptions`
+   (adds `InvalidNotificationTransitionException`).
+3. **Aggregate and lifecycle** — `Notification` is the aggregate root with
+   `Draft → Queued → Dispatched`. `Dispatched` is terminal: reached only when
+   every recipient is terminal, in the same transaction that publishes
+   `NotificationDispatched`. `Dispatch()` throws
+   `InvalidNotificationTransitionException` if invoked when already
+   `Dispatched` (double-dispatch protection). Recipients may be added in
+   `Draft`/`Queued`; `Queue()` requires at least one recipient.
+4. **Recipient lifecycle and terminal-state invariants** —
+   `Pending → Sent → Delivered → Read`, with `Failed` terminal from
+   `Pending`/`Sent`. Transitions are guarded: `MarkSent` only from `Pending`;
+   `MarkDelivered` only from `Sent` (provider ack) or directly from `Pending`
+   (InApp immediate delivery); `MarkRead` only from `Delivered` (a notification
+   that was never delivered or that failed can never be read); `MarkFailed`
+   only from `Pending`/`Sent`. Any other transition throws
+   `InvalidNotificationTransitionException`. `Delivered`, `Read` and `Failed`
+   are terminal per recipient; no regress, no reopen — a re-send is always a
+   **new** notification (Workflow "no reopen" philosophy).
+5. **Channels and provider boundary** — ratified channel catalog:
+   `InApp(3)`, `Email(1)`, `Push(2)`, `Sms(4)`. **InApp** is domain-owned and
+   implemented in the first gate: dispatch writes a readable inbox row
+   (`Pending → Delivered`), and `Read` is tracked via the API. **Email, SMS and
+   Push** are ratified logical channels with domain-owned state semantics
+   (`Sent` = handed to a provider; `Delivered` = provider ack; `Read` = read
+   receipt where the provider supports it), but their concrete providers (SMTP/
+   SES, SMS gateway, APNS/FCM) are **future infrastructure integrations** behind
+   `INotificationChannelDispatcher`. With no provider configured, dispatch fails
+   closed (`Failed`, reason `provider-not-configured`). No channel-specific
+   schema exists beyond the channel code + status: provider payloads are
+   transport details resolved at dispatch time.
+6. **Templates/content ownership** — `MessageTemplate` remains part of
+   Notifications. The `NotificationType` catalog owns the default subject/body
+   template per type and is seeded idempotently at migration time
+   (`NotificationCatalogSeeder`), mirroring the Workflow task-definition
+   catalog. Bodies are rendered at dispatch time with a validated, non-PII
+   variable set (ids, dates, codes). Notifications never owns authoritative
+   content (ADR-021 rule for citations applies to notification copy).
+7. **Permission matrix** — the `notifications.*` matrix below is adopted;
+   centralized and fail-closed; resource-level (`resourceType =
+   "notification"`); self-inbox access via relationship tuples; 404-equivalent
+   for unauthorized reads.
+8. **Scoping and sensitive access** — ADR-016 read-model projection; multi-scope
+   any-of-grant; `IsSensitive` notifications require the sensitive-read
+   permission; sensitive fields (failure reasons, distribution) are returned
+   only under `notifications.notification.read.sensitive`.
+9. **Consumed events** — the catalog below is adopted; the first gate
+   implements only the events that carry their own recipient lists
+   (`WorkflowTaskAssigned`, `WorkflowTaskEscalated`); all other triggers are
+   ratified and gated on a recipient-resolution dependency.
+10. **Produced events** — `NotificationDispatched` is the only exported
+    integration event; `NotificationDeliveredEvent`/`NotificationReadEvent` are
+    domain events only. Outbound payloads never carry recipient member ids,
+    bodies, names or failures (privacy rule).
+11. **Outbox/inbox** — ADR-015 transactional outbox + receive-endpoint inbox
+    enabled at the Notifications integration gate (see outbox gate).
+12. **Idempotency, retry, failure, reconciliation** — notification creation is
+    idempotent per (type, source type, source id, channel) via a uniqueness
+    constraint; reconcile consumers create-if-absent; duplicate events never
+    create duplicate notifications. Duplicate delivery/read acks are no-ops
+    (guarded terminal states). Provider retries are worker-level and bounded
+    (configuration-driven backoff) and never regress persisted domain state;
+    permanent failure is terminal `Failed` with a reason. Reconciliation
+    converges on redelivered events to the same notification.
+13. **Persistence** — own database `communityos_notifications`, schema
+    `notifications`; tables `notifications`, `notification_recipients`,
+    `notification_types`, `notification_preferences`,
+    `organization_unit_references` (projection), plus MassTransit
+    `InboxState`/`OutboxMessage`/`OutboxState`. EF migrations via the
+    Infrastructure project. Retention: no hard delete through normal
+    operations; expiry review-flagged; data privacy per boundary rules.
+14. **API contract** — versioned `/api/v1/notifications`; DTOs only;
+    inbox/read/sensitive/catalog/preferences endpoints per
+    `docs/api/notifications.md`; permission-to-endpoint equality verified at
+    the 10C gate; 404 for missing and unauthorized (no enumeration oracle).
+15. **Scaffold-remnant disposition (Content, Enrollment, Events, Reporting)** —
+    these four service folders are inert pre-ratification scaffolds **not in
+    the ADR-017 sequence**. They are **not ratified implementation candidates**
+    and must not be extended, migrated or treated as authoritative. They are
+    recorded in the ADR-017 status block as non-sequence scaffolds; any future
+    work on those domains requires a new ADR that explicitly adds the context
+    to the sequence and supersedes the prototype. This ADR makes Notifications
+    the sole ratified slot-9 work.
+16. **Audit readiness** — `NotificationDispatched` is outbox-protected from the
+    Notifications integration gate so Audit (slot 11) can subscribe later
+    without Notifications changes; Audit is not implemented now.
+
+### Notifications permission matrix (ratified)
+
+| Permission | Purpose | Typical holder |
+|------------|---------|----------------|
+| `notifications.notification.read` | List/read notification metadata and one's own inbox (self via relationship tuple) | all authorized users |
+| `notifications.notification.read.sensitive` | Read sensitive notification fields (failure reasons, distribution) and `IsSensitive` notifications | higher-privilege / privacy roles |
+| `notifications.notification.create` | Create a notification (directly or via event reconciliation) | services / coordinators |
+| `notifications.notification.send` | Trigger dispatch / admin re-send | dispatch operators |
+| `notifications.notification.admin` | Administrative override (re-queue, force-fail, view restricted diagnostics) | operators |
+| `notifications.type.manage` | Manage the notification-type/template catalog | administrators |
+| `notifications.template.read` | Read the notification-type/template catalog | authorized users |
+| `notifications.preference.manage` | Manage notification preferences (self via relationship tuple) | members |
+
+`notifications.notification.admin` is an override permission exercised through
+the standard endpoints (e.g. re-dispatching a failed notification), mirroring
+the Records/Workflow override pattern; it does not introduce a separate
+administration endpoint.
+
+Scope semantics follow `ADR-011`: data permissions are organization-scoped; a
+grant at a national scope covers descendant units via the Organization `/covers`
+hierarchy resolution. A global grant of a data permission only applies to
+checks with no organization context. Per-member inbox access composes through
+Authorization relationship tuples (recipient relation); Notifications never
+evaluates grants itself.
+
+### Notifications integration events (`CommunityOS.Contracts.Notifications`)
+
+| Event | Raised when | Key fields |
+|-------|-------------|-----------|
+| `NotificationDispatched` | A notification completes dispatch (all recipients terminal) | `NotificationId`, `TypeCode`, `Channel`, `SourceType`, `SourceId`, `RecipientCount`, `OccurredOn` |
+
+Payloads are identifiers and a count only. **Deliberately not exported**:
+recipient member ids (distribution is sensitive), subject/body copy, names,
+delivery failures, and read/delivery provenance. `NotificationDeliveredEvent`
+and `NotificationReadEvent` are **domain events only** and are never placed on
+the bus.
+
+### Notifications consumed events (ratified catalog)
+
+Recipient resolution is the gate criterion: the first gate (Prompt 10C)
+implements only triggers that carry their own recipient list and need no
+cross-service read.
+
+| Producer | Event | Notification type | Recipients | Gate |
+|----------|-------|-------------------|------------|------|
+| Organization | `OrganizationUnitCreated/Updated/ParentChanged` | (projection only, not a notification trigger) | — | First gate |
+| Workflow | `WorkflowTaskAssigned` | `task-assigned` | `AssigneeIds` (from event) | **First gate** |
+| Workflow | `WorkflowTaskEscalated` | `task-escalated` | `EscalatedTo` (from event) | **First gate** |
+| Workflow | `WorkflowTaskCompleted` | `task-completed` (originator digest) | originator via Workflow API read | Deferred |
+| Workflow | `WorkflowTaskCancelled` | `task-cancelled` (originator digest) | originator via Workflow API read | Deferred |
+| Records | `RecordVerified` | `record-verified` | submitter via Records API read | Deferred |
+| Records | `RecordRejected` | `record-rejected` | submitter via Records API read | Deferred |
+| Records | `RecordHoldPlaced` | `record-hold` (sensitive) | stakeholders via Records API read | Deferred |
+| Records | `RecordHoldReleased` | `record-hold` (sensitive) | stakeholders via Records API read | Deferred |
+| Knowledge | `QuestionFlagged` | `question-flagged` (moderation) | moderators via Knowledge API read | Deferred |
+| Knowledge | `QuestionUnderReview` | `question-flagged` (moderation) | moderators via Knowledge API read | Deferred |
+| Community | `ActivityCreated` | `community-activity` | audience selection (product decision) | Deferred |
+| Community | `CommunityEventCreated` | `community-event` | audience selection (product decision) | Deferred |
+| Community | `MeetingCreated` | `community-meeting` | audience selection (product decision) | Deferred |
+
+`WorkflowTaskCreated` is not a trigger (a task is not assigned until
+`WorkflowTaskAssigned`). Deferred triggers are ratified contracts, not
+implemented in the first gate; each states its recipient-resolution dependency
+so it cannot silently fire without recipients.
+
+### Notification type catalog (ratified baseline)
+
+Seeded idempotently at migration time; codes are stable strings, extensible
+via configuration; types are retired, never deleted:
+
+| Code | Purpose | Default channel | Sensitive |
+|------|---------|-----------------|-----------|
+| `task-assigned` | A workflow task is assigned to the recipient | InApp | no |
+| `task-escalated` | A workflow task is escalated to the recipient | InApp | no |
+| `task-completed` | A task the recipient originated is completed (deferred trigger) | InApp | no |
+| `task-cancelled` | A task the recipient originated is cancelled (deferred trigger) | InApp | no |
+| `record-verified` | A record the recipient submitted is verified (deferred trigger) | InApp | no |
+| `record-rejected` | A record the recipient submitted is rejected (deferred trigger) | InApp | no |
+| `record-hold` | A hold is placed/released on a record (deferred trigger) | InApp | yes |
+| `question-flagged` | A question is flagged for moderation (deferred trigger) | InApp | no |
+| `community-activity` / `community-event` / `community-meeting` | Community activity digests (deferred triggers) | InApp | no |
+| `general` | Free-standing / administrative notifications (API-created) | InApp | no |
+
+Superseded decisions: none. The pre-existing `Notifications.Domain` scaffold is
+dispositioned by decision 2 above; it is superseded by this ADR, not ratified.

@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.API\CommunityOS.Notifications.API.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.Application\CommunityOS.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.Domain\CommunityOS.Notifications.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Notifications\CommunityOS.Notifications.Infrastructure\CommunityOS.Notifications.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
-    <PackageReference Include="Testcontainers.RabbitMq" />
   </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
 </Project>

@@ -63,6 +63,20 @@ public static class PermissionCatalog
     public const string WorkflowDefinitionManage = "workflow.definition.manage";
     public const string WorkflowTaskAdmin = "workflow.task.admin";
 
+    // Notifications capabilities (notifications.*, ratified ADR-025). Inbox and
+    // sensitive-field reads are separate capabilities; reading sensitive fields
+    // requires notifications.notification.read.sensitive in addition to
+    // notifications.notification.read. notifications.notification.admin is the
+    // administrative override for dispatch (admin re-send).
+    public const string NotificationRead = "notifications.notification.read";
+    public const string NotificationReadSensitive = "notifications.notification.read.sensitive";
+    public const string NotificationCreate = "notifications.notification.create";
+    public const string NotificationSend = "notifications.notification.send";
+    public const string NotificationAdmin = "notifications.notification.admin";
+    public const string NotificationTypeManage = "notifications.type.manage";
+    public const string NotificationTemplateRead = "notifications.template.read";
+    public const string NotificationPreferenceManage = "notifications.preference.manage";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global
