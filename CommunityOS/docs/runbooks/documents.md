@@ -142,7 +142,9 @@ guarded endpoint returns `403 Forbidden` (fail-closed).
 
 ## Health and operations
 
-- Health probe: `GET /health`.
+- Health: the Documents API exposes no dedicated health probe endpoint (only
+  Organization and Authorization register `GET /health`). Observe availability
+  through Serilog console/Seq logs and container/infrastructure probes.
 - Logs: Serilog to console (Seq endpoint when configured). Never log content or
   filenames.
 

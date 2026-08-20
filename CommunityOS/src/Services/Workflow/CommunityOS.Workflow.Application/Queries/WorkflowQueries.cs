@@ -126,9 +126,9 @@ internal sealed class GetWorkflowTaskSensitiveFieldsQueryHandler(
         // Sensitive reads require both the base read permission and the
         // sensitive capability; any failure surfaces as 404 (no oracle).
         if (!await WorkflowTaskAuthorization.HasForTaskAsync(
-                guard, query.ActorId, WorkflowPermissions.TaskRead, task, CancellationToken.None) ||
+                guard, query.ActorId, WorkflowPermissions.TaskRead, task, ct) ||
             !await WorkflowTaskAuthorization.HasForTaskAsync(
-                guard, query.ActorId, WorkflowPermissions.TaskReadSensitive, task, CancellationToken.None))
+                guard, query.ActorId, WorkflowPermissions.TaskReadSensitive, task, ct))
             throw new WorkflowTaskNotFoundException(query.TaskId);
 
         return task.ToSensitiveFieldsDto();

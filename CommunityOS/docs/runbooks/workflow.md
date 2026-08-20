@@ -63,10 +63,6 @@ Known limitations at Prompt 09C:
 - Docker/Testcontainers is unavailable in the implementation environment, so
   the integration test suite (`CommunityOS.Workflow.IntegrationTests`) is
   **compile-only**; it has not been executed against PostgreSQL.
-- The `docs/api/workflow.md` idempotent-create note (duplicate create returns
-  the existing open task) and the runbook 409 troubleshooting entry describe
-  two different behaviours; the handler returns the existing open task and the
-  filtered unique index is the concurrency backstop. See the Prompt 09C report.
 
 ## Outbox gate (ADR-015)
 
@@ -172,9 +168,10 @@ the presented token is misconfigured, every guarded endpoint returns
 
 ## Health and operations
 
-- Health: the Workflow API exposes no dedicated health probe endpoint (consistent
-  with the Records service). Observe availability through Serilog console/Seq
-  logs and container/infrastructure probes.
+- Health: the Workflow API exposes no dedicated health probe endpoint (Records,
+  Documents, Knowledge and Community likewise expose none; only Organization and
+  Authorization register `GET /health`). Observe availability through Serilog
+  console/Seq logs and container/infrastructure probes.
 - Logs: Serilog to console (Seq endpoint when configured). Never log task
   notes, sensitive fields, secrets or names.
 
