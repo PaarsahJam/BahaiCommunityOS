@@ -44,7 +44,7 @@ public sealed class RecordsReviewIntegrationEventConsumer(
         Guid recordId, DateTime occurredOn, CancellationToken ct)
     {
         var task = await CreateIfAbsentAsync(
-            tasks, RecordReviewDefinitionCode, RecordDomainType, recordId,
+            tasks, mediator, RecordReviewDefinitionCode, RecordDomainType, recordId,
             originatorId: SystemActorId, occurredOn, ct);
         if (task is not null)
             logger.RecordReviewTaskCreated(task.Id, recordId);

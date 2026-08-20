@@ -39,6 +39,7 @@ public static class WorkflowReconciliation
     /// </summary>
     public static async Task<WorkflowTask?> CreateIfAbsentAsync(
         IWorkflowTaskRepository tasks,
+        IMediator mediator,
         string definitionCode,
         string domainType,
         Guid domainEntityId,
@@ -62,8 +63,14 @@ public static class WorkflowReconciliation
             SystemActorId,
             occurredOn);
 
-        // Reconcile-created tasks are published through the same outbox gate;
-        // the create event and the task row commit atomically.
+        // Reconcile-created tasks are published through the same transactional
+        // outbox gate as direct creation (ADR-015): the created domain event is
+        // forwarded BEFORE the insert so the WorkflowTaskCreated outbox row and
+        // the task row commit atomically. If the filtered unique index wins a
+        // concurrent race, AddIfAbsentAsync rolls back the whole SaveChanges —
+        // the uncommitted outbox row is discarded with the scope, so no spurious
+        // event is ever emitted for a task that was not persisted.
+        await DomainEventPublisher.PublishAsync(task, mediator, ct);
         var persisted = await tasks.AddIfAbsentAsync(task, ct);
         return persisted is not null && persisted.Id == task.Id ? task : null;
     }

@@ -60,7 +60,7 @@ public sealed class KnowledgeReviewIntegrationEventConsumer(
     private async Task CreateModerationTaskIfAbsentAsync(Guid questionId, DateTime occurredOn, CancellationToken ct)
     {
         var task = await CreateIfAbsentAsync(
-            tasks, KnowledgeModerationDefinitionCode, KnowledgeQuestionDomainType, questionId,
+            tasks, mediator, KnowledgeModerationDefinitionCode, KnowledgeQuestionDomainType, questionId,
             originatorId: SystemActorId, occurredOn, ct);
         if (task is not null)
             logger.ModerationTaskCreated(task.Id, questionId);
@@ -79,7 +79,7 @@ public sealed class KnowledgeReviewIntegrationEventConsumer(
         Guid suggestionId, Guid questionId, DateTime occurredOn, CancellationToken ct)
     {
         var task = await CreateIfAbsentAsync(
-            tasks, KnowledgeAiReviewDefinitionCode, KnowledgeAiSuggestionDomainType, suggestionId,
+            tasks, mediator, KnowledgeAiReviewDefinitionCode, KnowledgeAiSuggestionDomainType, suggestionId,
             originatorId: SystemActorId, occurredOn, ct);
         if (task is not null)
             logger.AiReviewTaskCreated(task.Id, suggestionId, questionId);

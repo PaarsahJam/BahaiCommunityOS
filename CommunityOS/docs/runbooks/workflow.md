@@ -172,7 +172,9 @@ the presented token is misconfigured, every guarded endpoint returns
 
 ## Health and operations
 
-- Health probe: `GET /health`.
+- Health: the Workflow API exposes no dedicated health probe endpoint (consistent
+  with the Records service). Observe availability through Serilog console/Seq
+  logs and container/infrastructure probes.
 - Logs: Serilog to console (Seq endpoint when configured). Never log task
   notes, sensitive fields, secrets or names.
 

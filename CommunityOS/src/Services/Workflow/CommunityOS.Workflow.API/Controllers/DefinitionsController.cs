@@ -19,6 +19,9 @@ public sealed class DefinitionsController(ISender sender) : ControllerBase
 
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<TaskDefinitionDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
         var result = await sender.Send(new ListTaskDefinitionsQuery(ActorId), ct);
@@ -27,7 +30,10 @@ public sealed class DefinitionsController(ISender sender) : ControllerBase
 
     [HttpGet("{code}")]
     [ProducesResponseType<TaskDefinitionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetByCode(string code, CancellationToken ct)
     {
         var result = await sender.Send(new GetTaskDefinitionQuery(ActorId, code), ct);
@@ -37,7 +43,10 @@ public sealed class DefinitionsController(ISender sender) : ControllerBase
     [HttpPost]
     [ProducesResponseType<TaskDefinitionDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Create(CreateTaskDefinitionRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new CreateTaskDefinitionCommand(
@@ -49,8 +58,11 @@ public sealed class DefinitionsController(ISender sender) : ControllerBase
     [HttpPut("{code}")]
     [ProducesResponseType<TaskDefinitionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(string code, UpdateTaskDefinitionRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new UpdateTaskDefinitionCommand(
@@ -61,8 +73,11 @@ public sealed class DefinitionsController(ISender sender) : ControllerBase
 
     [HttpPost("{code}/retire")]
     [ProducesResponseType<TaskDefinitionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Retire(string code, CancellationToken ct)
     {
         var result = await sender.Send(new RetireTaskDefinitionCommand(ActorId, code), ct);

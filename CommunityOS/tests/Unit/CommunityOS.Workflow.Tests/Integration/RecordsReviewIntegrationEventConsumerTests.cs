@@ -1,4 +1,5 @@
 using CommunityOS.Workflow.Domain.Aggregates;
+using CommunityOS.Workflow.Domain.Events;
 using CommunityOS.Workflow.Domain.Repositories;
 using CommunityOS.Workflow.Infrastructure.Integration.Records;
 using MassTransit;
@@ -54,6 +55,9 @@ public class RecordsReviewIntegrationEventConsumerTests
         await tasks.Received(1).FindOpenAsync(
             Arg.Any<string>(), Arg.Any<string>(), RecordId, Arg.Any<CancellationToken>());
         await tasks.Received(1).AddIfAbsentAsync(Arg.Any<WorkflowTask>(), Arg.Any<CancellationToken>());
+        // Reconcile-created tasks publish WorkflowTaskCreated through the outbox
+        // exactly once, mirroring direct creation (ADR-015).
+        await mediator.Received(1).Publish(Arg.Any<WorkflowTaskCreatedEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -70,6 +74,8 @@ public class RecordsReviewIntegrationEventConsumerTests
         await consumer.Consume(Context(new CommunityOS.Contracts.Records.RecordSubmitted(RecordId, "submitted", Now)));
 
         await tasks.DidNotReceive().AddIfAbsentAsync(Arg.Any<WorkflowTask>(), Arg.Any<CancellationToken>());
+        // Duplicate events never re-emit WorkflowTaskCreated (idempotency).
+        await mediator.DidNotReceive().Publish(Arg.Any<WorkflowTaskCreatedEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

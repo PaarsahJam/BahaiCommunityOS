@@ -1,4 +1,5 @@
 using CommunityOS.Workflow.Domain.Aggregates;
+using CommunityOS.Workflow.Domain.Events;
 using CommunityOS.Workflow.Domain.Repositories;
 using CommunityOS.Workflow.Infrastructure.Integration.Knowledge;
 using MassTransit;
@@ -62,6 +63,9 @@ public class KnowledgeReviewIntegrationEventConsumerTests
                 t.DomainType == "knowledge-question" &&
                 t.DomainEntityId == QuestionId),
             Arg.Any<CancellationToken>());
+        // Reconcile-created tasks publish WorkflowTaskCreated through the outbox
+        // exactly once, mirroring direct creation (ADR-015).
+        await mediator.Received(1).Publish(Arg.Any<WorkflowTaskCreatedEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -75,6 +79,8 @@ public class KnowledgeReviewIntegrationEventConsumerTests
         await consumer.Consume(Context(new CommunityOS.Contracts.Knowledge.QuestionUnderReview(QuestionId, Now)));
 
         await tasks.DidNotReceive().AddIfAbsentAsync(Arg.Any<WorkflowTask>(), Arg.Any<CancellationToken>());
+        // Duplicate events never re-emit WorkflowTaskCreated (idempotency).
+        await mediator.DidNotReceive().Publish(Arg.Any<WorkflowTaskCreatedEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -126,6 +132,9 @@ public class KnowledgeReviewIntegrationEventConsumerTests
                 t.DomainType == "knowledge-ai-suggestion" &&
                 t.DomainEntityId == SuggestionId),
             Arg.Any<CancellationToken>());
+        // Reconcile-created tasks publish WorkflowTaskCreated through the outbox
+        // exactly once, mirroring direct creation (ADR-015).
+        await mediator.Received(1).Publish(Arg.Any<WorkflowTaskCreatedEvent>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

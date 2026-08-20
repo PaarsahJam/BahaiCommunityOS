@@ -254,6 +254,31 @@ public class WorkflowTaskLifecycleTests
         task.Activity.Should().Contain(a => a.Notes == "Sensitive completion note.");
     }
 
+    [Fact]
+    public void AddNote_appends_sensitive_note_on_open_task()
+    {
+        var task = CreateTask(Assignee);
+
+        task.AddNote("Sensitive note.", Actor, Now);
+
+        task.Notes.Should().Be("Sensitive note.");
+        task.Activity.Should().Contain(a => a.Notes == "Sensitive note.");
+    }
+
+    [Fact]
+    public void Terminal_tasks_reject_notes()
+    {
+        var task = CreateTask(Assignee);
+        task.Start(Assignee, adminOverride: false, Now);
+        task.Complete("verified", null, ["verified", "rejected"], Assignee, false, Now);
+
+        var act = () => task.AddNote("Sensitive note.", Actor, Now);
+
+        act.Should().Throw<InvalidWorkflowTaskTransitionException>();
+        task.Notes.Should().BeNull();
+        task.Activity.Should().NotContain(a => a.Notes == "Sensitive note.");
+    }
+
     // --- Overdue ---
 
     [Fact]

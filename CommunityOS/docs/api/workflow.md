@@ -134,7 +134,7 @@ Errors are returned as JSON with a problem-details body. Common codes:
 | 401 | Missing / invalid access token |
 | 403 | Caller lacks the required capability (fail-closed) |
 | 404 | Task / definition not found (also for unauthorized reads) |
-| 409 | Invalid transition, duplicate open task, duplicate definition code, retire-in-use definition |
+| 409 | Invalid transition, duplicate definition code, retire-in-use definition |
 
 ## Service-to-service notes
 

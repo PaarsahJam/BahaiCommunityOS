@@ -19,8 +19,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
 
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<WorkflowTaskSummaryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> List(
-        [FromQuery] string? definitionCode,
+        [FromQuery] string? definition,
         [FromQuery] string? status,
         [FromQuery] Guid? assigneeId,
         [FromQuery] string? domainType,
@@ -30,13 +33,15 @@ public sealed class TasksController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var result = await sender.Send(new ListWorkflowTasksQuery(
-            ActorId, definitionCode, status, assigneeId, domainType, domainEntityId, organizationUnitId, overdue), ct);
+            ActorId, definition, status, assigneeId, domainType, domainEntityId, organizationUnitId, overdue), ct);
         return Ok(result);
     }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await sender.Send(new GetWorkflowTaskQuery(ActorId, id), ct);
@@ -45,7 +50,9 @@ public sealed class TasksController(ISender sender) : ControllerBase
 
     [HttpGet("{id:guid}/sensitive")]
     [ProducesResponseType<WorkflowTaskSensitiveFieldsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetSensitiveFields(Guid id, CancellationToken ct)
     {
         var result = await sender.Send(new GetWorkflowTaskSensitiveFieldsQuery(ActorId, id), ct);
@@ -55,6 +62,9 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Create(CreateWorkflowTaskRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new CreateWorkflowTaskCommand(
@@ -73,9 +83,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/assign")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Assign(Guid id, AssignWorkflowTaskRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new AssignWorkflowTaskCommand(ActorId, id, request.AssigneeIds), ct);
@@ -85,9 +97,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/start")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Start(Guid id, StartWorkflowTaskRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new StartWorkflowTaskCommand(ActorId, id, request.AdminOverride), ct);
@@ -97,9 +111,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/complete")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Complete(Guid id, CompleteWorkflowTaskRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new CompleteWorkflowTaskCommand(
@@ -110,9 +126,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/cancel")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
     {
         var result = await sender.Send(new CancelWorkflowTaskCommand(ActorId, id), ct);
@@ -122,9 +140,11 @@ public sealed class TasksController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/escalate")]
     [ProducesResponseType<WorkflowTaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Escalate(Guid id, EscalateWorkflowTaskRequest request, CancellationToken ct)
     {
         var result = await sender.Send(new EscalateWorkflowTaskCommand(ActorId, id, request.EscalateTo, request.Reason), ct);
@@ -133,7 +153,9 @@ public sealed class TasksController(ISender sender) : ControllerBase
 
     [HttpGet("{id:guid}/activity")]
     [ProducesResponseType<IReadOnlyList<TaskActivityDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> ListActivity(Guid id, CancellationToken ct)
     {
         var result = await sender.Send(new ListWorkflowTaskActivityQuery(ActorId, id), ct);

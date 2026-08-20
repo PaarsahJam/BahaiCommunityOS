@@ -425,10 +425,14 @@ public sealed class WorkflowTask : AggregateRoot<Guid>
 
     /// <summary>
     /// Appends a sensitive note (e.g. assigned on complete/escalate) to the
-    /// activity history. Notes are stored, never exported.
+    /// activity history. Notes are stored, never exported. Terminal
+    /// (Completed/Cancelled) tasks are immutable and reject notes.
     /// </summary>
     public void AddNote(string notes, Guid actorId, DateTime occurredOn)
     {
+        if (IsTerminal)
+            throw new InvalidWorkflowTaskTransitionException(Id, Status.Name, Status.Name);
+
         Guard.NotNullOrWhiteSpace(notes, nameof(notes));
         Guard.MaxLength(notes, 2000, nameof(notes));
 
