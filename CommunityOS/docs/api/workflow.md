@@ -1,8 +1,7 @@
 # Workflow Service API
 
-> **STATUS: RATIFIED (Prompt 09B).** Contract for the future Workflow service,
-> aligned with ratified ADR-024 and `docs/workflow.md`. Not implemented;
-> implementation proceeds in Prompt 09C.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 09C).** Contract for the Workflow
+> service, aligned with ratified ADR-024 and `docs/workflow.md`.
 
 All endpoints are versioned under `/api/v1/workflow`, require a valid access
 token (`[Authorize]`), and return DTOs — **EF entities are never exposed**.

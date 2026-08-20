@@ -231,8 +231,9 @@ Implementation-sequence status:
 - Slots 1–7 (Foundation, Identity, Authorization, Organization, Community,
   Documents, Records) are **implemented**; Records (slot 7) completed the full
   08A→08E gate with the transactional outbox enabled (ADR-015, Prompt 08A-R2).
-- Slot 8 (**Workflow**) is **ratified** (ADR-024, Prompt 09B gate) but **not
-  yet implemented**.
+- Slot 8 (**Workflow**) is **implemented** (ADR-024, Prompt 09C gate); the
+  integration test suite is compile-only because Docker/Testcontainers is not
+  available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
 - Slots 9–11 and 13–19 are not started.
 
@@ -715,7 +716,8 @@ Prompt 08B implementation gate.
 
 ## ADR-024 — Workflow bounded context and task boundary
 
-**Status:** Accepted (ratified at the Prompt 09B gate).
+**Status:** Accepted (ratified at the Prompt 09B gate; implemented at the
+Prompt 09C gate).
 
 The Workflow bounded context owns **task/work-item state** and the task engine
 that routes, assigns, tracks and escalates human review and approval work across

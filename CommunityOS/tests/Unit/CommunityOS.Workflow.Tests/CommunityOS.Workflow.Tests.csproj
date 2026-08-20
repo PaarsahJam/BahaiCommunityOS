@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Authorization\CommunityOS.Authorization.Application\CommunityOS.Authorization.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.API\CommunityOS.Workflow.API.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.Application\CommunityOS.Workflow.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.Domain\CommunityOS.Workflow.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.Infrastructure\CommunityOS.Workflow.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.API\appsettings.json"
+          Link="Config\appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\src\Services\Workflow\CommunityOS.Workflow.API\appsettings.Production.json"
+          Link="Config\appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

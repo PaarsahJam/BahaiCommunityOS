@@ -47,6 +47,22 @@ public static class PermissionCatalog
     public const string CategoryManage = "records.category.manage";
     public const string RecordAdmin = "records.record.admin";
 
+    // Workflow capabilities (workflow.*, ratified ADR-024). Task lifecycle
+    // actions are separate capabilities; sensitive-field read requires
+    // workflow.task.read.sensitive in addition to workflow.task.read.
+    // workflow.task.admin is the administrative override for start/complete.
+    public const string WorkflowTaskRead = "workflow.task.read";
+    public const string WorkflowTaskReadSensitive = "workflow.task.read.sensitive";
+    public const string WorkflowTaskCreate = "workflow.task.create";
+    public const string WorkflowTaskAssign = "workflow.task.assign";
+    public const string WorkflowTaskStart = "workflow.task.start";
+    public const string WorkflowTaskComplete = "workflow.task.complete";
+    public const string WorkflowTaskCancel = "workflow.task.cancel";
+    public const string WorkflowTaskEscalate = "workflow.task.escalate";
+    public const string WorkflowDefinitionRead = "workflow.definition.read";
+    public const string WorkflowDefinitionManage = "workflow.definition.manage";
+    public const string WorkflowTaskAdmin = "workflow.task.admin";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global
@@ -68,8 +84,6 @@ public static class PermissionCatalog
         "documents.document.delete",
         "correspondence.letter.create",
         "correspondence.letter.submit",
-        "correspondence.letter.read",
-        "workflow.task.read",
-        "workflow.task.complete"
+        "correspondence.letter.read"
     ];
 }

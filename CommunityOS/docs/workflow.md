@@ -1,8 +1,7 @@
 # Workflow Service
 
-> **STATUS: RATIFIED (Prompt 09B).** Architectural design for the Workflow
-> bounded context (`ADR-024`), positioned at ADR-017 slot 8. Not implemented;
-> implementation proceeds in Prompt 09C.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 09C).** Architectural design for
+> the Workflow bounded context (`ADR-024`), positioned at ADR-017 slot 8.
 
 The Workflow bounded context owns **task/work-item state** and the task engine
 that routes, assigns, tracks and escalates human review and approval work across

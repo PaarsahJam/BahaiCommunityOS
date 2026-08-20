@@ -1,8 +1,7 @@
 # Workflow Service Runbook
 
-> **STATUS: RATIFIED (Prompt 09B).** Operational notes for the future Workflow
-> service (`ADR-024` Accepted, `docs/workflow.md` ratified). **Not implemented.**
-> These notes are the operational contract to be followed during Prompt 09C.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 09C).** Operational notes for the
+> Workflow service (`ADR-024` Accepted, `docs/workflow.md` ratified).
 
 ## Services
 
@@ -20,45 +19,54 @@
   Records/Knowledge consumer is registered in a shared environment. See "Outbox
   gate" below.
 
-## Implementation status (Prompt 09B)
+## Implementation status (Prompt 09C)
 
-Not implemented. Ratified architecture and contracts exist in `ADR-024`,
-`docs/workflow.md` and `docs/api/workflow.md`. Prompt 09C is the implementation
-gate.
+Implemented. Service projects live under `src/Services/Workflow/`
+(Domain / Application / Infrastructure / API) and are referenced in
+`CommunityOS.sln`, plus unit and compile-only integration test projects.
+The following Prompt 09C steps are complete:
 
-Planned implementation steps (Prompt 09C):
-
-1. Create service projects under `src/Services/Workflow/` and reference them in
-   `CommunityOS.sln` (Domain / Application / Infrastructure / API), plus the
-   unit and integration test projects.
-2. Add `CREATE DATABASE communityos_workflow;` to
+1. Service projects created under `src/Services/Workflow/` and referenced in
+   `CommunityOS.sln` (Domain / Application / Infrastructure / API), plus unit
+   and integration test projects.
+2. `CREATE DATABASE communityos_workflow;` added to
    `docker/init/01-create-databases.sql`.
-3. Create the initial EF Core migration `InitialCreateWorkflow`
-   (`task_definitions`, `workflow_tasks`, `task_assignments`, `task_activity`,
+3. Initial EF Core migration `InitialCreateWorkflow` generated
+   (`task_definitions`, `workflow_tasks`, `task_assignments`,
+   `task_assignment_assignees`, `task_scopes`, `task_activity`,
    `organization_unit_references`, plus the MassTransit outbox tables in the
    `workflow` schema).
-4. Wire `AddCommunityOSEventBusWithOutbox<WorkflowDbContext>`,
-   `ConfigureAuthorizationService` + `HttpAuthorizationEvaluator` +
-   `AuthorizationGuard`, and the open-generic `INotificationHandler<>`
-   integration publisher following the existing pattern.
-5. Register the ratified `workflow.*` permission matrix in the Authorization
-   permission catalog and the development role seeds.
-6. Register the `OrganizationUnitCreated/Updated/ParentChanged` consumer
-   (ADR-016 projection), the Records
-   `RecordSubmitted/RecordVerified/RecordRejected` consumer, and the Knowledge
+4. `AddCommunityOSEventBusWithOutbox<WorkflowDbContext>` wired with the three
+   consumers, `ConfigureAuthorizationService` + `HttpAuthorizationEvaluator` +
+   `AuthorizationGuard`, and the `WorkflowIntegrationEventPublisher` following
+   the existing pattern.
+5. The ratified `workflow.*` permission matrix is registered in the
+   Authorization permission catalog and the development role seeds.
+6. Consumers registered: `OrganizationUnitCreated/Updated/ParentChanged`
+   (ADR-016 projection), Records
+   `RecordSubmitted/RecordVerified/RecordRejected`, and Knowledge
    `QuestionFlagged/QuestionUnderReview/QuestionMerged/QuestionArchived/
-   AiSuggestionRequested/AiSuggestionReviewed` consumer.
-7. Configure the `AuthorizationService`, `DocumentsService` and `CommunityService`
-   sections (service principals) and the event-bus/outbox wiring.
-8. Seed the baseline task-definition catalog idempotently at migration time
+   AiSuggestionRequested/AiSuggestionReviewed`.
+7. `AuthorizationService`, `DocumentsService` and `CommunityService` sections
+   (service principals) and the event-bus/outbox wiring are configured.
+8. Baseline task-definition catalog is seeded idempotently at migration time
    (`WorkflowCatalogSeeder`: `record-review`, `document-review`,
    `knowledge-moderation`, `knowledge-ai-review`, `general`).
-9. Ship `appsettings.json` / `appsettings.Development.json` /
-   `appsettings.Production.json` (`WorkflowDb`, JWT, RabbitMq,
+9. `appsettings.json` / `appsettings.Development.json` /
+   `appsettings.Production.json` shipped (`WorkflowDb`, JWT, RabbitMq,
    AuthorizationService, DocumentsService, CommunityService sections;
    `Jwt:RequireHttpsMetadata: "true"` in Production).
-10. Implement the API surface in `docs/api/workflow.md` and the documentation in
-    `docs/workflow.md`.
+10. API surface in `docs/api/workflow.md` and the documentation in
+    `docs/workflow.md` implemented.
+
+Known limitations at Prompt 09C:
+- Docker/Testcontainers is unavailable in the implementation environment, so
+  the integration test suite (`CommunityOS.Workflow.IntegrationTests`) is
+  **compile-only**; it has not been executed against PostgreSQL.
+- The `docs/api/workflow.md` idempotent-create note (duplicate create returns
+  the existing open task) and the runbook 409 troubleshooting entry describe
+  two different behaviours; the handler returns the existing open task and the
+  filtered unique index is the concurrency backstop. See the Prompt 09C report.
 
 ## Outbox gate (ADR-015)
 
@@ -200,9 +208,12 @@ dotnet test tests/Integration/CommunityOS.Workflow.IntegrationTests
 - **`InvalidOperationException: CommunityService:BaseUrl is not configured`** —
   set `CommunityService:BaseUrl` to the Community API base URL; Workflow only
   needs it to resolve assignee names at read time.
-- **`409` on create for an open task** — task creation is idempotent per
-  (definition, domain entity); the domain entity already has an open task of
-  that definition.
+- **Duplicate create for an open task** — task creation is idempotent per
+  (definition, domain entity); a duplicate create returns the existing open
+  task (200), never a new row. The filtered unique index
+  `ix_workflow_tasks_open_definition_domain` is the concurrency backstop: a
+  genuine race surfaces as `DbUpdateException`, which the repository converts
+  back into the existing task.
 - **`409` on complete for a `Created`/`Assigned` task** — complete is only
   legal from `In Progress`; start the task first (`POST /tasks/{id}/start`).
 - **Reconcile consumer missing events** — check that the transactional outbox

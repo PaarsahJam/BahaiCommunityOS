@@ -30,7 +30,12 @@ public static class AuthorizationSeeder
             "records.record.correct", "records.record.archive", "records.record.deactivate",
             "records.record.restore", "records.record.classify", "records.record.scope.manage",
             "records.record.evidence.manage", "records.retention.manage", "records.hold.manage",
-            "records.category.manage", "records.record.admin"
+            "records.category.manage", "records.record.admin",
+
+            "workflow.task.read", "workflow.task.read.sensitive",
+            "workflow.task.create", "workflow.task.assign", "workflow.task.start",
+            "workflow.task.complete", "workflow.task.cancel", "workflow.task.escalate",
+            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -49,7 +54,12 @@ public static class AuthorizationSeeder
             "records.record.correct", "records.record.archive", "records.record.deactivate",
             "records.record.restore", "records.record.classify", "records.record.scope.manage",
             "records.record.evidence.manage", "records.retention.manage", "records.hold.manage",
-            "records.category.manage", "records.record.admin"
+            "records.category.manage", "records.record.admin",
+
+            "workflow.task.read", "workflow.task.read.sensitive",
+            "workflow.task.create", "workflow.task.assign", "workflow.task.start",
+            "workflow.task.complete", "workflow.task.cancel", "workflow.task.escalate",
+            "workflow.definition.read", "workflow.definition.manage", "workflow.task.admin"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [

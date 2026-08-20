@@ -1,0 +1,8 @@
+root = false
+
+[*.cs]
+# Generated EF Core migrations frequently build constant arrays for composite
+# index column lists. Follow the Documents/Organization/Records service
+# convention and suppress these analyzers for generated migration code only.
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
