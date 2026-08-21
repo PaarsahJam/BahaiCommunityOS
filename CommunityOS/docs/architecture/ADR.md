@@ -31,6 +31,8 @@ This directory contains ADRs for CommunityOS.
 | ADR-023 | Records bounded context and official-record boundary | Accepted |
 | ADR-024 | Workflow bounded context and task boundary | Accepted |
 | ADR-025 | Notifications bounded context and delivery boundary | Accepted |
+| ADR-026 | Search bounded context and full-text projection boundary | Accepted |
+
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
 
@@ -238,8 +240,10 @@ Implementation-sequence status:
 - Slot 9 (**Notifications**) is **implemented** (ADR-025, Prompt 10C gate);
   the integration test suite is compile-only because Docker/Testcontainers is
   not available in the implementation environment.
+- Slot 10 (**Search**) is **ratified** (ADR-026, Prompt 11B gate); implementation
+  begins at Prompt 11C.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
-- Slots 10–11 and 13–19 are not started.
+- Slots 11 and 13–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -1250,3 +1254,158 @@ via configuration; types are retired, never deleted:
 
 Superseded decisions: none. The pre-existing `Notifications.Domain` scaffold is
 dispositioned by decision 2 above; it is superseded by this ADR, not ratified.
+
+## ADR-026 — Search bounded context and full-text projection boundary
+
+**Status:** Accepted (ratified at Prompt 11B gate).
+
+### Context
+
+CommunityOS requires a cross-domain search surface enabling authorized users
+to locate records, documents, workflow tasks, and knowledge questions from a
+single query interface. Nine bounded contexts are already implemented; each
+owns its own database and read API. A dedicated Search projection service is
+needed so that callers can issue a single query across multiple source types
+without each caller needing to query every source API individually.
+
+The key architectural constraint is that no new infrastructure component may be
+introduced unless explicitly justified: every service already depends on
+PostgreSQL 16 (ADR-006). Introducing Elasticsearch, OpenSearch, Meilisearch, or
+any other dedicated search engine requires: a new Docker compose service, new
+NuGet packages (not used elsewhere), new Testcontainers images, and significant
+operational overhead not present in the current stack.
+
+### Decision
+
+**PostgreSQL full-text search (`tsvector` / `tsquery`)** is selected as the
+Search engine for the first gate. The rationale:
+
+1. **Zero new infrastructure** — the shared `postgres:16-alpine` instance is
+   already required by all 9 implemented services. No new Docker compose entry
+   is needed.
+2. **Zero new NuGet packages** — `Npgsql.EntityFrameworkCore.PostgreSQL` is
+   already the project-wide ORM; `NpgsqlTsVector` support ships with it.
+3. **Zero new Testcontainers images** — integration tests already use
+   `Testcontainers.PostgreSql`.
+4. **Sufficient capability for the first gate** — multi-word and phrase queries
+   (`websearch_to_tsquery`), `ts_rank` relevance ordering, `ts_headline`
+   snippet generation, language dictionaries, and `GIN` index support are all
+   available natively in PostgreSQL 16.
+5. **Operational continuity** — no separate engine, no separate backup strategy,
+   no additional monitoring surface.
+
+Dedicated search engines (Elasticsearch, OpenSearch) remain valid future options
+if the platform outgrows PostgreSQL FTS; the Search bounded context abstraction
+ensures that replacing the engine is an infrastructure-only change.
+
+### Search is a projection-only service
+
+Search is a **read projection** service. It owns only `SearchDocument`
+projections derived from integration events published by source services.
+It never owns the domain facts it indexes. Source services remain the
+source of truth for their own state.
+
+Consequences:
+- A missed event leaves a document temporarily absent from search results; it
+  remains fully accessible through each source service's own API.
+- This is acceptable because search is explicitly best-effort (see decision 12
+  and `docs/records.md`).
+- The `POST /admin/reindex` endpoint corrects drift.
+
+### Ratified decisions (Prompt 11B)
+
+1. **Ownership** — Search owns `SearchDocument` projections, `AdditionalScope`
+   child rows, `OrganizationUnitReference` read-model projections (ADR-016
+   pattern), and `SearchIndexLog` diagnostics. It never owns the domain facts
+   it indexes.
+
+2. **Technology** — PostgreSQL full-text search (`tsvector`/`tsquery`) on the
+   existing shared PostgreSQL 16 instance. Database: `communityos_search`;
+   schema: `search`. `GIN` index on `search_vector`. Unique index on
+   `(source_type, source_id)` for idempotent upsert. See `docs/search.md` for
+   the full deployment model.
+
+3. **First-gate index taxonomy** — four source types are indexed at Prompt 11C:
+   - `record` — from `CommunityOS.Contracts.Records` events
+   - `document` — from `CommunityOS.Contracts.Documents` events
+   - `workflow-task` — from `CommunityOS.Contracts.Workflow` events
+   - `knowledge-question` — from `CommunityOS.Contracts.Knowledge` events
+   Deferred: Knowledge Library (Works/Editions/Passages), Knowledge answers,
+   Community persons/households (PII gate required), Community events/meetings/
+   activities, Organization units, Notifications.
+
+4. **Privacy rules (mandatory)** — `DisplayTitle` for records is the category
+   code only (never a person's name or any field value). `DisplayTitle` for
+   Knowledge questions is the literal string `"Question"` (text resolved via
+   Knowledge API). No names, contact details, field values, hold reasons, task
+   notes, passage text, or document filenames are ever stored in any projection
+   field. `IsSensitive = true` projections are indexed but excluded from
+   standard results; only `search.result.read.sensitive` callers see them.
+
+5. **Permission matrix** — three permissions, registered in
+   `PermissionCatalog` and development role seeds at Prompt 11C:
+   - `search.result.read` — execute queries, receive non-sensitive results
+   - `search.result.read.sensitive` — receive sensitive-flagged results
+   - `search.index.manage` — trigger reindex, view index health
+
+6. **API surface** — five endpoints at first gate (see `docs/api/search.md`):
+   - `GET /api/v1/search` — full-text query across all source types
+   - `GET /api/v1/search/{sourceType}` — query scoped to one source type
+   - `GET /api/v1/search/admin/health` — index health (`search.index.manage`)
+   - `POST /api/v1/search/admin/reindex` — full rebuild (`search.index.manage`)
+   - `POST /api/v1/search/admin/reindex/{sourceType}` — partial rebuild
+
+7. **Authorization** — every guarded endpoint calls the Authorization service
+   through `AuthorizationGuard` (fail-closed; ADR-009/010/011/018/019). No
+   `[Authorize(Roles = "...")]`, no local RBAC, no direct Authorization
+   database access. Search result filtering is fail-closed: queries return only
+   results the caller is authorized to read; unauthorized results are silently
+   absent (no enumeration oracle).
+
+8. **Organization scoping** — follows ADR-016. The `SearchDocument` projection
+   carries `OrganizationUnitId` (primary scope) and zero or more `AdditionalScope`
+   child rows. Any-of-scope semantics: a caller is authorized to see a result when
+   they hold `search.result.read` at **any** of the result's scopes. Mirrors the
+   Records/Workflow/Notifications any-of-grant pattern (ADR-011).
+
+9. **Pagination** — `limit` / `offset` parameters. Default `limit = 25`;
+   maximum `limit = 50` (configurable via `Search:MaxResultsPerPage`). Values
+   above the maximum are clamped. Results ordered by `ts_rank` descending; ties
+   by `IndexedOn` descending.
+
+10. **Idempotency** — consumers upsert by `(SourceType, SourceId)` unique key.
+    A stale-event guard (compare incoming `OccurredOn` to current `IndexedOn`)
+    prevents late re-delivery of an older event from regressing a newer
+    projection. The MassTransit EF Core inbox provides exactly-once consume
+    semantics at the receive endpoint.
+
+11. **Outbox / inbox** — Search is inbox-only at the first gate. The MassTransit
+    EF Core inbox (`InboxState` table) is enabled for exactly-once consume
+    semantics. No outbox is needed: Search publishes no integration events at
+    the first gate. Outbox tables (`OutboxMessage`, `OutboxState`) are
+    provisioned but unused; they will be activated if a future gate introduces
+    Search-published events (ADR-015 amendment pattern).
+
+12. **Best-effort delivery** — Search does not require guaranteed delivery from
+    producers (explicitly aligned with `docs/records.md`). A missed event means
+    a document is temporarily absent from search results only — the document
+    remains fully accessible through the source service's own API. This differs
+    from Workflow and Audit consumers which have compliance obligations.
+
+13. **Soft-delete model** — when a source object enters a terminal state
+    (Archived, Deactivated, Merged, Cancelled), the `SearchDocument.Status` is
+    updated to the terminal status string. The row is retained for diagnostics
+    but is excluded from all query results via a status filter. Hard deletion
+    requires an admin rebuild.
+
+14. **Logs / events privacy** — logs record only indexed source type, source id,
+    operation, and outcome. `DisplayTitle` values, query strings containing PII,
+    and source field values are never logged. Search publishes no integration
+    events at the first gate; if future events are added, they must contain
+    identifiers only (no PII, no field values, no display titles).
+
+15. **Scaffold status** — there is no pre-existing Search scaffold. Search is a
+    greenfield bounded context at Prompt 11C.
+
+Superseded decisions: none. ADR-017 slot 10 status updated from NOT STARTED to
+RATIFIED (Prompt 11B); will be updated to IMPLEMENTED at the Prompt 11C gate.
