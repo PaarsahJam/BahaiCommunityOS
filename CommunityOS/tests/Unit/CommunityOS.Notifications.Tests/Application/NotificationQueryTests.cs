@@ -142,4 +142,54 @@ public class NotificationQueryTests
         dto.NotificationId.Should().Be(notification.Id);
         dto.Distribution.Should().ContainSingle(r => r.MemberId == Actor);
     }
+
+    // --- Pagination (F-003 coverage) ---
+
+    [Fact]
+    public async Task Inbox_passes_limit_plus_one_and_offset_to_the_repository()
+    {
+        // The handler uses an over-fetch of limit+1 so callers can detect a
+        // next page without a separate count query; the final result is capped
+        // to limit via Take(). The repository is the source of skip/take; the
+        // handler delegates both parameters.
+        var h = new ApplicationHarness();
+        h.AllowBatch(
+            NotificationsPermissions.NotificationRead,
+            NotificationsPermissions.NotificationReadSensitive);
+        h.Repos.Notifications.ListInboxCandidatesAsync(Actor, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        await h.Sender.Send(new ListInboxQuery(Actor, null, null, null, null, Limit: 10, Offset: 5));
+
+        await h.Repos.Notifications.Received(1).ListInboxCandidatesAsync(
+            Actor,
+            limit: 11,   // limit + 1 (over-fetch)
+            offset: 5,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Inbox_caps_result_to_limit_when_repository_returns_more_candidates()
+    {
+        // Simulates the repository returning limit+1 authorized candidates;
+        // the handler must return exactly limit items (the over-fetch row is
+        // discarded by Take()).
+        const int Limit = 3;
+        var h = new ApplicationHarness();
+        h.AllowBatch(
+            NotificationsPermissions.NotificationRead,
+            NotificationsPermissions.NotificationReadSensitive);
+
+        var notifications = Enumerable.Range(0, Limit + 1)
+            .Select(_ => ApplicationHarness.CreateQueuedNotification(
+                recipients: [Actor], organizationUnitId: Guid.NewGuid()))
+            .ToList();
+
+        h.Repos.Notifications.ListInboxCandidatesAsync(Actor, Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(notifications);
+
+        var result = await h.Sender.Send(new ListInboxQuery(Actor, null, null, null, null, Limit: Limit, Offset: 0));
+
+        result.Should().HaveCount(Limit);
+    }
 }

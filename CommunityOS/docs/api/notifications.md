@@ -17,7 +17,7 @@ API at dispatch time.
 
 | Method | Path | Capability | Description |
 |--------|------|------------|-------------|
-| GET | `/inbox?type=&channel=&status=&organizationUnitId=&cursor=` | `notifications.notification.read` | List the caller's own inbox (relationship-tuple access; returns only items the caller may read) |
+| GET | `/inbox?type=&channel=&status=&organizationUnitId=&limit=50&offset=0` | `notifications.notification.read` | List the caller's own inbox (relationship-tuple access; returns only items the caller may read) |
 | GET | `/notifications/{id}` | `notifications.notification.read` | Get notification metadata, recipients, scopes, status, provenance (non-sensitive) |
 | GET | `/notifications/{id}/sensitive` | `notifications.notification.read.sensitive` | Get the sensitive fields (failure reasons, full distribution) and `IsSensitive` notification content |
 | POST | `/notifications` | `notifications.notification.create` | Create a notification (directly or via event reconciliation) |

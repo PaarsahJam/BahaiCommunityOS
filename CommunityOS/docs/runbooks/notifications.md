@@ -5,15 +5,11 @@
 
 ## Services
 
-- **Notifications API** — to be created at
-  `src/Services/Notifications/CommunityOS.Notifications.API`. Project name
-  `CommunityOS.Notifications.API` (follow the Records/Workflow project layout:
-  Domain / Application / Infrastructure / API + unit and integration test
-  projects). A prototype scaffold already exists under
-  `src/Services/Notifications/`; per ADR-025 decision 2 the retained scaffold
-  files (`MessageTemplate`, `NotificationChannel`, recipient dedup,
-  `NotificationNotFoundException`) are reused and the rest is superseded —
-  **do not treat the scaffold as authoritative**.
+- **Notifications API** — implemented at
+  `src/Services/Notifications/CommunityOS.Notifications.API`. Four projects:
+  Domain / Application / Infrastructure / API, plus unit and integration test
+  projects. Per ADR-025 decision 2 the original scaffold was superseded at the
+  Prompt 10C gate; the current source is the authoritative implementation.
 
 ## Prerequisites
 
@@ -159,7 +155,7 @@ dotnet ef migrations has-pending-model-changes \
 | `CommunityService:BaseUrl` | | *(empty in dev)* | Community API base URL (channel-destination resolution at dispatch time) |
 | `CommunityService:AccessToken` | | *(empty in dev)* | Service token presented to Community |
 | `CommunityService:ClientId` | | `communityos-notifications` | `X-Client-Id` sent to Community |
-| `Notifications:MaxRetries` | | `3` | Bounded worker-level provider retry count |
+| `NotificationRecipient.MaxRetryCount` | `5` | *(domain constant)* | Fixed provider-retry bound enforced by the domain entity; not configurable at runtime |
 | `Notifications:RetentionWindow` | | `P180D` | Review-flagged retention disposition window |
 | `Notifications:InternalClientId` | | *(reserved)* | Trusted in-process caller for future fact queries |
 

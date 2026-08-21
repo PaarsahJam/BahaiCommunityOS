@@ -273,7 +273,7 @@ access token. No EF entities are exposed; DTOs are returned. See
 | `CommunityService:BaseUrl` | | *(empty in dev)* | Community API base URL (channel-destination resolution at dispatch time) |
 | `CommunityService:AccessToken` | | *(empty in dev)* | Service token presented to Community |
 | `CommunityService:ClientId` | | `communityos-notifications` | `X-Client-Id` sent to Community |
-| `Notifications:MaxRetries` | | `3` | Bounded worker-level provider retry count |
+| `NotificationRecipient.MaxRetryCount` | `5` | *(domain constant)* | Fixed provider-retry bound enforced by the domain entity; not configurable at runtime |
 | `Notifications:RetentionWindow` | | `P180D` | Review-flagged retention disposition window |
 | `Notifications:InternalClientId` | | *(reserved)* | Trusted in-process caller for future fact queries |
 
