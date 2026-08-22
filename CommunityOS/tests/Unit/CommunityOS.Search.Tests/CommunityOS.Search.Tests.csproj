@@ -4,5 +4,6 @@
     <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Domain\CommunityOS.Search.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Application\CommunityOS.Search.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Infrastructure\CommunityOS.Search.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.API\CommunityOS.Search.API.csproj" />
   </ItemGroup>
 </Project>

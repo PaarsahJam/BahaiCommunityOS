@@ -121,8 +121,11 @@ current `IndexedOn` value and skip if the incoming event is older).
 When a source object is archived, deactivated, or merged/archived (terminal
 states), the corresponding `SearchDocument` row is **soft-deleted** (its
 `Status` is updated to the terminal status string). The row is retained for
-audit/diagnostics but is **excluded from all search queries** via a
-`WHERE Status NOT IN ('Deactivated','Archived','Merged','Cancelled')` filter.
+audit/diagnostics and is **excluded from default search results**: queries
+without an explicit `status` filter apply
+`WHERE Status NOT IN ('Deactivated','Archived','Merged','Cancelled')`.
+Explicitly requesting one or more terminal statuses through the `status`
+query parameter overrides this default exclusion (see `docs/api/search.md`).
 Hard deletion from the projection table is never performed through normal
 operations — it requires an admin rebuild.
 

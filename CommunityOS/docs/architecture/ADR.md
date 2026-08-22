@@ -1396,7 +1396,9 @@ Consequences:
 13. **Soft-delete model** — when a source object enters a terminal state
     (Archived, Deactivated, Merged, Cancelled), the `SearchDocument.Status` is
     updated to the terminal status string. The row is retained for diagnostics
-    but is excluded from all query results via a status filter. Hard deletion
+    but is excluded from default search results via a status filter; terminal
+    rows may still be surfaced explicitly by requesting their status through
+    the `status` query parameter (see `docs/api/search.md`). Hard deletion
     requires an admin rebuild.
 
 14. **Logs / events privacy** — logs record only indexed source type, source id,
