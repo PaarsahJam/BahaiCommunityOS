@@ -1,6 +1,6 @@
 # Search Service API
 
-> **STATUS: RATIFIED, NOT IMPLEMENTED (Prompt 11B).** Contract for the Search
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 11C).** Contract for the Search
 > service, aligned with ratified ADR-026 and `docs/search.md`.
 
 All endpoints are versioned under `/api/v1/search`, require a valid access

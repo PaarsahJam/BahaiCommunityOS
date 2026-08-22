@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Domain\CommunityOS.Search.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Application\CommunityOS.Search.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Search\CommunityOS.Search.Infrastructure\CommunityOS.Search.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

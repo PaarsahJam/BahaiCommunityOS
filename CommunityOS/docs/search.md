@@ -1,6 +1,6 @@
 # Search Service
 
-> **STATUS: RATIFIED, NOT IMPLEMENTED (Prompt 11B).** Architectural design for
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 11C).** Architectural design for
 > the Search bounded context (`ADR-026`), positioned at ADR-017 slot 10.
 
 The Search bounded context owns **search index projections and the cross-domain

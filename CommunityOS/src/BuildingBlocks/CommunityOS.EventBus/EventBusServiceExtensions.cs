@@ -15,7 +15,7 @@ public static class EventBusServiceExtensions
         this IServiceCollection services,
         IConfiguration config,
         Action<IRegistrationConfigurator>? configureConsumers = null) =>
-        RegisterBus(services, config, configureConsumers, outboxDbContextType: null);
+        RegisterBus(services, config, configureConsumers, outboxDbContextType: null, inboxOnly: false);
 
     /// <summary>
     /// Registers the bus together with the MassTransit transactional outbox
@@ -43,13 +43,23 @@ public static class EventBusServiceExtensions
         IConfiguration config,
         Action<IRegistrationConfigurator>? configureConsumers = null)
         where TDbContext : DbContext =>
-        RegisterBus(services, config, configureConsumers, typeof(TDbContext));
+        RegisterBus(services, config, configureConsumers, typeof(TDbContext), inboxOnly: false);
+
+    public static IServiceCollection AddCommunityOSEventBusWithInbox<TDbContext>(
+        this IServiceCollection services,
+        IConfiguration config,
+        Action<IRegistrationConfigurator>? configureConsumers = null)
+        where TDbContext : DbContext
+    {
+        return RegisterBus(services, config, configureConsumers, typeof(TDbContext), inboxOnly: true);
+    }
 
     private static IServiceCollection RegisterBus(
         IServiceCollection services,
         IConfiguration config,
         Action<IRegistrationConfigurator>? configureConsumers,
-        Type? outboxDbContextType)
+        Type? outboxDbContextType,
+        bool inboxOnly)
     {
         var host = config["RabbitMq:Host"] ?? "localhost";
         var port = ushort.TryParse(config["RabbitMq:Port"], out var parsed) ? parsed : (ushort)5672;
@@ -60,7 +70,9 @@ public static class EventBusServiceExtensions
         {
             configureConsumers?.Invoke(bus);
 
-            if (outboxDbContextType is not null)
+            if (inboxOnly && outboxDbContextType is not null)
+                ConfigureInbox(bus, outboxDbContextType);
+            else if (outboxDbContextType is not null)
                 ConfigureOutbox(bus, outboxDbContextType);
 
             bus.SetKebabCaseEndpointNameFormatter();
@@ -81,6 +93,22 @@ public static class EventBusServiceExtensions
             .Configure(options => options.WaitUntilStarted = true);
 
         return services;
+    }
+
+    private static void ConfigureInbox(IBusRegistrationConfigurator bus, Type dbContextType)
+    {
+        var configure = typeof(EventBusServiceExtensions)
+            .GetMethod(nameof(ConfigureInboxCore), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .MakeGenericMethod(dbContextType);
+        configure.Invoke(null, [bus]);
+    }
+
+    private static void ConfigureInboxCore<TDbContext>(IBusRegistrationConfigurator bus)
+        where TDbContext : DbContext
+    {
+        bus.AddEntityFrameworkOutbox<TDbContext>(o => o.UsePostgres());
+        bus.AddConfigureEndpointsCallback((ctx, name, cfg) =>
+            cfg.UseEntityFrameworkOutbox<TDbContext>(ctx));
     }
 
     private static void ConfigureOutbox(IBusRegistrationConfigurator bus, Type dbContextType)

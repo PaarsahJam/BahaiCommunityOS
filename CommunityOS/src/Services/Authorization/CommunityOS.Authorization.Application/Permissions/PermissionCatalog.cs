@@ -77,6 +77,10 @@ public static class PermissionCatalog
     public const string NotificationTemplateRead = "notifications.template.read";
     public const string NotificationPreferenceManage = "notifications.preference.manage";
 
+    public const string SearchResultRead = "search.result.read";
+    public const string SearchResultReadSensitive = "search.result.read.sensitive";
+    public const string SearchIndexManage = "search.index.manage";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global

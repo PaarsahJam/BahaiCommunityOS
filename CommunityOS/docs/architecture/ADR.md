@@ -240,8 +240,9 @@ Implementation-sequence status:
 - Slot 9 (**Notifications**) is **implemented** (ADR-025, Prompt 10C gate);
   the integration test suite is compile-only because Docker/Testcontainers is
   not available in the implementation environment.
-- Slot 10 (**Search**) is **ratified** (ADR-026, Prompt 11B gate); implementation
-  begins at Prompt 11C.
+- Slot 10 (**Search**) is **implemented** (ADR-026, Prompt 11C gate); the
+  integration test suite is compile-only because Docker/Testcontainers is not
+  available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
 - Slots 11 and 13–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
@@ -1408,4 +1409,4 @@ Consequences:
     greenfield bounded context at Prompt 11C.
 
 Superseded decisions: none. ADR-017 slot 10 status updated from NOT STARTED to
-RATIFIED (Prompt 11B); will be updated to IMPLEMENTED at the Prompt 11C gate.
+RATIFIED (Prompt 11B), then to IMPLEMENTED (Prompt 11C gate).

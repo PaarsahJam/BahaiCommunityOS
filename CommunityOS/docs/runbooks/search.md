@@ -1,12 +1,13 @@
 # Search Service Runbook
 
-> **STATUS: RATIFIED, NOT IMPLEMENTED (Prompt 11B).** Operational notes for the
-> Search service (`ADR-026` Accepted, `docs/search.md` ratified).
-> Implementation begins at Prompt 11C.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 11C).** Operational notes for the
+> Search service (`ADR-026` Accepted, `docs/search.md` ratified). The service
+> is implemented at `src/Services/Search/CommunityOS.Search.API` with unit and
+> integration tests.
 
 ## Services
 
-- **Search API** — to be implemented at
+- **Search API** — implemented at
   `src/Services/Search/CommunityOS.Search.API`. Four projects:
   Domain / Application / Infrastructure / API, plus unit and integration test
   projects. The Search service owns only projection data; no source-of-truth

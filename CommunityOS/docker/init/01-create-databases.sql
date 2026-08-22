@@ -15,3 +15,4 @@ CREATE DATABASE communityos_documents;
 CREATE DATABASE communityos_records;
 CREATE DATABASE communityos_workflow;
 CREATE DATABASE communityos_notifications;
+CREATE DATABASE communityos_search;
