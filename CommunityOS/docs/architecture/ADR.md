@@ -32,6 +32,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-024 | Workflow bounded context and task boundary | Accepted |
 | ADR-025 | Notifications bounded context and delivery boundary | Accepted |
 | ADR-026 | Search bounded context and full-text projection boundary | Accepted |
+| ADR-027 | Audit bounded context and compliance-journal boundary | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -244,7 +245,10 @@ Implementation-sequence status:
   integration test suite is compile-only because Docker/Testcontainers is not
   available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
-- Slots 11 and 13–19 are not started.
+- Slot 11 (**Audit**) is **RATIFIED** at the Prompt 12B gate (ADR-027); it is
+  not implemented yet. Audit is the next bounded context in the ratified
+  sequence.
+- Slots 13–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -417,6 +421,17 @@ events) once Audit, Records and Correspondence subscribe. Per the ADR-015
 amendment (Prompt 08A-R2), the outbox therefore must land at the **Records
 integration gate** — the earliest guaranteed-delivery consumer — not before
 Documents.
+
+**Amendment (Prompt 12B, ADR-027):** the Audit bounded context (slot 11) is now
+ratified. The guaranteed-delivery prerequisite for the Documents compliance
+subset (`DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`,
+`DocumentContentDownloaded`, `DocumentScanCompleted`) becomes concrete:
+Documents must be upgraded to transactional outbox publication for that subset
+at the **Documents outbox gate**, and the Audit implementation gate must not
+enable any Documents consumer before that gate completes. The upgrade is a
+producer-side change scheduled with the Audit implementation work; nothing here
+changes Documents' current best-effort behavior before that gate. See ADR-027
+decisions 4–5.
 
 Ratified decisions (Prompt 07A-R):
 
@@ -1412,3 +1427,386 @@ Consequences:
 
 Superseded decisions: none. ADR-017 slot 10 status updated from NOT STARTED to
 RATIFIED (Prompt 11B), then to IMPLEMENTED (Prompt 11C gate).
+
+## ADR-027 — Audit bounded context and compliance-journal boundary
+
+**Status:** Accepted (ratified at the Prompt 12B gate; implementation not
+started).
+
+### Context
+
+Audit is positioned in the implementation sequence (`ADR-017`) at slot 11 —
+after Search, before Knowledge. Prompt 12A verified that Audit is completely
+blank-slate: no source projects, contracts, tests, database, permissions,
+configuration or documentation exist for it, and no inert scaffold could be
+mistaken for it. Multiple ratified ADRs already name Audit as a future
+guaranteed-delivery consumer: ADR-015 (amended) requires the transactional
+outbox before any Audit subscription; ADR-023 decision 14 designates Records a
+compliance-critical context whose lifecycle events target Audit; ADR-024
+decision 14 reserves Workflow compliance events for Audit; ADR-025 decision 16
+reserves `NotificationDispatched` for Audit; ADR-022 ratifies
+`DocumentContentDownloaded` as targeting security/audit consumers; ADR-014
+requires break-glass operations to emit high-priority audit events.
+
+The authoritative Security Architecture, Data Classification Model and
+Authorization Model specifications are PLACEHOLDER (ADR-020) and must not be
+relied upon. Audit-specific privacy, retention and immutability rules are
+therefore ratified here directly.
+
+### Decision
+
+The Audit bounded context owns an **append-only compliance journal**: a
+write-once, queryable record of selected integration events raised by producer
+contexts. It is a historical/compliance record of selected events — **never a
+replacement source of truth** for any domain fact.
+
+### Ratified decisions (Prompt 12B)
+
+1. **Ownership model.** Audit owns: audit entries, audit-entry identity,
+   ingest metadata, retention state, legal-hold references on entries, the
+   Organization read-model reference table required for authorization
+   (ADR-016 pattern), idempotency state and inbox state. Audit does **not**
+   own: domain facts, Records state, Document state or content, Workflow task
+   state or task activity history, Notification delivery state, recipient
+   distribution, or any source-service business rule. Where an upstream fact is
+   not exported onto the bus (task activity notes, notification distribution,
+   hold reasons), Audit's journal is deliberately partial by design; the
+   upstream service remains authoritative.
+
+2. **Immutability model — application AND database enforced (both).** The
+   strongest practical model consistent with this codebase is layered:
+
+   - **Application level:** `AuditEntry` is a write-once aggregate. No command,
+     handler, repository method or API path updates or deletes an existing
+     entry. Corrections, reversals and superseding facts arrive as **new events
+     from producers**, which become **new** entries.
+   - **Database level:** the initial migration ships native PostgreSQL triggers
+     that reject `UPDATE`/`DELETE` on `audit_entries` unless the session sets a
+     purge authorization setting (`app.audit_purge_authorized = 'on'`) via
+     `SET LOCAL`. Only the ratified retention-purge operation sets it. Zero new
+     infrastructure is introduced (PostgreSQL-native, no new service, package
+     or container).
+   - **Retention purge is not an ordinary correction.** Purge is a separate
+     controlled lifecycle operation (decision 13): it writes a purge-marker
+     entry in the same transaction before deleting the expired batch, so the
+     deletion itself remains auditable after the fact.
+   - **Legal holds never touch immutable rows.** Hold state lives in a separate
+     mutable `audit_entry_holds` table referencing entries; an active hold
+     exempts its entries from purge regardless of retention expiry. Audit may
+     place administrative holds on its own entries; each placement/release is
+     itself journaled (decision 14).
+
+3. **Blank-slate status.** No scaffold disposition is required. There is no
+   pre-existing Audit artifact anywhere in the repository (verified at Prompt
+   12A). Audit is greenfield.
+
+4. **Producer reliability prerequisites (F-01 resolution, generalized).**
+   Guaranteed delivery to Audit is a property of the **producer**. Verified
+   publication status per producer: Records, Workflow and Notifications publish
+   through the transactional outbox (`AddCommunityOSEventBusWithOutbox`) and
+   are clear for Audit subscription. **Documents publishes best-effort** (plain
+   `AddCommunityOSEventBus`, no outbox entities) although `docs/documents.md`
+   has always marked its compliance subset as guaranteed-delivery-required
+   "before Audit is implemented"; and **Authorization also publishes
+   best-effort**, including the ADR-014-mandatory break-glass events.
+   Therefore:
+
+   - Before Audit consumes **any** Documents compliance event, Documents must
+     be upgraded to transactional outbox publication for the ratified
+     compliance subset — the **Documents outbox gate** (see the amendment note
+     inside ADR-022 above). This upgrades existing documented policy to a
+     concrete, scheduled prerequisite; it does not silently override Documents'
+     current behavior.
+   - Symmetrically, before Audit consumes Authorization events, Authorization
+     must be upgraded to outbox publication for the security subset — the
+     **Authorization outbox gate** — because break-glass auditing (ADR-014) is
+     a mandatory compliance obligation, not best-effort telemetry.
+   - Both gates are producer-side changes executed with the Audit
+     implementation work (Prompt 12C or a dedicated remediation step inside
+     that gate). Until a producer's gate completes, Audit's implementation
+     must not register that producer's consumers.
+
+5. **First-gate event catalog.** Every event in every existing contract
+   (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
+   Prompt 12C implements exactly the FIRST GATE set plus the projection
+   consumers, and nothing else. GATED events activate only when their
+   producer's outbox gate completes. Deferred/not-classified events are never
+   subscribed without a new ADR amendment.
+
+   **CONSUMED AND PERSISTED — first gate (22):**
+
+   | Producer | Events |
+   |----------|--------|
+   | Records (16) | `RecordCreated`, `RecordSubmitted`, `RecordUnderReview`, `RecordVerified`, `RecordRejected`, `RecordCorrected`, `RecordArchived`, `RecordDeactivated`, `RecordRestored`, `RecordClassified`, `RecordHoldPlaced`, `RecordHoldReleased`, `RecordRetentionChanged`, `RecordEvidenceAttached`, `RecordEvidenceRemoved`, `RecordRetentionExpired` |
+   | Workflow (5) | `WorkflowTaskCreated`, `WorkflowTaskAssigned`, `WorkflowTaskCompleted`, `WorkflowTaskCancelled`, `WorkflowTaskEscalated` |
+   | Notifications (1) | `NotificationDispatched` |
+
+   Rationale: Records' full lifecycle is the compliance core named by ADR-023;
+   consuming all 16 costs nothing extra because they are already
+   outbox-protected. Assignment/completion/cancellation/escalation bracket task
+   accountability (ADR-024); task *start* adds review-latency detail only.
+   Dispatch completion is the sole exportable notification fact (ADR-025).
+
+   **CONSUMED AND PERSISTED — gated on producer outbox gate (12):**
+
+   | Producer | Gate | Events |
+   |----------|------|--------|
+   | Documents (5) | Documents outbox gate | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
+   | Authorization (7) | Authorization outbox gate | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+
+   Rationale: exactly the subset `docs/documents.md` has always listed as
+   guaranteed-delivery-required, plus the entire authorization-security set
+   (role/delegation changes are privilege facts; break-glass is mandated by
+   ADR-014).
+
+   **CONSUMED BUT NOT PERSISTED AS AUDIT ENTRIES — projection only (3):**
+   Organization `OrganizationUnitCreated/Updated/ParentChanged` →
+   `organization_unit_references` (ADR-016 scoping infrastructure; never
+   journaled as entries).
+
+   **DEFERRED (17)** — candidate second-gate material; none subscribed now:
+   `WorkflowTaskStarted`; Identity account-security subset (`UserAccountLocked`,
+   `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`,
+   `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`);
+   Organization governance facts (`DelegationFactGranted`,
+   `DelegationFactRevoked`); Knowledge moderation/AI-governance subset
+   (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`,
+   `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`);
+   `DocumentArchived`.
+
+   **NOT AN AUDIT EVENT (41):** Documents `DocumentCreated`,
+   `DocumentMetadataUpdated`, `DocumentVersionAdded`; Identity
+   `UserAccountRegistered` (carries email), `UserAccountVerified`,
+   `UserAccountDeactivated`, `DeviceRegistered` (carries device name),
+   `RefreshTokenIssued` (high-volume session telemetry); Organization
+   `OrganizationCreated/Updated`, `Committee*`, `AppointmentAssigned/Ended`;
+   all 14 Community events (person/household/membership/activity/meeting/
+   participation — routine community lifecycle whose official membership and
+   appointment facts already belong to Records); Knowledge Library pipeline and
+   answer/category events (`WorkImported`, `EditionImported`, `EditionVerified`,
+   `PassageImported`, `PassageCorrected`, `QuestionSubmitted`,
+   `QuestionPublished`, `AnswerAdded`, `AnswerUpdated`, `AnswerAccepted`,
+   `CategoryCreated`, `CategoryUpdated`).
+
+6. **Privacy and PII rules.** Because the Security/Data-Classification
+   specifications are PLACEHOLDER (F-04), these rules are self-ratified.
+   Persisted by default: stable identifiers, codes (category/classification/
+   definition/outcome/scan-status strings from payloads), timestamps, event
+   type, action/outcome codes, resource identifiers, organization identifiers,
+   sensitivity classification and minimal structured metadata. **Never
+   persisted:** names, addresses, emails, phone numbers, document or message
+   bodies, notification destinations, credentials, secrets, tokens, hold
+   reasons, arbitrary domain field values, uploaded content, or unnecessary
+   personal attributes. Payloads that carry such fields (e.g.
+   `UserAccountRegistered.Email`, `DocumentCreated.Title`,
+   `CommunityEventCreated.Title`) are either not consumed at all or mapped so
+   those fields are dropped at ingest. **Sensitivity model:** an entry is
+   `Sensitive` iff (a) its event type is in the ratified sensitive-event list
+   (`BreakGlassRequested/Approved/Revoked`, `RecordHoldPlaced`,
+   `RecordHoldReleased`, `DocumentContentDownloaded`), or (b) the payload
+   explicitly carries `IsSensitive = true` (`RecordClassified`,
+   `DocumentClassified`). Sensitivity is deterministic and payload-driven —
+   never inferred. **Metadata:** no arbitrary payload serialization.
+   `MetadataJson` stores flat key/value pairs only; keys must come from a
+   per-event-type allowlist maintained in code/configuration; values must be
+   scalars (ids, codes, enums, counts, booleans); maximum ten keys. An ingest
+   mapping that cannot conform dead-letters the message rather than sanitizing
+   or truncating.
+
+7. **Correlation/causation (F-02 resolution): option C with reserved columns.**
+   Existing contracts carry `OccurredOn` but no correlation/causation
+   identifiers, and broker-assigned message ids are transport details that
+   ADR-004 forbids relying on. The entry schema therefore carries nullable
+   `CorrelationId`/`CausationId` columns that remain unpopulated at the first
+   gate; causal-chain reconstruction is explicitly **not guaranteed**. Enriching
+   the shared event envelope with ratified correlation identifiers is a
+   potential future cross-cutting contracts gate requiring its own ADR
+   amendment; it is deliberately **not** part of Audit's gate and no contract
+   changes are made here. No correlation data is invented.
+
+8. **Entry schema.** `audit_entries` (schema `audit`):
+
+   | Field | Required | Purpose | Privacy | Mutable | Indexed |
+   |-------|----------|---------|---------|---------|---------|
+   | `Id` (Guid) | yes | Synthetic row identity | non-PII | no | PK |
+   | `OccurredOn` (DateTime UTC) | yes | When the producer says the fact occurred (event occurrence time) | non-PII | no | yes |
+   | `IngestedOn` (DateTime UTC) | yes | When Audit durably recorded it — deliberately distinct from `OccurredOn`; the gap exposes delivery latency | non-PII | no | no |
+   | `SourceService` (string 50) | yes | Producing bounded context | non-PII | no | yes |
+   | `SourceEventType` (string 100) | yes | Contract event type name | non-PII | no | yes |
+   | `SourceEventHash` (string 64) | yes | Deterministic SHA-256 over canonical (source service, event type, resource ids, occurred-on, discriminating scalar fields); the idempotency identity — unique | non-PII | no | UNIQUE |
+   | `Action` (string 100) | yes | Normalized action code (e.g. `record-verified`, `hold-placed`, `task-completed`, `break-glass-approved`) | non-PII | no | yes (with date filters) |
+   | `Outcome` (string 100) | no | Normalized outcome/status code carried by the payload (workflow outcome, scan status) | non-PII | no | no |
+   | `ResourceType` (string 50) | yes | What the fact is about (`record`, `document`, `workflow-task`, `notification`, `authz-role`, `authz-delegation`, `break-glass-request`) | non-PII | no | yes (composite) |
+   | `ResourceId` (Guid) | yes | Primary aggregate id from the payload | non-PII | no | composite with type |
+   | `SecondaryResourceId` (Guid?) | no | Sub-object id where applicable (hold id, version id, assignment/request id) | non-PII | no | no |
+   | `SubjectId` (Guid?) | no | Person/household the fact concerns, when the payload carries one (e.g. `RecordCreated.SubjectId`); null otherwise — never resolved or enriched | person-id reference | no | yes |
+   | `ActorId` (Guid?) | no | Who performed the action, when the payload carries one (`VerifiedBy`, `PlacedBy`, `CompletedBy`, `RequesterId`, …); nullable because some payloads lack actors (e.g. `RoleAssigned`) | person-id reference | no | yes |
+   | `OrganizationUnitId` (Guid?) | yes (nullable column) | Primary scope from the payload; null means global/unscoped fact | non-PII | no | yes |
+   | `Sensitivity` (enum) | yes | `Normal \| Sensitive` per decision 6 rules | classification | no | yes |
+   | `CorrelationId` (Guid?) | no | Reserved for F-02 option A activation; unpopulated at first gate | non-PII | no | no |
+   | `CausationId` (Guid?) | no | Reserved as above | non-PII | no | no |
+   | `MetadataJson` (jsonb) | no | Allowlist-validated flat scalar metadata per decision 6 | allowlisted scalars only | no | no |
+   | `RetentionClass` (string 50) | yes | Retention classification code driving expiry | non-PII | no | partial composite |
+   | `RetentionExpiresOn` (DateTime?) | no | Computed at ingest from class configuration; null = retain indefinitely | non-PII | no | partial composite |
+
+   Additional tables: `audit_entry_holds` (`Id`, `EntryId` FK, `HoldType`
+   `legal|administrative`, `PlacedBy`, `PlacedOn`, optional `ReleasedBy`/
+   `ReleasedOn`, `ReasonCode` — a short code, never free text); mutable by
+   design. `organization_unit_references` (ADR-016 projection). MassTransit
+   inbox/outbox tables (decision 9).
+
+9. **Delivery model — inbox-only.** Audit publishes **no integration events**
+   at the first gate; there is no downstream consumer of audit data. It
+   registers via `AddCommunityOSEventBusWithInbox<AuditDbContext>` (Search
+   pattern, ADR-026 decision 11): MassTransit EF Core receive-endpoint inbox
+   for exactly-once consume semantics. Outbox tables are provisioned but
+   unused; activating them requires an explicit ADR amendment. No outbox
+   behavior is introduced merely because infrastructure supports it.
+
+10. **Idempotency.** Exactly-once persistence keyed on `SourceEventHash`
+    (unique constraint) computed deterministically at ingest:
+
+    - duplicate delivery of the same broker message → suppressed by the inbox;
+    - semantically identical redelivery under a new broker message (same fact)
+      → identical hash → insert treated as success no-op — normal broker
+      redelivery can never create a duplicate compliance entry;
+    - redelivery after transaction failure → inbox retry, ordinary insert path;
+    - same logical event re-published with a different `OccurredOn` → different
+      hash → a **new distinct occurrence**, persisted as its own entry (this is
+      correct: the producer restated the fact);
+    - malformed/unmappable event identity → dead-letter queue + error log,
+      never a persisted entry.
+
+11. **Organization scoping.** ADR-016 projection pattern. Entries carry the
+    payload's primary `OrganizationUnitId`; additional-scope child rows are
+    **not** used at the first gate (no producer payload exports multi-scope
+    audit facts). Any-of-scope semantics: access succeeds when the caller's
+    grant of `audit.entry.read` is effective at the entry's scope (hierarchy
+    coverage resolved by the Authorization service per ADR-011). Per ADR-011,
+    data-permission grants behave as follows: national/regional/local grants
+    cover descendant units via `/covers` resolution; a Global-scope grant of
+    `audit.entry.read` matches checks with **no** organization context — which
+    is exactly how **null-scoped entries** (global facts such as break-glass
+    requests) become visible only to Global-grant holders. Fail-closed: an
+    entry whose scope cannot be established is unreadable. Anti-enumeration:
+    single reads return `404` for missing and unauthorized alike; list/query
+    results are silently filtered and counts exclude inaccessible rows
+    (Records/Search pattern). Sensitive second pass: `Sensitive` entries are
+    excluded entirely from standard results and require
+    `audit.entry.read.sensitive` to appear anywhere (Search sensitive pattern),
+    including export.
+
+12. **Permission matrix (ratified; registration happens at the implementation
+    gate — not modified in this prompt):**
+
+    | Permission | Purpose | Typical holder |
+    |------------|---------|----------------|
+    | `audit.entry.read` | Query/list/read non-sensitive audit entries | auditors / national administrators |
+    | `audit.entry.read.sensitive` | See `Sensitive` entries (second pass, additive to read) | higher-privilege auditors / privacy officers |
+    | `audit.entry.export` | Run capped synchronous exports (sensitive rows additionally require `.read.sensitive`) | auditors / administrators |
+    | `audit.entry.admin` | Place/release holds, execute retention purge batches, view restricted diagnostics | operators |
+
+    `admin` does **not** imply `read`: capability separation mirrors the
+    records/workflow override pattern; administrative results still require
+    `read`. Role seeds (GlobalAdministrator/NationalAdministrator receive the
+    matrix at their scopes; LocalAdministrator receives none — audit is a
+    national-level compliance function; PlatformService receives none) are
+    registered in `PermissionCatalog`/`AuthorizationSeeder` at the Prompt 12C
+    gate.
+
+13. **API surface (minimum first-gate compliance surface; six endpoints):**
+
+    | Method | Path | Capability |
+    |--------|------|------------|
+    | GET | `/api/v1/audit` | `audit.entry.read` |
+    | GET | `/api/v1/audit/{id}` | `audit.entry.read` (+`.sensitive` for sensitive rows) |
+    | POST | `/api/v1/audit/export` | `audit.entry.export` (+`.read.sensitive` opt-in) |
+    | POST | `/api/v1/audit/holds` | `audit.entry.admin` |
+    | POST | `/api/v1/audit/holds/{id}/release` | `audit.entry.admin` |
+    | POST | `/api/v1/audit/admin/purge-expired` | `audit.entry.admin` |
+
+    Resource/subject convenience endpoints are deliberately omitted — the query
+    filter surface covers them. Query supports filters (source service, event
+    type/action, resource type/id, subject, actor, organization unit, occurred-on
+    date range), fixed ordering by `OccurredOn` descending (ascending opt-in),
+    `limit` default 25 / maximum 100 (clamped) with offset paging. Export is
+    **synchronous** with a hard cap (10,000 rows) and streams CSV/NDJSON; an
+    asynchronous job system is not justified at this scale. Full contract in
+    `docs/api/audit.md`.
+
+14. **Retention / archival / legal hold.** Architecture-level behavior:
+    retention classes are configuration (code → ISO-8601 duration) applied at
+    ingest to compute `RetentionExpiresOn`; the default class retains
+    indefinitely until deployment policy defines durations (deployment-specific
+    policy is explicitly **not** invented here — no legal requirements are
+    asserted). Expiry detection is a periodic sweep over the partial retention
+    index; expiry alone never deletes. Purge is two-step: expiry marks
+    eligibility; execution requires the `audit.entry.admin` purge endpoint,
+    which processes one bounded batch of expired, unheld entries per call,
+    writing a purge-marker entry in the same transaction before deleting under
+    the trigger guard (`SET LOCAL app.audit_purge_authorized`). Active holds
+    block purge regardless of expiry. Audit may place administrative holds on
+    its own entries for investigations; placements/releases are journaled.
+    Purge is hard row deletion (cryptographic erasure schemes are not justified
+    by any ratified requirement). Archival (cold storage export-and-delete) is
+    deferred unless a future ADR requires it.
+
+15. **Audit-of-audit.** Explicit first-gate model:
+
+    - Reading/querying audit entries creates **no** entries (recursion/noise
+      prevention).
+    - Exports create an entry (direct insert, `SourceService = "audit"`):
+      actor, filter-criteria summary, row count, format — never row contents.
+    - Administrative mutations (hold place/release, purge batch execution)
+      create entries (direct insert).
+    - Failed authorization attempts against Audit create **no** entries (the
+      Authorization check API remains the enforcement record; journaling denials
+      would hand attackers a probe oracle inside the very store being guarded).
+
+    Loop prevention: audit-generated entries are inserted directly within the
+    handling request's transaction and are never published onto the bus, so no
+    consumer feedback loop can form.
+
+16. **Reconciliation / replay.** Unlike Search, Audit never truncates-and-
+    rebuilds: a "reindex" would fabricate or destroy history and is forbidden.
+    Replay is nevertheless **safe by construction**: because dedupe keys on
+    content hash, re-consuming old messages converges to zero new rows. Replay
+    uses the ordinary consumption path (operator requeues from the broker);
+    there is no replay/rebuild API at the first gate. History that pre-dates
+    Audit activation, or that was lost before a producer's outbox gate, cannot
+    be reconstructed — this limitation is accepted and mitigated by the
+    guaranteed-delivery prerequisites rather than hidden. Schema evolution is
+    forward-only: ingest mappings may change for newly consumed messages;
+    existing entries are never reinterpreted retroactively.
+
+17. **Database / infrastructure.** Dedicated database `communityos_audit`,
+    schema `audit`, PostgreSQL 16 (ADR-006) on the shared instance — zero new
+    infrastructure. EF Core + Npgsql following the existing snake_case/schema
+    conventions; migrations via the Infrastructure project. Indexes: PK;
+    UNIQUE `source_event_hash`; `(occurred_on)`; `(resource_type, resource_id)`;
+    `(subject_id)`; `(actor_id)`; `(organization_unit_id)`; `(sensitivity)`;
+    partial `(retention_class, retention_expires_on)` WHERE
+    `retention_expires_on IS NOT NULL`. MassTransit inbox tables required;
+    outbox tables provisioned but unused (decision 9). Immutability triggers
+    ship in the initial migration (decision 2).
+
+18. **Security model.** `AuthorizationGuard` over the HTTP evaluator on every
+    exposed operation (ADR-009/010/018); fail-closed everywhere; RS256-only JWT
+    validation mirroring the Search validation profile; authenticated subject
+    required on every endpoint; HTTPS metadata defaults; no
+    `[Authorize(Roles = ...)]`; no local RBAC; no direct Authorization database
+    access; no cross-service database access (ADR-018); no source-domain
+    secrets or PII in payloads or logs (logs carry entry ids, action, outcome,
+    source ids only); sensitive second-pass authorization (decisions 11–12);
+    404-equivalent anti-enumeration (decision 11).
+
+19. **ADR numbering and documentation deliverables.** This ADR is numbered
+    ADR-027 (next free number after ADR-026). Companion documents ratified at
+    this gate: `docs/audit.md` (bounded-context design),
+    `docs/api/audit.md` (API contract), `docs/runbooks/audit.md` (operational
+    runbook for the future implementation). ADR-017 slot 11 status updated from
+    NOT STARTED to RATIFIED.
+
+Superseded decisions: none. ADR-027 extends (does not amend) ADR-015/022/023/
+024/025/026 constraints into concrete Audit-gate prerequisites and records the
+Documents outbox amendment note inside ADR-022.
