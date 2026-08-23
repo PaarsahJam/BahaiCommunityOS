@@ -280,7 +280,10 @@ public sealed record CancelLetterResult(Guid LetterId, string Status);
 public sealed record CancelLetterCommand(Guid ActorId, Guid LetterId, string ReasonCode) : IRequest<CancelLetterResult>;
 
 /// <summary>Cancels pre-dispatch; the consumed reference number is retained
-/// permanently. Unnumbered drafts cancel with a zero reference in the event.</summary>
+/// permanently. Unnumbered drafts cancel with a zero reference in the event.
+/// The cancellation event is published before the save so the bus outbox
+/// buffers it into the same context, and <see cref="ILetterJournal.SaveAsync"/>
+/// commits letter, history and outbox row atomically (ADR-028 decision 8).</summary>
 public sealed class CancelLetterHandler(
     ILetterJournal journal,
     AuthorizationGuard guard,
@@ -300,11 +303,12 @@ public sealed class CancelLetterHandler(
         var fromStatus = LetterFormatting.Status(letter.Status);
         var (year, sequence) = LetterEventFactory.Number(letter);
         letter.Cancel(command.ActorId, command.ReasonCode.Trim(), DateTime.UtcNow);
-        await journal.SaveAsync(letter, cancellationToken);
 
         await publisher.Publish(new LetterCancelledDomainEvent(
             letter.Id, year, sequence, letter.OrganizationUnitId, fromStatus,
             command.ReasonCode.Trim(), command.ActorId), cancellationToken);
+
+        await journal.SaveAsync(letter, cancellationToken);
         return new(letter.Id, LetterFormatting.Status(letter.Status));
     }
 }
@@ -312,7 +316,9 @@ public sealed class CancelLetterHandler(
 public sealed record DispatchLetterCommand(Guid ActorId, Guid LetterId, string MethodCode) : IRequest<LetterDto>;
 
 /// <summary>Manual dispatch recording — the first gate has no external
-/// providers; method code <c>manual</c> only.</summary>
+/// providers; method code <c>manual</c> only. The dispatched event is
+/// published before the save so letter, history and outbox row commit in one
+/// atomic SaveChanges (ADR-028 decision 8).</summary>
 public sealed class DispatchLetterHandler(
     ILetterJournal journal,
     AuthorizationGuard guard,
@@ -333,12 +339,13 @@ public sealed class DispatchLetterHandler(
 
         var methodCode = command.MethodCode.Trim();
         letter.RecordDispatch(methodCode, command.ActorId, DateTime.UtcNow);
-        await journal.SaveAsync(letter, cancellationToken);
 
         var (year, sequence) = LetterEventFactory.Number(letter);
         await publisher.Publish(new LetterDispatchedDomainEvent(
             letter.Id, year, sequence, letter.OrganizationUnitId, methodCode, command.ActorId),
             cancellationToken);
+
+        await journal.SaveAsync(letter, cancellationToken);
         return CreateLetterHandler.ToDto(letter, isHeld: false);
     }
 }
@@ -379,8 +386,6 @@ public sealed class RecordDeliveryOutcomeHandler(
             letter.FailDelivery(methodCode, command.ReasonCode!.Trim(), command.ActorId, now);
         }
 
-        await journal.SaveAsync(letter, cancellationToken);
-
         var (year, sequence) = LetterEventFactory.Number(letter);
         if (outcome == DeliveryOutcome.Confirmed)
         {
@@ -395,6 +400,7 @@ public sealed class RecordDeliveryOutcomeHandler(
                 command.ReasonCode!.Trim(), command.ActorId), cancellationToken);
         }
 
+        await journal.SaveAsync(letter, cancellationToken);
         return CreateLetterHandler.ToDto(letter, isHeld: false);
     }
 }

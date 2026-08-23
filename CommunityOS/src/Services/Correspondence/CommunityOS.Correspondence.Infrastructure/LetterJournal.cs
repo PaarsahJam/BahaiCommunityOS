@@ -17,7 +17,9 @@ namespace CommunityOS.Correspondence.Infrastructure;
 /// constraint remains the storage-level backstop. The retention purge runs in
 /// one explicit transaction that flips the session-local trigger guard,
 /// appends tombstone history rows and deletes exactly the selected batch
-/// (ADR-028 decision 13).
+/// (ADR-028 decision 13). Hold placements and releases likewise append
+/// their letter_status_history rows in the same single save as the hold
+/// state (ADR-028 decisions 9F and 13).
 /// </summary>
 public sealed class LetterJournal(CorrespondenceDbContext db, ILogger<LetterJournal> logger) : ILetterJournal
 {
@@ -145,13 +147,45 @@ public sealed class LetterJournal(CorrespondenceDbContext db, ILogger<LetterJour
 
     public async Task SaveHoldsAsync(IReadOnlyList<LetterHold> holds, CancellationToken ct)
     {
+        var letterIds = holds.Select(h => h.LetterId).Distinct().ToList();
+        var statuses = await db.Letters
+            .Where(l => letterIds.Contains(l.Id))
+            .Select(l => new { l.Id, l.Status })
+            .ToDictionaryAsync(x => x.Id, x => x.Status, ct);
+        if (statuses.Count != letterIds.Count)
+        {
+            throw new LetterNotFoundException();
+        }
+
+        // Placements append one immutable history row per hold (ADR-028
+        // decisions 9F and 13): no status transition (from == to == current),
+        // cause command, the hold's ratified reason code — committed in the
+        // same single save as the hold rows.
         db.LetterHolds.AddRange(holds);
+        db.Set<LetterStatusHistory>().AddRange(holds.Select(h =>
+        {
+            var current = statuses[h.LetterId];
+            return LetterStatusHistory.Create(
+                h.LetterId, current, current, HistoryCause.Command,
+                h.PlacedBy, h.ReasonCode, h.PlacedOn);
+        }));
         await db.SaveChangesAsync(ct);
     }
 
     public async Task SaveHoldReleaseAsync(LetterHold hold, CancellationToken ct)
     {
+        var current = await db.Letters
+            .Where(l => l.Id == hold.LetterId)
+            .Select(l => new { l.Status })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new LetterNotFoundException();
+
+        // Releases append the matching immutable history row in the same
+        // single save as the released hold state (ADR-028 decisions 9F and 13).
         db.LetterHolds.Update(hold);
+        db.Set<LetterStatusHistory>().Add(LetterStatusHistory.Create(
+            hold.LetterId, current.Status, current.Status, HistoryCause.Command,
+            hold.ReleasedBy!.Value, hold.ReasonCode, hold.ReleasedOn!.Value));
         await db.SaveChangesAsync(ct);
     }
 
