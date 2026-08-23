@@ -33,6 +33,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-025 | Notifications bounded context and delivery boundary | Accepted |
 | ADR-026 | Search bounded context and full-text projection boundary | Accepted |
 | ADR-027 | Audit bounded context and compliance-journal boundary | Accepted |
+| ADR-028 | Correspondence bounded context and communication-lifecycle boundary | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -244,11 +245,18 @@ Implementation-sequence status:
 - Slot 10 (**Search**) is **implemented** (ADR-026, Prompt 11C gate); the
   integration test suite is compile-only because Docker/Testcontainers is not
   available in the implementation environment.
+- Slot 11 (**Audit**) is **implemented** (ADR-027, Prompt 12C gate) and
+  **closed** by the Prompt 12F final read-only closure verification (verdict:
+  PASS; all eight Prompt 12D findings remediated at Prompt 12E). The
+  integration test suite is compile-only because Docker/Testcontainers is not
+  available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
-- Slot 11 (**Audit**) is **RATIFIED** at the Prompt 12B gate (ADR-027); it is
-  not implemented yet. Audit is the next bounded context in the ratified
-  sequence.
-- Slots 13–19 are not started.
+- Slot 13 (**Correspondence**) is **RATIFIED — NOT IMPLEMENTED (Prompt 12H)**
+  at the ADR-028 gate. Correspondence is the next bounded context in the
+  ratified sequence. Its implementation prerequisites include the Documents
+  transactional-outbox upgrade (the Documents producer reliability gate;
+  ADR-022 amendment note, ADR-028 decision 8).
+- Slots 14–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -1810,3 +1818,510 @@ replacement source of truth** for any domain fact.
 Superseded decisions: none. ADR-027 extends (does not amend) ADR-015/022/023/
 024/025/026 constraints into concrete Audit-gate prerequisites and records the
 Documents outbox amendment note inside ADR-022.
+
+## ADR-028 — Correspondence bounded context and communication-lifecycle boundary
+
+**Status:** Accepted (ratified at the Prompt 12H architecture/design gate).
+
+### Context
+
+Correspondence is slot 13 in the ratified implementation sequence (ADR-017).
+It owns the institutional letter lifecycle of the community administration:
+drafting official letters, confirming them, submitting them as formal acts,
+materializing the submitted letters as immutable document artifacts, tracking
+dispatch and delivery, cancelling before dispatch, and retaining the history.
+
+Existing ratified documents reference Correspondence only as forward
+boundaries: `docs/documents.md` states that a correspondence letter's
+draft/confirm/submit/track lifecycle stays in Correspondence while Documents
+receives materialized immutable versions; `docs/records.md` states Records may
+reference submitted letters as evidence but never owns letter lifecycle;
+ADR-022 decision 12 reserves correspondence lifecycle, recipient selection and
+institutional routing to Correspondence; ADR-021 positions Knowledge before
+Correspondence in the sequence; ADR-027 classifies no correspondence events.
+The three `correspondence.letter.*` strings inside
+`PermissionCatalog.DocumentedExamples` are explicitly non-normative examples
+("NOT enforced here") and carry no ratification weight. No Correspondence
+source, tests, contracts, database or configuration exists anywhere in the
+repository (verified at Prompt 12G): the context is greenfield.
+
+### Decision
+
+Correspondence is implemented as a standard four-project bounded context
+(Domain/Application/Infrastructure/API) following the established house
+patterns: PostgreSQL 16 on the shared instance, EF Core + Npgsql with
+snake_case naming and a dedicated schema, MassTransit over RabbitMQ via
+`CommunityOS.EventBus`, MediatR CQRS with FluentValidation pipeline,
+AuthorizationGuard over the Authorization check API, RS256-only JWT, Serilog,
+ASP.NET versioning, Testcontainers integration tests. The ratified decisions
+follow.
+
+1. **Ownership model.** Correspondence owns: the letter aggregate (identity,
+   human reference number, subject, category code, sensitivity classification,
+   organization scope), letter content while it is a working record (draft
+   bodies and the retained submitted text), recipients as structured
+   references plus captured external addressing snapshots, the submission /
+   dispatch / delivery state machine and its full transition history, manual
+   dispatch and delivery-outcome recordings, external-provider references
+   (future), attachments as references to existing Documents artifacts, the
+   document-materialization correlation state, the template registry,
+   retention state and legal holds on letters, and its own export activity
+   journal. Correspondence does **not** own: person or household facts
+   (Community), organization-unit facts (Organization), document storage,
+   object storage or immutable document versions (Documents — the materialized
+   letter version is a Documents artifact from birth), official-record
+   registration (Records — Records may reference submitted letters as
+   evidence), task/approval workflow (Workflow), notification delivery
+   (Notifications), search indices (Search), the compliance journal (Audit),
+   AI behavior (no first-gate role). The ratified rule from ADR-022 decision
+   12 is preserved verbatim: **Documents never owns the correspondence letter
+   lifecycle**, and symmetrically Correspondence never owns document storage
+   or version immutability mechanics.
+
+2. **Source-of-truth table.**
+
+   | Fact | Owner | Consumers | Notes |
+   |------|-------|-----------|-------|
+   | Letter identity & reference number | Correspondence | Audit, Records (evidence refs), Search (deferred) | per-unit yearly sequence, unique |
+   | Letter metadata (subject, category, sensitivity, scope) | Correspondence | Audit, Search (deferred) | subject may contain personal names — never exported to events |
+   | Recipient identity (person/unit ids) | Community / Organization own the entities; Correspondence owns the *reference* on the letter | Audit (ids only) | resolved at read time through owning APIs |
+   | External recipient addressing snapshot | Correspondence | none (never leaves the row except into the materialized artifact) | only for external-kind recipients |
+   | Letter content (body) | Correspondence (working + retained copy); Documents owns the immutable materialized version artifact | readers via Correspondence API | duplication is deliberate: working record vs archival artifact |
+   | Letter version (submitted snapshot) | Documents (immutable version) with Correspondence holding the DocumentReference | Records evidence, future consumers | one immutable version per submission |
+   | Submission act | Correspondence | Audit, Records | compliance core fact |
+   | Dispatch recording | Correspondence (manual first gate; provider refs future) | Audit | provider truth once providers exist |
+   | Delivery result | Correspondence | Audit | reason codes fixed vocabulary |
+   | Approval step | Correspondence (built-in confirm step) | — | no Workflow delegation at this gate |
+   | Notification about letters | none at this gate (deferred) | — | Notifications would consume Correspondence events in a future gate |
+   | Audit record of letter facts | Audit | auditors | Correspondence remains source of truth for state; Audit is the append-only historical journal |
+   | Search representation | none at this gate (Search indexing deferred) | — | requires future ADR-026 amendment |
+
+3. **Letter lifecycle (deterministic state machine).** States:
+   `Draft → Confirmed → Submitted → Materialized → Dispatched → Delivered`
+   with terminal branches `DeliveryFailed` and `Cancelled`. Legal
+   transitions:
+
+   | From | To | Caused by | Actor |
+   |------|----|-----------|-------|
+   | — | Draft | create command | authorized user |
+   | Draft | Confirmed | confirm command | `correspondence.letter.update` |
+   | Confirmed | Draft | unconfirm command | `correspondence.letter.update` |
+   | Draft/Confirmed | Cancelled | cancel command (reason code) | `correspondence.letter.cancel` |
+   | Confirmed | Submitted | submit command (publishes `LetterSubmitted`, assigns reference number) | `correspondence.letter.submit` |
+   | Submitted | Materialized | consumption of the correlated materialization event (`DocumentVersionAdded` for this letter) | system |
+   | Submitted/Materialized | Cancelled | cancel command pre-dispatch (reason code) | `correspondence.letter.cancel` |
+   | Materialized | Dispatched | manual dispatch recording (method code `manual` at first gate; provider codes later) | `correspondence.letter.admin` |
+   | Dispatched | Delivered | delivery outcome recording (confirmed) | `correspondence.letter.admin` |
+   | Dispatched | DeliveryFailed | delivery outcome recording (failed + reason code) | `correspondence.letter.admin` |
+
+   Invalid transitions throw domain exceptions surfaced as `409 Conflict`.
+   Every transition appends an immutable row to `letter_status_history`
+   (from, to, actor or system cause, optional reason code, timestamp) — the
+   lifecycle is fully retained locally and therefore auditable without
+   reconstruction. Content edits are permitted **only** in `Draft`; each save
+   bumps an optimistic-concurrency revision. Sensitivity classification is set
+   at creation and editable only while `Draft`. Submitted content is
+   immutable: corrections after submission are new letters (optionally linked
+   via `RelatedLetterId`), mirroring the Records "corrections arrive as new
+   records" philosophy. Commands are user-driven HTTP commands; the
+   Draft→…→Materialized edge is the sole integration-event reaction;
+   provider-callback reactions are future.
+
+4. **Letter numbering.** Each issuing unit owns a yearly sequence:
+   `UNIQUE (organization_unit_id, letter_year, letter_sequence)` with
+   sequence allocated transactionally at submit; the API composes the display
+   reference `{letter_year}-{sequence:D5}` scoped by unit. Numbers are never
+   reused, never renumbered, and survive cancellation (cancelled numbers are
+   consumed).
+
+5. **Recipients and addressing.** A letter carries one primary recipient
+   kind: `person` (Community person id), `unit` (Organization unit id), or
+   `external` (captured display/address lines). Person and unit recipients are
+   stored as stable identifiers only and resolved at read time through the
+   owning services' APIs; free-text display lines are captured **only** for
+   `external` recipients (bounded length). Multiple recipients per letter are
+   supported (bounded list). Recipient data never appears in logs, published
+   events or exports beyond what §9 permits.
+
+6. **Templates.** Correspondence owns a minimal template registry (unique
+   code, title, subject/body skeletons, category code, active flag).
+   Templates are mutable while referenced by no submitted letter; creating a
+   letter from a template copies (snapshots) the skeleton into the draft, so
+   later template edits never mutate existing letters. Deactivation is soft.
+   No template versioning tables at this gate.
+
+7. **Documents integration (materialization loop).** Submission is an
+   event-driven handshake:
+
+   - `POST .../submit` validates the confirmed letter, allocates the reference
+     number, persists `Submitted` status + history, journals nothing externally
+     yet, and publishes `LetterSubmitted` **through the transactional outbox**
+     in the same database transaction (atomicity, ADR-015).
+   - A future Documents-side consumer (recorded as the ADR-022 amendment
+     requirement below) consumes `LetterSubmitted` and materializes the
+     letter's content and recipient snapshot as a new immutable document
+     version owned by Documents, publishing the existing
+     `DocumentVersionAdded` fact enriched with two new optional fields
+     (`SourceContext = "correspondence"`, `SourceEntityId = letterId`) — a
+     **future contract addition** identified here, not created in this prompt.
+   - Correspondence consumes that correlated `DocumentVersionAdded`, records
+     the DocumentReference `(DocumentId, VersionNumber)` in
+     `letter_documents`, and transitions the letter to `Materialized`.
+   - **Submission itself succeeds independently of materialization; dispatch
+     is blocked until the immutable version exists.** A letter stranded in
+     `Submitted` past the operator-configured warn threshold is visible to the
+     runbook query and repairable via the admin reconciliation endpoint, which
+     re-publishes `LetterSubmitted` (safe: Documents-side materialization is
+     idempotent per `(SourceContext, SourceEntityId)`).
+   - If materialization permanently fails, the letter remains `Submitted`,
+     the failure surfaces in the reconciliation listing, and no dispatch path
+     exists until repaired. The submission fact is never lost or rewritten.
+   - Data crossing the boundary toward Documents: letter id, reference number,
+     subject, body text, category/sensitivity codes, organization unit,
+     recipient snapshot (ids; display lines only for external recipients),
+     submitter id, occurred-on. No credentials, no provider data.
+   - Documents remains the sole source of truth for the resulting immutable
+     document and version; Correspondence stores only the DocumentReference.
+   - Correspondence consumes exactly one Documents event at this gate:
+     the correlated `DocumentVersionAdded`. No Correspondence→Documents
+     event consumption exists for Documents to subscribe to at this gate;
+     whether Documents ever consumes `LetterSubmitted`-derived facts beyond
+     materialization is decided by the ADR-022 amendment, not assumed here.
+
+8. **Producer reliability gates (binding).** Mirroring the ADR-027 pattern:
+
+   - **Correspondence outbox (born-with-outbox):** every published
+     Correspondence event (`LetterSubmitted`, `LetterDispatched`,
+     `LetterDeliveryConfirmed`, `LetterDeliveryFailed`, `LetterCancelled`) is
+     transactional-outbox protected from day one, because guaranteed-delivery
+     consumers (Audit at minimum) exist by design. Registration uses
+     `AddCommunityOSEventBusWithOutbox<CorrespondenceDbContext>`.
+   - **Documents outbox gate:** because the materialization loop depends on
+     reliably receiving `DocumentVersionAdded`, **Correspondence MUST NOT
+     register any Documents-event consumer until Documents upgrades its
+     publication to the transactional outbox** (the ADR-022 amendment note
+     already anticipates this upgrade; `documents.md` marks it "required
+     before Correspondence is implemented"). Until that producer gate
+     completes, the `Submitted → Materialized` edge cannot ship; the
+     implementation prompt must either complete the Documents outbox upgrade
+     first or stage the lifecycle behind the gate exactly as ADR-027 staged
+     gated events. This gate is a producer-side change; it is **not** executed
+     in this prompt.
+   - **Authorization events:** no Authorization-event consumption is
+     contemplated; the symmetric Authorization outbox gate (ADR-027 decision
+     4) therefore does not apply to Correspondence at this gate.
+
+9. **Integration-event catalog.** Exhaustive classification of every
+   contract-relevant event for this context:
+
+   **A. Consumed at first gate (projection-only, 3):**
+   Organization `OrganizationUnitCreated`, `OrganizationUnitUpdated`,
+   `OrganizationUnitParentChanged` → `organization_unit_references`
+   (ADR-016 scoping infrastructure; never journaled as letters). Inbox-
+   protected like all consumption.
+
+   **B. Consumed only after the Documents producer reliability gate (1):**
+   Documents `DocumentVersionAdded` **with the ratified contract extension**
+   (`SourceContext`, `SourceEntityId`) — filtered to
+   `SourceContext == "correspondence"`; closes the materialization loop
+   (decision 7). The contract extension is a future contract addition; until
+   it ships together with the Documents outbox, this consumer must not be
+   registered.
+
+   **C. Projection-only:** the Organization trio above (same list; no other
+   projection sources).
+
+   **D. Published by Correspondence (5, all outbox-protected):**
+
+   | Event | Required fields (all scalar/codes/ids) | Privacy | Delivery | Idempotency | Audit consumes? | Search consumes? |
+   |-------|----------------------------------------|---------|----------|-------------|-----------------|------------------|
+   | `LetterSubmitted` | LetterId, LetterNumber(Year+Sequence), OrganizationUnitId, CategoryCode, Sensitivity, RecipientCount, RecipientPersonIds[], RecipientUnitIds[], SubmittedBy, OccurredOn | ids/codes only — never subject/body/display lines | outbox (guaranteed) | dedup on LetterId (single submission per letter) | **Yes** (compliance core) | deferred |
+   | `LetterDispatched` | LetterId, LetterNumber, OrganizationUnitId, MethodCode, DispatchedBy, OccurredOn | ids/codes only | outbox | one per dispatch attempt epoch | **Yes** | deferred |
+   | `LetterDeliveryConfirmed` | LetterId, LetterNumber, OrganizationUnitId, MethodCode, ConfirmedBy, OccurredOn | ids/codes only | outbox | dedupe per letter terminal state | **Yes** | deferred |
+   | `LetterDeliveryFailed` | LetterId, LetterNumber, OrganizationUnitId, MethodCode, ReasonCode, OccurredOn | ids/codes only | outbox | dedupe per letter terminal state | **Yes** | deferred |
+   | `LetterCancelled` | LetterId, LetterNumber, OrganizationUnitId, CancelledBy, ReasonCode, OccurredOn | ids/codes only | outbox | single cancellation per letter | **Yes** | deferred |
+
+   **E. Deferred (not subscribed, not published at this gate):**
+   template lifecycle events, recipient-change events, read receipts,
+   letter-status notifications (a future Notifications-consumes-
+   Correspondence direction), `DocumentDeactivated`/`DocumentRestored`
+   interplay, Workflow task linkage, provider-specific telemetry.
+
+   **F. Explicitly NOT integration events:** draft creation/edit/confirm/
+   unconfirm (local commands), queries, exports (internally journalled as
+   `export_activity` rows instead — actor, filter summary, row count, format;
+   never letter contents), hold place/release (internal rows +
+   `letter_status_history`), purge executions (internal tombstone history
+   row), provider callbacks (internal commands with provider-reference
+   idempotency).
+
+10. **Audit integration (future ADR-027 amendment).** The five published
+    events in decision 9D constitute the correspondence compliance subset:
+    Audit **must eventually consume all five** as first-gate-style entries
+    (source service `correspondence`). Because Correspondence is born with a
+    transactional outbox, these enter ADR-027's catalog as
+    **CONSUMED AND PERSISTED — gated only on Correspondence implementation
+    itself** (no additional producer reliability gate is required — unlike
+    the Documents/Authorization gates). Field-level ingest mappings follow the
+    ADR-027 model: stable ids, codes, counts, timestamps, actor/recipient
+    **identifiers**; allowlisted scalar metadata only; sensitivity
+    `Normal` for all five at this gate (letters classified Sensitive remain
+    Normal-sensitivity audit entries — the audit fact is that a letter was
+    submitted/dispatched/etc., not its content). Operational/internal facts
+    (drafts, edits, confirms, template changes, holds, purges, exports)
+    produce **no** audit entries at this gate. Events carrying PII risk
+    (anything containing subject/body/display lines) do not exist in the
+    catalog by construction — nothing needs excluding. This decision is
+    recorded here as the required **future amendment to ADR-027** (extend the
+    consumed-and-persisted catalog with the five correspondence events when
+    the Correspondence implementation gate lands); ADR-027 itself is not
+    modified in this prompt.
+
+11. **Outbox/inbox/delivery guarantees.** Follows ADR-004/015/022 patterns:
+    MassTransit EF Core transactional outbox for all publications
+    (decision 8); receive-endpoint inbox for all consumption including the
+    projection trio; retry via default bus retry policy; poison/unmappable
+    messages dead-letter with error logs; handler-level natural-key guards
+    (submission uniqueness per letter, single materialization link per
+    `(letter, document)`, single cancellation) make redelivery convergent;
+    reconciliation is operator-triggered re-publication (decision 7) — there
+    is **no truncate-and-rebuild** semantics anywhere (consistent with ADR-027
+    decision 16); replay of old events converges to zero side effects because
+    every consumer action is keyed on natural identities.
+
+12. **Database and persistence.** Dedicated database `communityos_correspondence`,
+    schema `correspondence`, PostgreSQL 16 on the shared instance (ADR-006),
+    EF Core + Npgsql snake_case conventions, migrations in Infrastructure.
+    Tables:
+
+    - `letters` — PK `id`; `letter_year`, `letter_sequence`;
+      `UNIQUE (organization_unit_id, letter_year, letter_sequence)`;
+      `subject` (≤200), `category_code` (≤50), `sensitivity` (normal|sensitive),
+      `status`, `body` (text, nullable only pre-first-save),
+      `related_letter_id` (nullable), `template_id` (nullable, soft ref),
+      `revision` (concurrency token), `created_by`, `created_on`,
+      `submitted_by`, `submitted_on`, `organization_unit_id`; indexes:
+      `(organization_unit_id)`, `(status)`, `(sensitivity)`,
+      `(category_code)`, partial `(retention_expires_on)` composite with
+      `retention_class`.
+    - `letter_recipients` — PK; FK `letter_id`; `kind` (person|unit|external);
+      `person_id` / `unit_id` (nullable, exclusive by kind check constraint);
+      `display_line` (≤500, external only); index `(letter_id)`.
+    - `letter_status_history` — append-only; FK `letter_id`; `from_status`,
+      `to_status`, `changed_by` (nullable for system), `cause`
+      (command|event|provider|purge-marker), `reason_code` (nullable),
+      `changed_on`; index `(letter_id, changed_on)`.
+    - `letter_documents` — materialization links; FK `letter_id`;
+      `document_id`, `version_number`, `content_hash`, `materialized_on`;
+      `UNIQUE (document_id)` and `UNIQUE (letter_id, document_id)`.
+    - `letter_attachments` — references to pre-existing Documents artifacts;
+      FK `letter_id`; `document_id`, `reference_type`; unique
+      `(letter_id, document_id, reference_type)` (ADR-022 tuple shape).
+    - `letter_delivery_records` — dispatch/outcome recordings; FK `letter_id`;
+      `method_code`, `outcome` (dispatched|confirmed|failed),
+      `reason_code` (nullable), `actor_id`, `occurred_on`,
+      `provider_reference` (nullable, future); index `(letter_id)`.
+    - `templates` — PK; `code` UNIQUE (≤50), `title`, `subject_template`,
+      `body_template`, `category_code`, `is_active`, timestamps.
+    - `letter_holds` — mirrors the ratified hold shape (Audit pattern):
+      `entry_id`=letter FK, `hold_type` (legal|administrative), `placed_by`,
+      `placed_on`, nullable `released_by`/`released_on`, `reason_code` from
+      fixed set {investigation, legal-request, dispute, regulatory-inquiry,
+      other}; partial index on active holds.
+    - `export_activity` — internal export journal (actor, filter summary ≤200,
+      row count, format, occurred-on).
+    - `organization_unit_references` (ADR-016 projection) and MassTransit
+      inbox/outbox tables.
+
+    Concurrency: optimistic via `revision` on letters; unique constraints
+    back every idempotency claim; no soft-delete of letters (cancellation is
+    the terminal state; retention purge is hard delete under holds, §13).
+    **AdditionalScopes: not adopted** — letters carry exactly one primary
+    organization scope; null-scope is reserved and treated as global-only
+    visibility (ADR-011 global-grant semantics). `OrganizationUnitReference`
+    projection: adopted (required for scope display and future hierarchy
+    needs). Audit-related reference fields on letters: none (Audit references
+    letters; not vice versa).
+
+13. **Retention and legal holds.** Retention classes are configuration
+    (class code → ISO-8601 duration; empty/missing = indefinite), computed at
+    submit into `retention_expires_on`; deployment policy sets actual
+    durations (none invented here). Expiry alone never deletes. Purge is
+    operator-driven, batch-bounded, excludes actively-held letters, writes a
+    tombstone row into `letter_status_history` (`cause=purge-marker`)
+    transactionally before deleting the batch, and runs under the same
+    SET LOCAL trigger-guard pattern ratified for Audit (native triggers reject
+    UPDATE/DELETE on `letters` unless `app.correspondence_purge_authorized='on'`
+    is set session-locally by the purge operation). Holds place/release are
+    admin capabilities; placements/releases append history rows. History,
+    holds, templates and delivery records never expire.
+
+14. **Privacy, PII and logging prohibitions.** Persisted by design: ids,
+    codes, subject line (working record only), body text (working + retained
+    copy), recipient identifiers, external display lines, statuses,
+    timestamps, provider references (future). Never logged (structured logs
+    carry letter id, status codes, category/sensitivity codes, counts, actor
+    and provider reference ids only): letter bodies, subjects, recipient
+    names, addresses, email addresses, phone numbers, credentials, tokens,
+    provider secrets. Never published onto the bus: bodies, subjects, display
+    lines, addresses — events carry identifiers and codes exclusively
+    (decision 9D). What Audit may retain: the identifier/code surface defined
+    by the ingest mappings (§10) and nothing more. What Search may index:
+    nothing at this gate (§14 posture below). Export restrictions: the export
+    endpoint emits a capped metadata/index stream (ids, numbers, codes,
+    statuses, timestamps, recipient kinds/counts — **never bodies, subjects
+    or external display lines**) and requires the export capability plus the
+    sensitive second pass when sensitive letters are included. Encryption: at
+    rest via the deployment's PostgreSQL storage policy and TLS in transit;
+    no application-layer field encryption at this gate (ratified explicitly —
+    no legal requirement is asserted, mirroring ADR-027 decision 14 restraint).
+    Anonymization/deletion: retention purge (hard delete) is the only removal
+    path; no anonymization scheme at this gate.
+
+15. **Authorization matrix (ratified; registered at the implementation gate —
+    not modified in this prompt).** Exact-match ordinal membership semantics;
+    no capability implies another unless stated; administrative capability
+    does **not** imply read (hold placement additionally requires read-level
+    visibility of every target letter, mirroring ADR-027 decision 12):
+
+    | Permission | Purpose |
+    |------------|---------|
+    | `correspondence.letter.read` | Query/list/read non-sensitive letters |
+    | `correspondence.letter.read.sensitive` | Second pass for `Sensitive` letters (additive to read) |
+    | `correspondence.letter.create` | Create drafts |
+    | `correspondence.letter.update` | Edit drafts, confirm/unconfirm |
+    | `correspondence.letter.submit` | Submit letters |
+    | `correspondence.letter.cancel` | Cancel pre-dispatch |
+    | `correspondence.letter.export` | Run capped metadata exports |
+    | `correspondence.letter.admin` | Manual dispatch/delivery recording, holds, retention purge, materialization reconciliation |
+    | `correspondence.template.read` | List/get templates |
+    | `correspondence.template.manage` | Create/update/deactivate templates |
+
+    Role seeds (registered in `PermissionCatalog`/`AuthorizationSeeder` at the
+    implementation gate): **GlobalAdministrator** — all ten, global scope;
+    **NationalAdministrator** — all ten, national scope; **LocalAdministrator**
+    — `read`, `create`, `update`, `submit`, `cancel`, `template.read` at local
+    scope (communities author their own outgoing letters; export/admin/
+    sensitive-read/template-management are national functions); **Volunteer**
+    and **Guest** — none. Scoping: letters carry the issuing unit's scope;
+    access follows ADR-011 any-of/hierarchy semantics resolved by the
+    Authorization service; fail-closed everywhere; uniform `404` for missing
+    and unauthorized single reads (anti-enumeration); list results silently
+    filtered; sensitive letters absent entirely unless the caller opted in
+    with the second-pass capability.
+
+16. **API surface (v1; full contract in `docs/api/correspondence.md`).**
+    Route root `/api/v{version}/correspondence`. Endpoints (each annotated
+    with its capability):
+
+    | Method | Path | Capability | Success |
+    |--------|------|------------|---------|
+    | GET | `/letters` | read (+`.sensitive` opt-in) | 200 page |
+    | GET | `/letters/{id}` | read (+`.sensitive` for sensitive) | 200 / 404 anti-enumerated |
+    | POST | `/letters` | create | 201 |
+    | PUT | `/letters/{id}/content` | update | 200 (optimistic `expectedRevision`) |
+    | POST | `/letters/{id}/confirm` | update | 200 |
+    | POST | `/letters/{id}/unconfirm` | update | 200 |
+    | POST | `/letters/{id}/submit` | submit | **202 Accepted** (state `Submitted`; materialization asynchronous) |
+    | POST | `/letters/{id}/cancel` | cancel | 200 |
+    | POST | `/letters/{id}/dispatch` | admin | 200 (manual method first gate) |
+    | POST | `/letters/{id}/delivery` | admin | 200 (confirmed / failed+reason) |
+    | GET | `/letters/{id}/history` | read (+second pass) | 200 |
+    | POST | `/letters/export` | export (+second pass opt-in) | 200 streamed CSV index |
+    | GET | `/templates` | template.read | 200 |
+    | POST | `/templates` | template.manage | 201 |
+    | PUT | `/templates/{id}` | template.manage | 200 |
+    | DELETE | `/templates/{id}` | template.manage | 204 (deactivate) |
+    | POST | `/admin/reconcile-materializations` | admin | 200 report |
+    | POST | `/admin/holds` | admin (+read visibility of targets) | 201 |
+    | POST | `/admin/holds/{id}/release` | admin | 200 |
+    | POST | `/admin/purge-expired` | admin | 200 |
+
+    Query filters (status, category, sensitivity opt-in, organization unit,
+    date range, free-text **reference-number** only — no body/subject search),
+    ordering by submitted-on/created-on ascending or descending (deterministic
+    tiebreak by id), `limit` default 25 clamped to max 100, offset paging.
+    Validation via FluentValidation pipeline → `400` ProblemDetails-shaped
+    errors; illegal transitions → `409`; DTO-only responses (EF entities never
+    exposed); camelCase JSON; Swagger development-only.
+
+17. **External delivery providers.** First gate supports **manual dispatch
+    recording only** (an authorized administrator records that a letter was
+    dispatched by conventional means, with a method code `manual` and optional
+    reference). Email/postal/SMS provider integrations are **deferred**: the
+    boundary is the `IDeliveryProvider` seam (future) — provider adapters
+    translate provider callbacks into the same internal delivery-recording
+    commands with provider-reference idempotency; internally owned state
+    remains the lifecycle statuses and delivery records defined here; provider
+    data storage limited to opaque provider references and status/reason
+    codes; no SDKs, no HTTP clients, no background pollers in this gate.
+
+18. **Workflow and notifications.** Approval stays **inside** Correspondence
+    as the built-in Confirm step; no Workflow task delegation, no hidden
+    workflow subsystem. Notifications: no integration in either direction at
+    this gate; a future gate may let Notifications consume
+    `LetterDispatched`/`LetterDeliveryFailed` to notify authors — recorded as
+    deferred, undecided here.
+
+19. **Search.** Letters are **not indexed at this gate**; the searchable
+    surface of Correspondence is nil. Rationale: letter subjects/bodies are
+    precisely the PII-bearing artifacts the platform keeps out of projections,
+    and ADR-026's sensitivity model would require a dedicated classification
+    design. Any future indexing requires an explicit **ADR-026 amendment**
+    (searchable source type, field allowlist, sensitivity mapping) plus a
+    Search-side consumer — recorded here as the future-amendment requirement;
+    ADR-026 is not modified in this prompt.
+
+20. **AI.** No first-gate role. Correspondence is fully functional without
+    AI. ADR-021's boundary rules apply should AI assistance ever be proposed
+    (suggestions only, never authoritative letters); no AI infrastructure is
+    introduced by this gate. (Note: ADR-022 decision 12 already assigns "AI
+    letter drafting" questions to Correspondence's future discretion, not
+    Documents'.)
+
+21. **Reconciliation / replay / duplicates.** Covered by decisions 7 and 11:
+    operator-triggered materialization re-request; inbox exactly-once +
+    natural-key guards for broker redelivery; duplicated provider callbacks
+    (future) deduped on provider reference; restated facts converge; no
+    rebuild semantics; forward-only schema evolution.
+
+22. **Test strategy (for the implementation gate; nothing created now).**
+    Domain: state-machine legality table exhaustively tested, invalid
+    transitions rejected, number allocation/uniqueness/retry, recipient-kind
+    exclusivity, hold release semantics, sensitivity immutability post-submit.
+    Application: validator coverage per command; authorization matrix per
+    capability × role × scope incl. admin-doesn't-imply-read; pagination
+    clamp/export cap semantics; optimistic-concurrency conflicts.
+    Infrastructure: event mapper purity and allowlisted-metadata conformance
+    (mirroring Audit mapper tests); inbox/outbox handlers; materialization
+    correlation filtering; purge guard/tombstone transactionality.
+    Persistence (Testcontainers, compile-only where Docker unavailable —
+    repository-wide established limitation): schema/migration creation,
+    triggers, unique constraints, idempotent ingestion, hold-exempt purge,
+    released-hold purge progression. Privacy/log-scrub tests asserting the
+    §14 prohibitions. Provider-seam tests for the manual dispatcher.
+
+23. **Documentation deliverables and implementation prerequisites.**
+    Companion documents ratified at this gate: `docs/correspondence.md`
+    (bounded-context design), `docs/api/correspondence.md` (API contract),
+    `docs/runbooks/correspondence.md` (operational runbook) — each headed
+    `STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12H)`. Implementation
+    prerequisites recorded for the next gates: (a) the **Documents
+    transactional-outbox upgrade** plus the `DocumentVersionAdded` contract
+    extension (decision 7/8) — producer-side work; (b) registration of the
+    ten permissions and role seeds (decision 15); (c) docker-init database
+    entry; (d) ADR-027 catalog amendment consuming the five letter events
+    (decision 10). None of these are executed in this prompt.
+
+Future amendments explicitly identified by this ADR (to be executed at their
+own gates, not silently): **ADR-022** — Documents consumes `LetterSubmitted`
+and materializes correspondence letters; `DocumentVersionAdded` gains
+`SourceContext`/`SourceEntityId`. **ADR-026** — if letters are ever indexed.
+**ADR-027** — extend the consumed-and-persisted catalog with the five
+correspondence events at the Correspondence implementation gate.
+
+Superseded decisions: none. ADR-028 extends (does not amend) ADR-004/006/009/
+010/011/015/016/017/020/021/022/023/024/025/026/027 constraints into concrete
+Correspondence-gate decisions and preserves every forward-boundary statement
+found in `docs/documents.md`, `docs/records.md` and ADR-021/022 as ratified
+constraints.
