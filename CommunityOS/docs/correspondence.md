@@ -1,9 +1,11 @@
 # Correspondence Bounded Context
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12H).** Design for the
+> **STATUS: IMPLEMENTED (Prompt 16).** Design for the
 > Correspondence bounded context (ADR-017 slot 13), ratified at the Prompt 12H
-> gate by ADR-028. Nothing in this document describes existing code; it is the
-> authoritative specification the future implementation gate must satisfy.
+> gate by ADR-028 and implemented as the Correspondence service
+> (`CommunityOS.Correspondence.{Domain,Application,Infrastructure,API}`).
+> This document remains the authoritative specification; deviations are noted
+> in the Prompt 16 implementation report.
 
 Correspondence owns the institutional letter lifecycle of the community
 administration: drafting official letters, confirming them, submitting them as

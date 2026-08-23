@@ -1,9 +1,8 @@
 # Correspondence Operations Runbook
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12H).** Operational runbook for
-> the future Correspondence service, ratified by ADR-028 at the Prompt 12H
-> gate. Nothing here runs yet; commands and endpoints are the specification
-> the implementation gate must satisfy.
+> **STATUS: IMPLEMENTED (Prompt 16).** Operational runbook for
+> the Correspondence service, ratified by ADR-028 at the Prompt 12H gate.
+> The commands and endpoints below are live in the running service.
 
 ## Service profile (planned)
 

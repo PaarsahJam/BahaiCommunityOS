@@ -90,6 +90,22 @@ public static class PermissionCatalog
     public const string AuditEntryExport = "audit.entry.export";
     public const string AuditEntryAdmin = "audit.entry.admin";
 
+    // Correspondence capabilities (correspondence.*, ratified ADR-028
+    // decision 15). Exact-match membership only and no capability implies
+    // another — correspondence.letter.admin never implies read, and hold
+    // placement additionally requires read-level visibility of every target
+    // letter (docs/correspondence.md).
+    public const string CorrespondenceLetterRead = "correspondence.letter.read";
+    public const string CorrespondenceLetterReadSensitive = "correspondence.letter.read.sensitive";
+    public const string CorrespondenceLetterCreate = "correspondence.letter.create";
+    public const string CorrespondenceLetterUpdate = "correspondence.letter.update";
+    public const string CorrespondenceLetterSubmit = "correspondence.letter.submit";
+    public const string CorrespondenceLetterCancel = "correspondence.letter.cancel";
+    public const string CorrespondenceLetterExport = "correspondence.letter.export";
+    public const string CorrespondenceLetterAdmin = "correspondence.letter.admin";
+    public const string CorrespondenceTemplateRead = "correspondence.template.read";
+    public const string CorrespondenceTemplateManage = "correspondence.template.manage";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global

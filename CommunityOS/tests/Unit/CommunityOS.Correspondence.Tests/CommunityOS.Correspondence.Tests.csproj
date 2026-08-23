@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Correspondence\CommunityOS.Correspondence.Domain\CommunityOS.Correspondence.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Correspondence\CommunityOS.Correspondence.Application\CommunityOS.Correspondence.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Correspondence\CommunityOS.Correspondence.Infrastructure\CommunityOS.Correspondence.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Correspondence\CommunityOS.Correspondence.API\CommunityOS.Correspondence.API.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

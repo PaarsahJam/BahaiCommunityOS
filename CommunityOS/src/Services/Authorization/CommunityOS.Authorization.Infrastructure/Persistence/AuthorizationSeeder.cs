@@ -42,7 +42,13 @@ public static class AuthorizationSeeder
             "notifications.notification.admin", "notifications.type.manage",
             "notifications.template.read", "notifications.preference.manage",
             "search.result.read", "search.result.read.sensitive", "search.index.manage",
-            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin"
+            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin",
+
+            "correspondence.letter.read", "correspondence.letter.read.sensitive",
+            "correspondence.letter.create", "correspondence.letter.update",
+            "correspondence.letter.submit", "correspondence.letter.cancel",
+            "correspondence.letter.export", "correspondence.letter.admin",
+            "correspondence.template.read", "correspondence.template.manage"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -73,14 +79,24 @@ public static class AuthorizationSeeder
             "notifications.notification.admin", "notifications.type.manage",
             "notifications.template.read", "notifications.preference.manage",
             "search.result.read", "search.result.read.sensitive", "search.index.manage",
-            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin"
+            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin",
+
+            "correspondence.letter.read", "correspondence.letter.read.sensitive",
+            "correspondence.letter.create", "correspondence.letter.update",
+            "correspondence.letter.submit", "correspondence.letter.cancel",
+            "correspondence.letter.export", "correspondence.letter.admin",
+            "correspondence.template.read", "correspondence.template.manage"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [
             "authz.role.list", "authz.role.assign", "authz.role.revoke",
             "authz.relationship.read",
             "authz.delegation.grant",
-            "authz.breakglass.approve"
+            "authz.breakglass.approve",
+
+            "correspondence.letter.read", "correspondence.letter.create",
+            "correspondence.letter.update", "correspondence.letter.submit",
+            "correspondence.letter.cancel", "correspondence.template.read"
         ]),
         ("CommitteeMember", "Committee Member",
         [

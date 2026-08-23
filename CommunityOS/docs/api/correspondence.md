@@ -1,9 +1,9 @@
 # Correspondence API Contract
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12H).** Contract for the
+> **STATUS: IMPLEMENTED (Prompt 16).** Contract for the
 > Correspondence service API, ratified by ADR-028 at the Prompt 12H gate.
-> No endpoint described here exists yet; this document is the specification
-> the implementation gate must satisfy.
+> All endpoints described here exist in `CommunityOS.Correspondence.API`;
+> this document remains the authoritative contract.
 
 Base URL route root: `/api/v{version}/correspondence` (ASP.NET versioning,
 default `1.0`). JSON is camelCase. Authentication: Identity-issued RS256
