@@ -1,8 +1,7 @@
 # Audit Service API
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12B).** Contract for the Audit
-> service, aligned with ratified ADR-027 and `docs/audit.md`. This is the API
-> surface the Prompt 12C implementation gate must realize.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 12C).** Contract for the Audit
+> service, aligned with ratified ADR-027 and `docs/audit.md`.
 
 All endpoints are versioned under `/api/v1/audit`, require a valid access
 token (`[Authorize]`), and return DTOs — **EF entities are never exposed**.
@@ -185,7 +184,10 @@ Executes **one** bounded purge batch: expired entries (`RetentionExpiresOn`
 past) that carry no active hold. Expiry alone never deletes; this endpoint is
 the explicit authorized execution step (ADR-027 decision 14).
 
-**Body:** `{ "maxBatchSize": 500 }` — default `500`, maximum `5000`.
+**Body:** `{ "maxBatchSize": 500 }` — default `500`, maximum `5000`. Values
+above the maximum are **clamped** to `5000` (the batch, not the request, is
+the bounded unit — ADR-027 decision 14); negative values are rejected with
+`400`.
 
 Behavior:
 
@@ -213,7 +215,7 @@ Repeated invocation drains the backlog. Purge is hard row deletion.
 
 | Status | Meaning |
 |--------|---------|
-| `400` | Validation failure (bad filter shape, `maxRows` above cap, unknown `reasonCode`) |
+| `400` | Validation failure (bad filter shape, `maxRows` above cap, negative `maxBatchSize`, unknown `reasonCode`) |
 | `401` | Missing/invalid token (RS256-only validation profile) |
 | `403` | Capability missing on an operation endpoint, or sensitive data requested without `audit.entry.read.sensitive` |
 | `404` | Single-entry read: missing **or** unauthorized (no oracle); hold referencing inaccessible entries |

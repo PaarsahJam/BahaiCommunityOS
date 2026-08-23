@@ -16,3 +16,4 @@ CREATE DATABASE communityos_records;
 CREATE DATABASE communityos_workflow;
 CREATE DATABASE communityos_notifications;
 CREATE DATABASE communityos_search;
+CREATE DATABASE communityos_audit;

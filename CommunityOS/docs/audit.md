@@ -1,10 +1,7 @@
 # Audit Service
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12B).** Architectural design for
-> the Audit bounded context (`ADR-027`), positioned at ADR-017 slot 11. This
-> document is the ratified design the Prompt 12C implementation gate must
-> follow. No source projects, contracts, permissions, migrations or tests exist
-> yet.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 12C).** Architectural design for
+> the Audit bounded context (`ADR-027`), positioned at ADR-017 slot 11.
 
 The Audit bounded context owns an **append-only compliance journal**: a
 write-once, queryable record of selected integration events raised by producer
@@ -313,8 +310,11 @@ requirements are asserted here):
    (configuration: code → ISO-8601 duration). The default class retains
    indefinitely (`RetentionExpiresOn` null) until deployment policy defines
    durations.
-2. **Expiry detection** — a periodic sweep over the partial retention index
-   identifies expired entries. Expiry alone never deletes.
+2. **Expiry detection** — eligibility is evaluated on demand against the
+   partial `(retention_class, retention_expires_on)` index: each purge
+   invocation selects expired, unheld entries directly and reports its
+   remaining-expired estimate. There is no background sweep worker at this
+   gate; expiry alone never deletes.
 3. **Two-step purge** — execution requires the `audit.entry.admin` purge
    endpoint: one bounded batch of expired, unheld entries per call; a
    purge-marker entry is written in the same transaction before the batch is

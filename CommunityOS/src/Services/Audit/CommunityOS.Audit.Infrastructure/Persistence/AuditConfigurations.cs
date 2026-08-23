@@ -13,6 +13,7 @@ public sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEntr
 
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.OccurredOn).HasColumnName("occurred_on");
+        builder.HasIndex(x => x.OccurredOn).HasDatabaseName("ix_audit_entries_occurred_on");
         builder.Property(x => x.IngestedOn).HasColumnName("ingested_on");
         builder.Property(x => x.SourceService).HasColumnName("source_service").HasMaxLength(50).IsRequired();
         builder.Property(x => x.SourceEventType).HasColumnName("source_event_type").HasMaxLength(100).IsRequired();

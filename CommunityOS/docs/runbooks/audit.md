@@ -1,14 +1,14 @@
 # Audit Service Runbook
 
-> **STATUS: RATIFIED — NOT IMPLEMENTED (Prompt 12B).** Operational runbook for
-> the Audit bounded context (`ADR-027`, ADR-017 slot 11). The implementation
-> steps below are the ratified plan Prompt 12C must execute; configuration and
-> operational procedures describe the ratified target state. No Audit source,
-> database or deployment exists yet.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 12C).** Operational runbook for
+> the Audit bounded context (`ADR-027`, ADR-017 slot 11). The service is
+> implemented at `src/Services/Audit/CommunityOS.Audit.API` with unit and
+> integration test projects; configuration and operational procedures below
+> describe the implemented state.
 
 ## Services
 
-- **Audit API/consumer host** — planned at
+- **Audit API/consumer host** — implemented at
   `src/Services/Audit/CommunityOS.Audit.API` with Domain / Application /
   Infrastructure projects plus unit and integration test projects, mirroring the
   Records/Workflow/Notifications/Search layout. Single deployable hosts both
@@ -63,9 +63,12 @@
    allowlists, deterministic sensitivity rules, retention-class application and
    `SourceEventHash` computation; unmappable input must dead-letter, never
    partially persist (ADR-027 decisions 6 and 10).
-9. Implement the retention sweep worker, two-step purge operation and hold
-   management (ADR-027 decision 14); ensure the purge path is the only code
-   that ever sets the trigger-guard setting, via `SET LOCAL`.
+9. Implement the two-step purge operation and hold management (ADR-027
+   decision 14); ensure the purge path is the only code that ever sets the
+   trigger-guard setting, via `SET LOCAL`. Expiry detection is evaluated on
+   demand against the partial retention index at each purge invocation (the
+   batch selection and its remaining-expired estimate) — there is no
+   background sweep worker at this gate; expiry alone never deletes.
 10. Ship unit tests (ingest mappings, sensitivity derivation, hash stability,
     allowlist enforcement) and Testcontainers integration tests (migration +
     trigger immutability + idempotent redelivery). See the environment
@@ -75,16 +78,25 @@
 
 | Key | Example/default | Purpose |
 |-----|-----------------|---------|
-| `AuditDb` | `Host=localhost;Database=communityos_audit;Username=communityos;Password=communityos` | Journal database connection |
+| `ConnectionStrings:AuditDb` | `Host=localhost;Port=5432;Database=communityos_audit;Username=communityos;Password=communityos` | Journal database connection |
+| `Jwt:Authority` / `Jwt:MetadataAddress` / `Jwt:Issuer` / `Jwt:Audience` | `http://localhost:5001` / `…/openid-configuration` / `http://localhost:5001` / `CommunityOS` | RS256 bearer-token validation profile |
 | `RabbitMq:Host` / `Port` / `Username` / `Password` | `localhost` / `5672` / `guest` / `guest` | Bus transport |
-| `AuthorizationService:BaseUrl` | `http://localhost:8080` | Check API base URL for the guard |
+| `AuthorizationService:BaseUrl` | `http://localhost:5007` | Check API base URL for the guard |
 | `AuthorizationService:ClientId` | `communityos-audit` | Service-principal identifier (audit/tracing) |
 | `AuthorizationService:AccessToken` | — | Service-principal token used by `HttpAuthorizationEvaluator` |
+| `Audit:MaxPageSize` | `100` | Query clamp ceiling (`limit` values above it are clamped, not rejected) |
+| `Audit:DefaultPageSize` | `25` | Page size when no `limit` is supplied |
+| `Audit:ExportMaxRows` | `10000` | Hard export cap (`maxRows` above it is rejected with `400`) |
+| `Audit:PurgeDefaultBatchSize` | `500` | Batch size when `maxBatchSize` is omitted on the purge endpoint |
+| `Audit:PurgeMaxBatchSize` | `5000` | Purge batch upper bound (`maxBatchSize` above it is clamped to this value; negative values are rejected with `400`) |
+| `Audit:HoldMaxBatchSize` | `500` | Maximum entries addressable by one hold-placement request |
+| `Audit:JournalClass` | `audit-journal` | Retention class of audit-of-audit entries (exports, holds, purge markers) |
+| `Audit:Retention:DefaultClass` | `default` | Class assigned to entries whose event type has no explicit mapping |
 | `Audit:Retention:Classes:{Code}` | ISO-8601 duration or empty (= indefinite) | Deployment retention policy per class code |
-| `Audit:SweepIntervalMinutes` | `60` | Retention expiry-sweep cadence |
-| `Audit:Purge:DefaultBatchSize` / `MaxBatchSize` | `500` / `5000` | Purge batch bounds (API rejects above max) |
-| `Audit:MaxPageSize` | `100` | Query clamp ceiling |
-| `Audit:ExportMaxRows` | `10000` | Hard export cap |
+| `Audit:Retention:EventClasses:{EventType}` | class code | Optional event-type → retention-class override |
+
+There is no sweep-interval setting: expiry detection runs inside the purge
+operation itself (see Retention / archival operations below).
 
 Retention durations are **deployment policy**, deliberately unspecified by the
 architecture; the default class retains indefinitely until configured
@@ -109,7 +121,9 @@ architecture; the default class retains indefinitely until configured
 
 ## Retention / archival operations
 
-1. The sweep flags expired entries; nothing deletes automatically.
+1. Expired entries are identified on demand by the purge operation against the
+   partial retention index; nothing deletes automatically and no background
+   sweep worker exists.
 2. Purge via `POST /api/v1/audit/admin/purge-expired` (one bounded batch per
    call; repeat to drain). Each invocation writes its purge-marker entry before
    deleting.

@@ -73,7 +73,7 @@ public static class AuthorizationSeeder
             "notifications.notification.admin", "notifications.type.manage",
             "notifications.template.read", "notifications.preference.manage",
             "search.result.read", "search.result.read.sensitive", "search.index.manage",
-            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export"
+            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [

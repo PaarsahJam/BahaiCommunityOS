@@ -2,6 +2,7 @@ using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure;
 using CommunityOS.Audit.Infrastructure.Persistence;
+using CommunityOS.Audit.Infrastructure.Retention;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,7 +53,7 @@ public sealed class AuditPersistenceTests : IAsyncLifetime
         return new AuditDbContext(options);
     }
 
-    private AuditIngestor CreateIngestor(AuditDbContext db)
+    private static AuditIngestor CreateIngestor(AuditDbContext db)
     {
         IRetentionPolicy policy = new AuditRetentionPolicy(
             Options.Create(new AuditOptions

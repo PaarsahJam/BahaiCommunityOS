@@ -23,6 +23,10 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     // ---- Query -------------------------------------------------------------
 
     [HttpGet]
+    [ProducesResponseType<AuditPageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<AuditPageDto>> Query(
         [FromQuery] string? sourceService,
         [FromQuery] string? eventType,
@@ -49,6 +53,10 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType<AuditEntryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AuditEntryDto>> Get(Guid id, CancellationToken ct) =>
         Ok(await mediator.Send(new GetAuditEntry(User.SubjectId(), id), ct));
 
@@ -71,6 +79,10 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("export")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Export(
         [FromBody] ExportRequestBody body,
         CancellationToken ct)
@@ -116,6 +128,12 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     public sealed record PlaceHoldBody(IReadOnlyList<Guid> EntryIds, string HoldType, string ReasonCode);
 
     [HttpPost("holds")]
+    [ProducesResponseType<IReadOnlyList<AuditHoldDto>>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> PlaceHold([FromBody] PlaceHoldBody body, CancellationToken ct)
     {
         if (body is null)
@@ -129,6 +147,11 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     }
 
     [HttpPost("holds/{id:guid}/release")]
+    [ProducesResponseType<AuditHoldDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ReleaseHold(Guid id, CancellationToken ct) =>
         Ok(await mediator.Send(new ReleaseHoldCommand(User.SubjectId(), id), ct));
 
@@ -137,6 +160,10 @@ public sealed class AuditController(IMediator mediator) : ControllerBase
     public sealed record PurgeBody(int MaxBatchSize = 0);
 
     [HttpPost("admin/purge-expired")]
+    [ProducesResponseType<PurgeResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> PurgeExpired([FromBody] PurgeBody? body, CancellationToken ct) =>
         Ok(await mediator.Send(new PurgeExpiredCommand(User.SubjectId(), body?.MaxBatchSize ?? 0), ct));
 

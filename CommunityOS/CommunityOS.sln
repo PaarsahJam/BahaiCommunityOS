@@ -249,6 +249,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Audit.Infrastru
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Audit.Tests", "tests\Unit\CommunityOS.Audit.Tests\CommunityOS.Audit.Tests.csproj", "{92ED6B0D-D20D-4E15-927E-6290911749D2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Audit.IntegrationTests", "tests\Integration\CommunityOS.Audit.IntegrationTests\CommunityOS.Audit.IntegrationTests.csproj", "{439327DC-EEDC-41C2-A3BB-894FA870C39B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1544,5 +1546,6 @@ Global
 		{8CF56E9F-5C48-477F-BEE7-8367531A4FC9} = {92F42DAB-CD95-DEFE-A96E-37B7027D6435}
 		{21AB59E6-99C8-4210-9778-08B412DDB599} = {92F42DAB-CD95-DEFE-A96E-37B7027D6435}
 		{92ED6B0D-D20D-4E15-927E-6290911749D2} = {9D556B49-86D1-93A7-9596-FFAAB74EC556}
+		{439327DC-EEDC-41C2-A3BB-894FA870C39B} = {28A6993C-471E-82FE-7D9E-AD3B1EC22BD9}
 	EndGlobalSection
 EndGlobal
