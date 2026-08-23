@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Audit\CommunityOS.Audit.Domain\CommunityOS.Audit.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Audit\CommunityOS.Audit.Application\CommunityOS.Audit.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Audit\CommunityOS.Audit.Infrastructure\CommunityOS.Audit.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Audit\CommunityOS.Audit.API\CommunityOS.Audit.API.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -81,6 +81,15 @@ public static class PermissionCatalog
     public const string SearchResultReadSensitive = "search.result.read.sensitive";
     public const string SearchIndexManage = "search.index.manage";
 
+    // Audit capabilities (audit.*, ratified ADR-027). Journal reads and the
+    // sensitive second pass are separate capabilities; audit.entry.admin never
+    // implies read access — hold placement additionally requires read-level
+    // visibility of every target entry (docs/audit.md, decision 12).
+    public const string AuditEntryRead = "audit.entry.read";
+    public const string AuditEntryReadSensitive = "audit.entry.read.sensitive";
+    public const string AuditEntryExport = "audit.entry.export";
+    public const string AuditEntryAdmin = "audit.entry.admin";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global

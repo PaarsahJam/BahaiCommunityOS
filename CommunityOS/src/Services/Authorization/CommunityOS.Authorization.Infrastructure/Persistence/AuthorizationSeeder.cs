@@ -41,7 +41,8 @@ public static class AuthorizationSeeder
             "notifications.notification.create", "notifications.notification.send",
             "notifications.notification.admin", "notifications.type.manage",
             "notifications.template.read", "notifications.preference.manage",
-            "search.result.read", "search.result.read.sensitive", "search.index.manage"
+            "search.result.read", "search.result.read.sensitive", "search.index.manage",
+            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export", "audit.entry.admin"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -71,7 +72,8 @@ public static class AuthorizationSeeder
             "notifications.notification.create", "notifications.notification.send",
             "notifications.notification.admin", "notifications.type.manage",
             "notifications.template.read", "notifications.preference.manage",
-            "search.result.read", "search.result.read.sensitive", "search.index.manage"
+            "search.result.read", "search.result.read.sensitive", "search.index.manage",
+            "audit.entry.read", "audit.entry.read.sensitive", "audit.entry.export"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>CommunityOS.Audit.Infrastructure</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CommunityOS.Audit.Application\CommunityOS.Audit.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.EventBus\CommunityOS.EventBus.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" /><PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" /><PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" /><PackageReference Include="MassTransit.EntityFrameworkCore" /><PackageReference Include="Microsoft.Extensions.Http.Resilience" /></ItemGroup>
+</Project>

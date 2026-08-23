@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>CommunityOS.Audit.Domain</AssemblyName></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.SharedKernel\CommunityOS.SharedKernel.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Npgsql" /></ItemGroup>
+</Project>
