@@ -34,6 +34,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-026 | Search bounded context and full-text projection boundary | Accepted |
 | ADR-027 | Audit bounded context and compliance-journal boundary | Accepted |
 | ADR-028 | Correspondence bounded context and communication-lifecycle boundary | Accepted |
+| ADR-029 | Localization bounded context and multilingual-resource boundary | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -2325,3 +2326,296 @@ Superseded decisions: none. ADR-028 extends (does not amend) ADR-004/006/009/
 Correspondence-gate decisions and preserves every forward-boundary statement
 found in `docs/documents.md`, `docs/records.md` and ADR-021/022 as ratified
 constraints.
+
+## ADR-029 — Localization bounded context and multilingual-resource boundary
+
+**Status:** Accepted (ratified at the Prompt 16E architecture/design gate;
+the ratifier resolved all five open questions as APPROVED — see the
+Ratification record at the end of this ADR).
+
+### Context
+
+Localization is slot 14 in the ratified implementation sequence (ADR-017). It
+owns the platform-wide multilingual resource capability: the registry of
+supported cultures, the catalog of UI strings and labels, by-reference
+translations of display fields belonging to records owned by other bounded
+contexts, machine-assisted translation suggestions, and the human review
+workflow that turns proposals into approved translations.
+
+Existing ratified material references this capability only indirectly:
+Community person records carry a preferred-language attribute owned by
+Community (`docs/community.md`); Search already plans language-specific
+dictionaries behind its own boundary (`docs/search.md`); Knowledge (ADR-021)
+exclusively owns the Library of authoritative Writings and their authoritative
+translations, and its own `Translation` entity and API are explicitly deferred
+from its first cut (`docs/knowledge.md`, Deviations). No Localization source,
+tests, contracts, database, configuration or documentation exists anywhere in
+the repository (verified exhaustively at Prompt 16D — the sole prior mention
+in the entire repository is the slot entry itself at ADR-017): the context is
+greenfield.
+
+The scope boundary in decision 1, the initial locale set in decision 3, the
+permission matrix in decision 11, and the open questions listed at the end of
+this record were ratified at Prompt 16E: all five open questions were resolved
+as APPROVED and the resolutions are recorded in the Ratification record, which
+is part of the ratified architecture.
+
+### Decision
+
+Localization is designed as a standard four-project bounded context
+(Domain/Application/Infrastructure/API) following the established house
+patterns: PostgreSQL on the shared instance, EF Core + Npgsql with snake_case
+naming and a dedicated schema, MassTransit over RabbitMQ via
+`CommunityOS.EventBus` with a transactional outbox from birth (ADR-015),
+MediatR CQRS with FluentValidation pipeline, AuthorizationGuard over the
+Authorization check API, RS256-only JWT with mandatory subject, fail-closed
+permission evaluation, Serilog, ASP.NET API versioning, Testcontainers
+integration tests. The ratified decisions follow.
+
+1. **Ownership model.** Localization owns: the locale registry (supported
+   cultures, default locale, fallback chains); the resource-string catalog
+   (namespaces, keys, revisions, lifecycle states); the entity-field
+   translation catalog (translated display values for records owned
+   elsewhere, stored strictly by reference); translation suggestions,
+   including machine-generated drafts; the review/approval workflow over
+   resources and entity translations; export bundle publication and
+   versioning. Localization does **not** own: authoritative Writings texts or
+   their authoritative translations (Knowledge/Library — the ADR-021 boundary
+   is preserved verbatim and Knowledge's deferred `Translation` entity remains
+   Knowledge's); person preferred-language facts (Community); search
+   dictionaries or indices (Search); notification message rendering or
+   delivery (Notifications); document storage or version immutability
+   (Documents); official-record registration (Records); task/approval
+   workflow (Workflow); the compliance journal (Audit); AI model hosting (AI
+   Platform, slot 15).
+
+2. **Source-of-truth table.**
+
+   | Fact | Owner | Consumers | Notes |
+   |------|-------|-----------|-------|
+   | Locale registry (active cultures, fallback) | Localization | all clients; Search (reference data only) | BCP-47 codes |
+   | UI resource strings | Localization | clients via export bundles | per-namespace, per-key, per-culture revisions |
+   | Entity-field display translations | Localization (the *translation* only) | owning contexts' readers | canonical value never leaves the owning context |
+   | Canonical record content (person names, unit names, letter subjects, ...) | the owning context | unchanged | Localization stores translated display values by reference, never canonical values |
+   | Authoritative Writings passages/translations | Knowledge (ADR-021) | unchanged | hard exclusion — see decision 18 |
+   | Person preferred language | Community | unchanged | Localization may expose the locale list used for preference selection |
+   | Machine-translation provider connectivity | AI Platform (future, slot 15) | Localization consumes via seam | Localization owns only the suggestion record and its provenance |
+
+3. **Locale registry and fallback chain.** Cultures are BCP-47 codes
+   validated against the registry at write time. The default locale is `en`.
+   Resolution order for any key: exact culture → parent culture (BCP-47
+   truncation, e.g. `fa-IR` → `fa`) → default locale. If still unresolved,
+   the API returns the key identifier itself (fail-visible), never a silent
+   empty string. Locale activation/deactivation is an admin command; no code
+   change or migration is required to activate a new culture. Ratified seed
+   policy: only `en` active at implementation time, with `fa` (Persian) and
+   `ar` (Arabic) ratified as the first activation **candidates** — candidate
+   status does not require them to be seeded or activated at the
+   architecture/ratification stage; the implementation gate defines the
+   concrete initial locale-registry seed consistently with this decision.
+
+4. **Resource catalog aggregate and lifecycle.** Hierarchy: namespace → key →
+   revisions. Revision states: `Draft → InReview → Approved`, terminal
+   `Rejected`; approved keys may be `Deprecated` (never deleted). Approved
+   revisions are immutable and append-only; any edit creates a new revision
+   that must pass review again. Approved keys are never renamed — deprecate
+   and create a successor key. Placeholders use ICU MessageFormat syntax;
+   servers never format dates/numbers/culturally sensitive values — they
+   return tokens for client-side formatting.
+
+5. **Entity translations by reference.** Uniqueness tuple:
+   `(source_context, entity_type, entity_id, field, culture)`. The canonical
+   value always remains in the owning context; Localization stores only the
+   translated display value plus a state mirroring decision 4's lifecycle.
+   Lifecycle changes in owning contexts propagate through future events, not
+   guesses; until such events exist, stale translations remain visibly
+   attributed with their last-approved timestamp.
+
+6. **Identifiers.** GUID surrogate identifiers throughout; natural uniqueness
+   enforced by `(namespace, key, culture)` for resources and the decision-5
+   tuple for entity translations. No human reference numbering exists in this
+   context.
+
+7. **Persistence.** Dedicated database `communityos_localization`, dedicated
+   schema, snake_case mapping, design-time DbContext factory, migrations
+   created at the implementation gate. No cross-context foreign keys
+   (house rule); references are opaque stable ids.
+
+8. **Concurrency.** Optimistic concurrency (PostgreSQL `xmin`) on all mutable
+   rows; immutable approved revisions need none; review transitions re-check
+   state inside the transaction and surface illegal transitions as
+   `409 Conflict`.
+
+9. **Retention.** Nothing is hard-deleted. Deprecated keys/revisions and
+   rejected suggestions are retained indefinitely with outcome attribution.
+   Export bundle versions are retained so older clients resolve deterministically.
+
+10. **Privacy / PII.** Resource strings must be PII-free by policy (review
+    checklist at approval). Attribution columns store JWT subject ids only —
+    never free-text names. Data classification: public/low. Log statements
+    record keys and identifiers, never resolved string values.
+
+11. **Authorization matrix (ratified).** Five permissions — exactly the five
+    permission strings in the table below, no more, no fewer — house naming
+    convention:
+
+    | Permission | Grant |
+    |------------|-------|
+    | `localization.locale.read` | every authenticated role |
+    | `localization.locale.manage` | Global officer, National Assembly member |
+    | `localization.resource.read` | every authenticated role |
+    | `localization.resource.propose` | Local Assembly secretary, National Assembly member, Global officer |
+    | `localization.resource.review` | National Assembly member, Global officer |
+
+    Admin does not imply read (house rule preserved). Volunteers and Guests:
+    none (fail closed). Exact seeding occurs at the implementation gate; no
+    local RBAC, no cross-service database access.
+
+12. **Organization scoping.** The catalog is institution-independent — one
+    shared translation body serving the whole administration, independent of
+    OrganizationUnit. No unit-scoped overrides at this gate (ratified
+    simplification, see ratification record OQ-5).
+    Audit columns capture acting subject and unit for accountability.
+
+13. **API surface (v1).** `/locales` (list, create, activate, deactivate);
+    `/resources/namespaces` (CRUD-lite) and `/resources/entries`
+    (search + list with cursor pagination); revision commands
+    (submit-for-review, approve, reject, deprecate); `/entity-translations`
+    (batch upsert/query); `/suggestions` (list, accept-into-review, reject);
+    `/export/bundles?culture=&namespace=` returning deterministic,
+    stably ordered JSON with ETag/version headers. Uniform 404
+    anti-enumeration, RS256-only JWT, mandatory subject, sensitive second-pass
+    authorization where applicable, ASP.NET versioning.
+
+14. **Integration events.** Publishes exactly one event type at this gate:
+    `LocalizationCatalogChanged` (context, namespace, culture, bundle
+    version) — emitted transactionally via the outbox in the same
+    SaveChanges scope that approves/publishes a revision (publish-before-save
+    house rule). Zero consumers registered at this gate. Consumes **no**
+    events at this gate — therefore **no upstream producer-reliability
+    prerequisite applies** (in particular, the Documents outbox upgrade is
+    explicitly *not* a prerequisite for this context).
+
+15. **Inbox/outbox.** Outbox enabled from birth (ADR-015 parity with slots
+    7–13). Inbox configured but inert until the first consumer exists.
+
+16. **Idempotency / reconciliation / replay.** Bundle ETags make client
+    caching idempotent; single-SaveChanges publication guarantees atomicity;
+    no replay requirements exist at this gate.
+
+17. **Audit interaction.** No Audit modification now (house rule: future
+    amendments execute at their own gates). Identified future amendment:
+    extend the ADR-027 consumed-and-persisted catalog with
+    `LocalizationCatalogChanged` at the Localization implementation gate if
+    ratifiers want catalog history journaled.
+
+18. **Context interactions.** **Knowledge:** hard boundary — no Writings
+    passage or authoritative translation may ever enter a Localization table
+    or API; enforced by rejecting reserved namespace prefixes (e.g.
+    `library.`) at validation and by review guidelines. **Community /
+    Organization:** entity translations reference their stable ids; resolution
+    stays with the owners. **Workflow:** none at this gate — built-in two-step
+    propose/review flow, mirroring the Correspondence precedent. **Search:**
+    dictionary selection remains Search's concern; Localization exports the
+    active locale list as reference data only. **Notifications:** deferred
+    consumer (string resolution integration at a future gate, if ever).
+    **Documents / Records:** none at this gate.
+
+19. **AI posture (ratifier-directed).** Machine translation is permitted
+    solely as non-authoritative DRAFT suggestions. Every AI suggestion enters
+    the same human review workflow as human proposals; AI can never
+    auto-publish, bypass review, or modify approved revisions. Provenance is
+    recorded per suggestion (`human` | `machine:<provider>`). The capability
+    ships disabled by configuration default. This complies with ADR-021's AI
+    limits (AI must never independently author authoritative material) and
+    `specifications/10-AI-Governance.md`; model hosting itself belongs to AI
+    Platform (slot 15) — Localization defines only the provider seam.
+
+20. **External providers.** A pluggable machine-translation provider
+    interface isolates vendors; no vendor SDK may leak into Domain or
+    Application layers; failures degrade gracefully to the human-only flow.
+
+21. **Logging / observability.** Serilog structured logging with request
+    logging parity; health checks for database and broker; no PII and no
+    resolved string values in logs (decision 10).
+
+22. **Test strategy (for the implementation gate; nothing created now).**
+    Unit: fallback-chain legality table, lifecycle state-machine table,
+    validator coverage per command, authorization matrix per role/scope
+    including admin-doesn't-imply-read, ETag determinism, reserved-namespace
+    rejection. Integration (Testcontainers; compile-only where Docker is
+    unavailable — established repository-wide limitation): schema/migration
+    creation, natural-tuple uniqueness, revision immutability under
+    concurrent approve attempts, outbox capture of
+    `LocalizationCatalogChanged` in the same SaveChanges scope, export
+    determinism across page walks.
+
+23. **Documentation deliverables and implementation prerequisites.**
+    Companion documents (`docs/localization.md`,
+    `docs/api/localization.md`, `docs/runbooks/localization.md`) are
+    deliverables of the post-ratification implementation gate — this record is
+    deliberately self-contained (explicitly ratified deviation from the
+    Correspondence two-gate doc precedent, see ratification record OQ-4;
+    deferral here is an architectural decision, not documentation
+    incompleteness at the ratification stage). Implementation prerequisites
+    recorded, none executed now: (a) permission registration and role seeds
+    (decision 11); (b) docker-init database entry; (c) source/test/contract
+    projects; (d) optional ADR-027 amendment (decision 17).
+
+### Ratification record (Prompt 16E)
+
+All five open questions were put to the ratifier and resolved as follows.
+The resolutions below are part of the ratified architecture and this record
+is self-contained.
+
+- **OQ-1 — Scope: APPROVED.** Localization owns the locale registry; the
+  localization resource catalog; by-reference entity-field translations;
+  the translation/review workflow; and localization-specific lifecycle,
+  versioning, retention, and governance state. The by-reference translation
+  model is approved. Localization MUST NOT own the source entities
+  themselves. The Knowledge and Library exclusions remain exactly as stated
+  in decisions 1 and 18 and are preserved verbatim: Localization must never
+  become the owner of Knowledge or Library content.
+
+- **OQ-2 — Default locale and initial activation: APPROVED.** Default locale
+  is `en`. Initial activation candidates are `fa` and `ar`. Candidate status
+  does not mean `fa`/`ar` must be seeded or activated during the
+  architecture/ratification stage; the implementation gate may define the
+  concrete initial locale-registry seed provided it remains consistent with
+  this ratified decision. No additional mandatory locales may be introduced
+  without a future architectural decision.
+
+- **OQ-3 — Authorization: APPROVED.** The permission matrix and role
+  grants in decision 11 are ratified exactly as specified there. Permission
+  semantics are exact-match. Administration permissions MUST NOT imply read
+  or any other permission. Authorization remains fail-closed and
+  organization-scoped according to the established CommunityOS authorization
+  architecture. No additional permissions are invented.
+
+- **OQ-4 — Companion documents: APPROVED (deferred).** The companion
+  documents (`docs/localization.md`, `docs/api/localization.md`,
+  `docs/runbooks/localization.md`) are intentionally deferred to the
+  Localization implementation gate. This is an explicit architectural
+  decision, not documentation incompleteness at the ratification stage.
+  ADR-029 is the authoritative architecture document now.
+
+- **OQ-5 — Catalog ownership / organization overrides: APPROVED.** The
+  localization catalog is institution-independent: there are NO
+  organization-unit-specific catalog overrides at the first gate. Resources
+  and locale definitions have one authoritative catalog independent of
+  OrganizationUnit. Organization scoping may still be used for authorization
+  where required, but it must not create per-unit copies or override layers
+  of the catalog. No additional override mechanism may be introduced without
+  a future ADR amendment.
+
+Future amendments explicitly identified by this ADR (to be executed at their
+own gates, not silently): **ADR-027** — optionally extend the Audit
+consumed-event catalog with `LocalizationCatalogChanged` (decision 17).
+**ADR-025** — if Notifications ever resolves strings server-side.
+**ADR-026** — if locale-aware search indexing is ever added.
+
+Superseded decisions: none. ADR-029 extends (does not amend) ADR-004/006/009/
+010/011/015/016/017/020/021 constraints into concrete Localization-gate
+decisions and preserves verbatim: the ADR-021 Knowledge/Library exclusivity
+over authoritative Writings translations, Community ownership of person
+preferred language, and Search ownership of dictionary mechanics.
