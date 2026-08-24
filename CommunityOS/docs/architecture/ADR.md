@@ -34,7 +34,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-026 | Search bounded context and full-text projection boundary | Accepted |
 | ADR-027 | Audit bounded context and compliance-journal boundary | Accepted |
 | ADR-028 | Correspondence bounded context and communication-lifecycle boundary | Accepted |
-| ADR-029 | Localization bounded context and multilingual-resource boundary | Accepted |
+| ADR-029 | Localization bounded context and multilingual-resource boundary | Accepted; implemented (16F) |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -2330,8 +2330,8 @@ constraints.
 ## ADR-029 — Localization bounded context and multilingual-resource boundary
 
 **Status:** Accepted (ratified at the Prompt 16E architecture/design gate;
-the ratifier resolved all five open questions as APPROVED — see the
-Ratification record at the end of this ADR).
+the ratifier resolved all five open questions as APPROVED - see the
+Ratification record at the end of this ADR) and IMPLEMENTED (Prompt 16F).
 
 ### Context
 

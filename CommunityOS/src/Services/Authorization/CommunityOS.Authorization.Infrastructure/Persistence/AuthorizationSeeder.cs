@@ -48,7 +48,11 @@ public static class AuthorizationSeeder
             "correspondence.letter.create", "correspondence.letter.update",
             "correspondence.letter.submit", "correspondence.letter.cancel",
             "correspondence.letter.export", "correspondence.letter.admin",
-            "correspondence.template.read", "correspondence.template.manage"
+            "correspondence.template.read", "correspondence.template.manage",
+
+            "localization.locale.read", "localization.locale.manage",
+            "localization.resource.read", "localization.resource.propose",
+            "localization.resource.review"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -85,7 +89,13 @@ public static class AuthorizationSeeder
             "correspondence.letter.create", "correspondence.letter.update",
             "correspondence.letter.submit", "correspondence.letter.cancel",
             "correspondence.letter.export", "correspondence.letter.admin",
-            "correspondence.template.read", "correspondence.template.manage"
+            "correspondence.template.read", "correspondence.template.manage",
+
+            // The catalog is institution-independent (ADR-029 decision 12):
+            // national administrators hold all five localization capabilities.
+            "localization.locale.read", "localization.locale.manage",
+            "localization.resource.read", "localization.resource.propose",
+            "localization.resource.review"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [
@@ -96,16 +106,22 @@ public static class AuthorizationSeeder
 
             "correspondence.letter.read", "correspondence.letter.create",
             "correspondence.letter.update", "correspondence.letter.submit",
-            "correspondence.letter.cancel", "correspondence.template.read"
+            "correspondence.letter.cancel", "correspondence.template.read",
+
+            // Administration never implies read; local admins author but do
+            // not review or administer the shared locale registry.
+            "localization.resource.read", "localization.resource.propose"
         ]),
         ("CommitteeMember", "Committee Member",
         [
-            "authz.relationship.read"
+            "authz.relationship.read",
+            "localization.resource.read"
         ]),
         ("Volunteer", "Volunteer", []),
         ("Member", "Member",
         [
-            "notifications.notification.read", "notifications.preference.manage"
+            "notifications.notification.read", "notifications.preference.manage",
+            "localization.resource.read"
         ]),
         ("Guest", "Guest", [])
     ];

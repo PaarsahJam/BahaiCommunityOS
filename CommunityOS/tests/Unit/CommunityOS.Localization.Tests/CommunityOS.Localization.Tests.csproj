@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Localization\CommunityOS.Localization.Domain\CommunityOS.Localization.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Localization\CommunityOS.Localization.Application\CommunityOS.Localization.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Localization\CommunityOS.Localization.Infrastructure\CommunityOS.Localization.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Localization\CommunityOS.Localization.API\CommunityOS.Localization.API.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

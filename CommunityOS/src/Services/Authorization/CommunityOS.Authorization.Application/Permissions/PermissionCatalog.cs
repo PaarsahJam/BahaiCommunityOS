@@ -106,6 +106,17 @@ public static class PermissionCatalog
     public const string CorrespondenceTemplateRead = "correspondence.template.read";
     public const string CorrespondenceTemplateManage = "correspondence.template.manage";
 
+    // Localization capabilities (localization.*, ratified ADR-029 decision
+    // 11). Exactly five capabilities; exact-match membership only and no
+    // capability implies another — localization.locale.manage never implies
+    // read, and review never implies propose. Institution-independent: the
+    // catalog is shared across units (docs/localization.md).
+    public const string LocalizationLocaleRead = "localization.locale.read";
+    public const string LocalizationLocaleManage = "localization.locale.manage";
+    public const string LocalizationResourceRead = "localization.resource.read";
+    public const string LocalizationResourcePropose = "localization.resource.propose";
+    public const string LocalizationResourceReview = "localization.resource.review";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global

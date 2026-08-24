@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\..\src\Services\Localization\CommunityOS.Localization.Infrastructure\CommunityOS.Localization.Infrastructure.csproj" /></ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <PropertyGroup><NoWarn>$(NoWarn);CA1707</NoWarn></PropertyGroup>
+</Project>
