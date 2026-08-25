@@ -73,7 +73,7 @@ public sealed class CreateResourceEntryValidator : AbstractValidator<CreateResou
         RuleFor(x => x.NamespaceId).NotEqual(Guid.Empty);
         RuleFor(x => x.Key)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().MaximumLength(ResourceRevision.ValueMaxLength)
+            .NotEmpty().MaximumLength(ResourceEntry.KeyMaxLength)
             .Must(k => k.Trim().All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or ':'))
             .WithMessage("Resource keys may contain ASCII letters, digits and '.', '_', '-', ':' only.");
         RuleFor(x => x.Culture).Must(Bcp47.IsValid)

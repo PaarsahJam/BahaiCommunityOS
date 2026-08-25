@@ -21,10 +21,11 @@ conflict, `500` unexpected.
 `localization.locale.read` → `.locale.manage` →
 `localization.resource.read` → `.resource.propose` → `.resource.review`
 
-No capability implies another. The mapping ratified in ADR-029:
-GlobalAdministrator and NationalAdministrator hold all five;
-LocalAdministrator holds read + propose; CommitteeMember and Member hold
-read; Volunteer/Guest/PlatformServicePrincipal hold none.
+No capability implies another. The mapping ratified in ADR-029 (decision 11,
+as amended): GlobalAdministrator and NationalAdministrator hold all five;
+LocalAdministrator holds `locale.read` + `resource.read` +
+`resource.propose`; CommitteeMember and Member hold `locale.read` +
+`resource.read`; Volunteer/Guest/PlatformServicePrincipal hold none.
 
 ## Locales
 
@@ -44,7 +45,7 @@ one default exists at all times.
 
 ## Namespaces
 
-### GET /namespaces — `localization.resource.read`
+### GET /resources/namespaces — `localization.resource.read`
 All namespaces with descriptions.
 
 ### POST /namespaces — `localization.resource.propose`
@@ -54,32 +55,39 @@ lower-cased dotted identifiers; reserved prefixes (`library.`,
 
 ## Resource entries
 
-### GET /entries — `localization.resource.read`
-Keyset-walk the catalog. Query: `namespaceId`, `state` (whitelist: draft,
-in_review, approved, rejected, superseded, deprecated), `search` (key
-substring), `cursor`, `limit` (default 25, max 100). Response includes the
-next opaque cursor; approved values are resolved inline.
+### GET /resources/entries — `localization.resource.read`
+Deterministic keyset walk of the catalog. Query: `namespaceId`, `state`
+(whitelist: draft, in_review, approved, rejected, superseded, deprecated),
+`search` (key substring), `cursor`, `limit` (omitted/0 → default 25;
+clamped to max 100). List responses are **metadata-only** — revision values
+are never included (ADR-029 decision 10). Response shape:
+`{ "items", "nextCursor" }`; `nextCursor` is an opaque continuation token
+and is `null` on the final page — keep walking while it is non-null to
+retrieve every match exactly once. State filtering happens inside the page
+query, so filtered walks are complete regardless of page size.
 
-### POST /entries — `localization.resource.propose`
-Create an entry with its first draft revision. Body:
-`{ "value", "culture", "provenance?" }`; namespace via `?namespaceId=`.
-The target culture must be an active locale.
+### POST /resources/entries — `localization.resource.propose`
+Create an entry with its first draft revision. Namespace via
+`?namespaceId=`. Body: `{ "key", "culture", "value" }`. Keys are unique per
+namespace (case-sensitive ordinal comparison), limited to ASCII letters and
+digits plus `.`, `_`, `-` and `:` with a maximum length of 200. The target
+culture must be an active locale.
 
-### POST /entries/{id}/revisions — `localization.resource.propose`
-Add a draft revision for a culture.
+### POST /resources/entries/{id}/revisions — `localization.resource.propose`
+Add a draft revision for a culture. Body: `{ "culture", "value" }`.
 
-### POST /entries/{id}/revisions/{revisionId}/submit — `localization.resource.propose`
+### POST /resources/entries/{id}/revisions/{revisionId}/submit — `localization.resource.propose`
 Move a draft to review. Only drafts may be submitted.
 
-### POST /entries/{id}/revisions/{revisionId}/approve — `localization.resource.review`
+### POST /resources/entries/{id}/revisions/{revisionId}/approve — `localization.resource.review`
 Approve a revision. Approving supersedes any previously approved revision
 for the same culture verbatim (history preserved). Every approval bumps the
 catalog bundle version and publishes `LocalizationCatalogChanged`.
 
-### POST /entries/{id}/revisions/{revisionId}/reject — `localization.resource.review`
+### POST /resources/entries/{id}/revisions/{revisionId}/reject — `localization.resource.review`
 Reject a revision from review.
 
-### DELETE /entries/{id} — `localization.resource.review`
+### DELETE /resources/entries/{id} — `localization.resource.review`
 Deprecate an entry (soft delete; nothing is ever hard-deleted). Publishes
 with culture `"*"`.
 
@@ -125,10 +133,11 @@ Reject a pending suggestion.
 
 ## Export
 
-### GET /bundles — `localization.resource.read`
+### GET /export/bundles — `localization.resource.read`
 Export a versioned bundle for client consumption. Query: `culture`,
-`namespaceId?`. Resolution walks the fallback chain
+`namespace?`. Resolution walks the fallback chain
 (requested → language → default locale) and fails visibly: keys without an
-approved value anywhere in the chain are reported missing, never silently
-substituted. Hard cap 10 000 keys per export. Responses carry a deterministic
-ETag (`"loc-v{bundleVersion}"`).
+approved value anywhere in the chain are omitted, and the client renders the
+key identifier itself (fail-visible, never silently substituted). Hard cap
+10 000 keys per export. Responses carry a deterministic ETag
+(`"loc-v{bundleVersion}"`).

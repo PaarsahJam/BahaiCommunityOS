@@ -2,6 +2,7 @@ using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Localization.Application;
 using CommunityOS.Localization.Domain;
 using CommunityOS.Localization.Domain.Events;
+using CommunityOS.Localization.Domain.Exceptions;
 using CommunityOS.Localization.Infrastructure;
 using CommunityOS.Localization.Infrastructure.Persistence;
 using FluentAssertions;
@@ -249,12 +250,12 @@ public sealed class LocalizationPersistenceTests : IAsyncLifetime
     {
         var act = () => EntityTranslation.Create(
             "library", "document", Guid.NewGuid(), "display_name", "en", DateTime.UtcNow);
-        act.Should().Throw<ArgumentException>(
+        act.Should().Throw<LocalizationConflictException>(
             "the Knowledge/Library boundary holds in the localization store too");
 
         var actKnowledge = () => EntityTranslation.Create(
             "knowledge", "article", Guid.NewGuid(), "title", "en", DateTime.UtcNow);
-        actKnowledge.Should().Throw<ArgumentException>();
+        actKnowledge.Should().Throw<LocalizationConflictException>();
     }
 
     [Fact]
@@ -293,6 +294,65 @@ public sealed class LocalizationPersistenceTests : IAsyncLifetime
         found!.Revisions.Should().HaveCount(2);
         found.Revisions[0].Value.Should().Be("علی",
             "the previously proposed value stays verbatim in history");
+    }
+
+    [Fact]
+    public async Task State_filtered_walks_return_complete_pages_from_the_database()
+    {
+        var actor = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        await using var db = CreateContext();
+        var journal = CreateJournal(db);
+        var reader = new LocalizationReader(db);
+
+        var ns = ResourceNamespace.Create("walk", null, actor, now);
+        await journal.SaveNamespaceAsync(ns, CancellationToken.None);
+
+        // Interleave states so a take-before-filter page window would silently
+        // drop matching rows beyond it (16G finding LOC-03).
+        foreach (var key in new[]
+                 {
+                     "a-approved", "b-draft", "c-approved",
+                     "d-draft", "e-approved", "f-draft"
+                 })
+        {
+            var entry = ResourceEntry.Create(ns.Id, key, now);
+            entry.ProposeDraft("en", $"value-{key}", ContentProvenance.ForHuman(), actor, now);
+            if (key.EndsWith("approved", StringComparison.Ordinal))
+            {
+                entry.SubmitForReview(entry.Revisions[0].Id, now);
+                entry.Approve(entry.Revisions[0].Id, actor, now);
+            }
+
+            await journal.SaveEntryAsync(entry, CancellationToken.None);
+        }
+
+        db.ChangeTracker.Clear();
+
+        // Walk the approved view with a window smaller than the match set.
+        var walked = new List<string>();
+        (string NamespaceName, string Key, Guid Id)? cursor = null;
+        while (true)
+        {
+            var page = await reader.WalkEntriesAsync(
+                ns.Id, "approved", null, cursor, 2, CancellationToken.None);
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            walked.AddRange(page.Select(r => r.Key));
+            if (page.Count < 2)
+            {
+                break;
+            }
+
+            var last = page[^1];
+            cursor = (last.NamespaceName, last.Key, last.Id);
+        }
+
+        walked.Should().Equal("a-approved", "c-approved", "e-approved");
     }
 
     private sealed class AllowAllEvaluator

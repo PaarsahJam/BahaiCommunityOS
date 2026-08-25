@@ -108,19 +108,24 @@ public static class AuthorizationSeeder
             "correspondence.letter.update", "correspondence.letter.submit",
             "correspondence.letter.cancel", "correspondence.template.read",
 
-            // Administration never implies read; local admins author but do
-            // not review or administer the shared locale registry.
+            // Administration never implies read (ADR-029 decision 11): local
+            // admins author but do not review or administer the shared locale
+            // registry. The ratified matrix grants every authenticated role
+            // except Volunteer/Guest both read capabilities.
+            "localization.locale.read",
             "localization.resource.read", "localization.resource.propose"
         ]),
         ("CommitteeMember", "Committee Member",
         [
             "authz.relationship.read",
+            "localization.locale.read",
             "localization.resource.read"
         ]),
         ("Volunteer", "Volunteer", []),
         ("Member", "Member",
         [
             "notifications.notification.read", "notifications.preference.manage",
+            "localization.locale.read",
             "localization.resource.read"
         ]),
         ("Guest", "Guest", [])

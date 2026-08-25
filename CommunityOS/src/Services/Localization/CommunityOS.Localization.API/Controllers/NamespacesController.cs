@@ -10,7 +10,7 @@ namespace CommunityOS.Localization.API.Controllers;
 [Authorize]
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/localization/namespaces")]
+[Route("api/v{version:apiVersion}/localization/resources/namespaces")]
 public sealed class NamespacesController(IMediator mediator) : ControllerBase
 {
     [HttpGet]

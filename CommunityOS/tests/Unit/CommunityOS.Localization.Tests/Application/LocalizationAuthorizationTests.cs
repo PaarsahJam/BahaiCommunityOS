@@ -164,7 +164,8 @@ public sealed class LocalizationAuthorizationTests
     public async Task Resource_walk_and_export_require_resource_read()
     {
         var (walkGuard, walkEval) = Guard();
-        await new WalkEntriesHandler(new StubReader(), walkGuard)
+        await new WalkEntriesHandler(new StubReader(), walkGuard,
+                Options.Create(new LocalizationOptions()))
             .Handle(new WalkEntriesQuery(Actor, null, null, null, null, 10), CancellationToken.None);
         walkEval.Requested.Should().Equal([LocalizationPermissions.ResourceRead]);
 

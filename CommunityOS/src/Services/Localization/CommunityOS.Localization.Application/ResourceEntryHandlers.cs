@@ -4,6 +4,7 @@ using CommunityOS.Localization.Domain;
 using CommunityOS.Localization.Domain.Events;
 using CommunityOS.Localization.Domain.Exceptions;
 using MediatR;
+using Microsoft.Extensions.Options;
 
 namespace CommunityOS.Localization.Application;
 
@@ -17,26 +18,53 @@ public sealed record WalkEntriesQuery(
     string? State,
     string? Search,
     string? Cursor,
-    int Limit) : IRequest<IReadOnlyList<EntryRow>>;
+    int Limit) : IRequest<WalkEntriesResult>;
+
+/// <summary>One deterministic page of the catalog walk plus the opaque
+/// continuation cursor. <paramref name="NextCursor"/> is null exactly when
+/// no further rows exist, so clients page by following it until absent
+/// (ADR-029 decision 13).</summary>
+public sealed record WalkEntriesResult(IReadOnlyList<EntryRow> Items, string? NextCursor);
 
 /// <summary>Deterministic keyset walk over the catalog. List responses are
 /// metadata-only: revision values never leave the store here (ADR-029
-/// decision 10).</summary>
+/// decision 10). The handler probes one row beyond the page size to detect
+/// the end of the sequence, so the emitted cursor is null on the final
+/// page.</summary>
 public sealed class WalkEntriesHandler(
     ILocalizationReader reader,
-    AuthorizationGuard guard)
-    : IRequestHandler<WalkEntriesQuery, IReadOnlyList<EntryRow>>
+    AuthorizationGuard guard,
+    IOptions<LocalizationOptions> options)
+    : IRequestHandler<WalkEntriesQuery, WalkEntriesResult>
 {
-    public async Task<IReadOnlyList<EntryRow>> Handle(WalkEntriesQuery request, CancellationToken cancellationToken)
+    public async Task<WalkEntriesResult> Handle(WalkEntriesQuery request, CancellationToken cancellationToken)
     {
         if (request.ActorId == Guid.Empty) throw new UnauthorizedAccessException("Authentication required.");
         await guard.RequireAsync(request.ActorId, LocalizationPermissions.ResourceRead, ct: cancellationToken);
 
+        var limit = Math.Clamp(
+            request.Limit == 0 ? options.Value.DefaultPageSize : request.Limit,
+            1, options.Value.MaxPageSize);
         var cursor = EntryCursor.Decode(request.Cursor);
-        return await reader.WalkEntriesAsync(
+
+        // Probe one extra row so "has more" is exact rather than inferred
+        // from a full page.
+        var rows = await reader.WalkEntriesAsync(
             request.NamespaceId, request.State?.Trim().ToLowerInvariant(),
             string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim(),
-            cursor, request.Limit, cancellationToken);
+            cursor, limit + 1, cancellationToken);
+
+        if (rows.Count == 0)
+        {
+            return new WalkEntriesResult([], null);
+        }
+
+        var hasMore = rows.Count > limit;
+        var items = hasMore ? rows.Take(limit).ToList() : rows;
+        var last = items[^1];
+        return new WalkEntriesResult(
+            items,
+            hasMore ? EntryCursor.Encode(last.NamespaceName, last.Key, last.Id) : null);
     }
 }
 

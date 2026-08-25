@@ -71,6 +71,29 @@ public sealed class LocalizationReader(LocalizationDbContext db) : ILocalization
                 .OrderBy(x => x.n.Name).ThenBy(x => x.e.Key).ThenBy(x => x.e.Id);
         }
 
+        // State filtering happens IN the database query so keyset pagination
+        // stays complete: Take() must never precede the filter.
+        if (!string.IsNullOrWhiteSpace(stateFilter))
+        {
+            if (stateFilter == "deprecated")
+            {
+                rows = rows.Where(x => x.e.IsDeprecated)
+                    .OrderBy(x => x.n.Name).ThenBy(x => x.e.Key).ThenBy(x => x.e.Id);
+            }
+            else
+            {
+                // The API contract accepts snake_case tokens ("in_review");
+                // enum names are PascalCase, so separators are stripped before
+                // parsing (validated whitelist guarantees a known token).
+                var wanted = System.Enum.Parse<ReviewState>(
+                    stateFilter.Replace("-", string.Empty).Replace("_", string.Empty),
+                    ignoreCase: true);
+                rows = rows.Where(x => db.Set<ResourceRevision>()
+                        .Any(r => r.EntryId == x.e.Id && r.State == wanted))
+                    .OrderBy(x => x.n.Name).ThenBy(x => x.e.Key).ThenBy(x => x.e.Id);
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             rows = rows.Where(x => EF.Functions.ILike(x.e.Key, $"%{EscapeLike(search)}%"))
@@ -108,13 +131,6 @@ public sealed class LocalizationReader(LocalizationDbContext db) : ILocalization
         var result = new List<EntryRow>(page.Count);
         foreach (var p in page)
         {
-            if (stateFilter is not null && !MatchesStateFilter(
-                    stateFilter, p.IsDeprecated,
-                    revisions.Where(r => r.EntryId == p.Id).Select(r => r.State)))
-            {
-                continue;
-            }
-
             result.Add(new EntryRow(
                 p.Id, p.NamespaceId, p.NamespaceName, p.Key,
                 p.IsDeprecated, p.DeprecatedOn,
@@ -126,22 +142,6 @@ public sealed class LocalizationReader(LocalizationDbContext db) : ILocalization
         }
 
         return result;
-    }
-
-    private static bool MatchesStateFilter(
-        string stateFilter, bool isDeprecated, IEnumerable<ReviewState> states)
-    {
-        if (stateFilter == "deprecated")
-        {
-            return isDeprecated;
-        }
-
-        if (!System.Enum.TryParse<ReviewState>(stateFilter, ignoreCase: true, out var wanted))
-        {
-            return false;
-        }
-
-        return states.Any(s => s == wanted);
     }
 
     public async Task<IReadOnlyList<ExportCandidateRow>> LoadExportCandidatesAsync(

@@ -13,6 +13,9 @@ public sealed class ResourceEntry
 {
     private readonly List<ResourceRevision> _revisions = [];
 
+    /// <summary>Hard bound for one resource key.</summary>
+    public const int KeyMaxLength = 200;
+
     private ResourceEntry()
     {
     }
@@ -46,7 +49,7 @@ public sealed class ResourceEntry
         }
 
         var normalized = key.Trim();
-        if (normalized.Length is < 1 or > 200 || !normalized.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or ':'))
+        if (normalized.Length is < 1 or > KeyMaxLength || !normalized.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-' or ':'))
         {
             throw new ArgumentException(
                 "Resource keys may contain ASCII letters, digits and '.', '_', '-', ':' only.");

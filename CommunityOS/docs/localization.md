@@ -33,7 +33,9 @@ Localization owns:
   inactive candidates by operators, never by migration;
 - the resource catalog: namespaces (`[a-z0-9.]`, reserved `library.` /
   `knowledge.` prefixes rejected — the ADR-021 Knowledge/Library boundary),
-  entries (`[a-z0-9._-]`, ≤200 chars) and per-culture revision history;
+  entries (ASCII letters and digits plus `.`, `_`, `-` and `:`, ≤200 chars,
+  case-sensitive ordinal uniqueness per namespace) and per-culture revision
+  history;
 - entity translations: per-field translation records for entities owned by
   other services, same review workflow, reserved source contexts enforced;
 - suggestions: external/agent-proposed drafts stored as provenance-tagged

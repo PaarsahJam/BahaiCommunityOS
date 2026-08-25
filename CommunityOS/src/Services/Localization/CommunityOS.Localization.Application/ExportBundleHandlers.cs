@@ -40,12 +40,13 @@ public sealed class ExportBundleHandler(
         await guard.RequireAsync(request.ActorId, LocalizationPermissions.ResourceRead, ct: cancellationToken);
 
         var culture = Bcp47.Normalize(request.Culture);
+        var defaultCulture = await ResolveDefaultCultureAsync(reader, cancellationToken);
+        var chain = BundleResolver.BuildChain(culture, defaultCulture);
         var version = await reader.GetCatalogVersionAsync(cancellationToken);
         var candidates = await reader.LoadExportCandidatesAsync(
-            request.NamespaceId, [culture], options.Value.MaxExportKeys, cancellationToken);
+            request.NamespaceId, chain, options.Value.MaxExportKeys, cancellationToken);
 
-        var items = BundleResolver.Resolve(
-            candidates, culture, await ResolveDefaultCultureAsync(reader, cancellationToken));
+        var items = BundleResolver.Resolve(candidates, culture, defaultCulture);
 
         return new ExportBundleDto(
             version,

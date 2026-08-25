@@ -10,17 +10,18 @@ namespace CommunityOS.Localization.API.Controllers;
 [Authorize]
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/localization/entries")]
+[Route("api/v{version:apiVersion}/localization/resources/entries")]
 public sealed class ResourceEntriesController(IMediator mediator) : ControllerBase
 {
     /// <summary>Deterministic keyset walk. List responses are metadata-only:
-    /// revision values are never included (ADR-029 decision 10).</summary>
+    /// revision values are never included (ADR-029 decision 10). The response
+    /// carries <c>nextCursor</c>; it is null on the final page.</summary>
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<EntryRow>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<WalkEntriesResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<IReadOnlyList<EntryRow>>> Walk(
+    public async Task<ActionResult<WalkEntriesResult>> Walk(
         [FromQuery] Guid? namespaceId,
         [FromQuery] string? state,
         [FromQuery] string? search,
@@ -28,10 +29,10 @@ public sealed class ResourceEntriesController(IMediator mediator) : ControllerBa
         [FromQuery] int? limit,
         CancellationToken ct)
     {
-        var rows = await mediator.Send(new WalkEntriesQuery(
+        var page = await mediator.Send(new WalkEntriesQuery(
             User.SubjectId(), namespaceId, state, search, cursor,
             limit ?? 25), ct);
-        return Ok(rows);
+        return Ok(page);
     }
 
     public sealed record CreateEntryRequestBody(string Key, string Culture, string Value);

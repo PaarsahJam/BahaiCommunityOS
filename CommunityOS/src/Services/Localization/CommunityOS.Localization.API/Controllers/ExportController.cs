@@ -10,7 +10,7 @@ namespace CommunityOS.Localization.API.Controllers;
 [Authorize]
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/localization/bundles")]
+[Route("api/v{version:apiVersion}/localization/export/bundles")]
 public sealed class ExportController(IMediator mediator) : ControllerBase
 {
     /// <summary>
@@ -27,11 +27,11 @@ public sealed class ExportController(IMediator mediator) : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ExportBundleDto>> GetBundle(
         [FromQuery] string culture,
-        [FromQuery] Guid? namespaceId,
+        [FromQuery] Guid? @namespace,
         CancellationToken ct)
     {
         var bundle = await mediator.Send(
-            new ExportBundleQuery(User.SubjectId(), namespaceId, culture), ct);
+            new ExportBundleQuery(User.SubjectId(), @namespace, culture), ct);
         Response.Headers.ETag = bundle.ETag;
         return Ok(bundle);
     }
