@@ -52,7 +52,9 @@ public static class AuthorizationSeeder
 
             "localization.locale.read", "localization.locale.manage",
             "localization.resource.read", "localization.resource.propose",
-            "localization.resource.review"
+            "localization.resource.review",
+
+            "ai.assist.invoke", "ai.platform.manage"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -95,7 +97,9 @@ public static class AuthorizationSeeder
             // national administrators hold all five localization capabilities.
             "localization.locale.read", "localization.locale.manage",
             "localization.resource.read", "localization.resource.propose",
-            "localization.resource.review"
+            "localization.resource.review",
+
+            "ai.assist.invoke", "ai.platform.manage"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [
@@ -113,20 +117,26 @@ public static class AuthorizationSeeder
             // registry. The ratified matrix grants every authenticated role
             // except Volunteer/Guest both read capabilities.
             "localization.locale.read",
-            "localization.resource.read", "localization.resource.propose"
+            "localization.resource.read", "localization.resource.propose",
+
+            "ai.assist.invoke"
         ]),
         ("CommitteeMember", "Committee Member",
         [
             "authz.relationship.read",
             "localization.locale.read",
-            "localization.resource.read"
+            "localization.resource.read",
+
+            "ai.assist.invoke"
         ]),
         ("Volunteer", "Volunteer", []),
         ("Member", "Member",
         [
             "notifications.notification.read", "notifications.preference.manage",
             "localization.locale.read",
-            "localization.resource.read"
+            "localization.resource.read",
+
+            "ai.assist.invoke"
         ]),
         ("Guest", "Guest", [])
     ];

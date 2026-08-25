@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\AI\CommunityOS.AI.Domain\CommunityOS.AI.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\AI\CommunityOS.AI.Application\CommunityOS.AI.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\AI\CommunityOS.AI.Infrastructure\CommunityOS.AI.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\AI\CommunityOS.AI.API\CommunityOS.AI.API.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

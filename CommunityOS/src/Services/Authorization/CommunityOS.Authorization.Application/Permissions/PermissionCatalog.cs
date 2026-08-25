@@ -117,6 +117,12 @@ public static class PermissionCatalog
     public const string LocalizationResourcePropose = "localization.resource.propose";
     public const string LocalizationResourceReview = "localization.resource.review";
 
+    // AI Platform capabilities (ai.*, ratified ADR-030 decision 10). Exactly
+    // two capabilities; exact-match membership only; manage does NOT imply
+    // invoke. Registered at the implementation gate (Prompt 16K).
+    public const string AiAssistInvoke = "ai.assist.invoke";
+    public const string AiPlatformManage = "ai.platform.manage";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global

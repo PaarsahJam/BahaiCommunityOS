@@ -252,12 +252,14 @@ Implementation-sequence status:
   integration test suite is compile-only because Docker/Testcontainers is not
   available in the implementation environment.
 - Slot 12 (**Knowledge**) was implemented early, out of sequence (ADR-021).
-- Slot 13 (**Correspondence**) is **RATIFIED — NOT IMPLEMENTED (Prompt 12H)**
-  at the ADR-028 gate. Correspondence is the next bounded context in the
-  ratified sequence. Its implementation prerequisites include the Documents
-  transactional-outbox upgrade (the Documents producer reliability gate;
-  ADR-022 amendment note, ADR-028 decision 8).
-- Slots 14–19 are not started.
+- Slot 13 (**Correspondence**) is **implemented** (ADR-028) and its blocking
+  findings were remediated in the recorded remediation commit; the Documents
+  transactional-outbox prerequisite was discharged before implementation.
+- Slot 14 (**Localization**) is **implemented** (ADR-029), its blocking
+  findings were remediated, and it is **closed** by the recorded final
+  read-only closure verification (verdict: CLOSED).
+- Slots 15–19 are not started. Slot 15 (**AI Platform**) was ratified at the
+  Prompt 16I architecture/design gate (ADR-030); implementation has not begun.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -2619,3 +2621,360 @@ Superseded decisions: none. ADR-029 extends (does not amend) ADR-004/006/009/
 decisions and preserves verbatim: the ADR-021 Knowledge/Library exclusivity
 over authoritative Writings translations, Community ownership of person
 preferred language, and Search ownership of dictionary mechanics.
+
+## ADR-030 — AI Platform bounded context and assistance boundary
+
+**Status:** Accepted (ratified at the Prompt 16I architecture/design gate).
+
+### Context
+
+AI Platform is slot 15 in the ratified implementation sequence (ADR-017).
+It is the home for AI-assisted capabilities so that assistance features do
+not proliferate ad hoc into every bounded context, while guaranteeing that
+AI never becomes an authority, never bypasses service APIs or authorization,
+and never transmits data across trust boundaries without policy.
+
+The context is greenfield — verified exhaustively at Prompt 16H: no source,
+tests, contracts, permissions, database, configuration or companion
+documentation exists anywhere in the repository. The sole prior mentions are
+forward references and boundary statements: `docs/documents.md` (AI Platform
+may receive document metadata and extracted text only, never originals),
+`docs/search.md` (Search does not depend on it yet), `docs/records.md`
+(a reserved, explicitly non-core `records.record.ai.review` string for a
+future assist feature), ADR-021's mandatory AI boundary rules, and ADR-029
+decisions 19–20 (the suggestion-only posture and provider-neutral seam whose
+hosting responsibility was deferred to this slot).
+
+**Governance-source limitation (recorded up front).** Both
+`specifications/10-AI-Governance.md` and
+`specifications/06-Data-Classification-Model.md` are declared placeholders —
+the authoritative documents have not been imported into the repository. This
+ADR is therefore ratified using existing authoritative repository constraints
+only (ADRs 009–029, ADR-021 boundary rules, ADR-029 decisions 19–20). It does
+not invent a governance specification. Where the missing documents would be
+authoritative — above all the data-transmission classification matrix — the
+gap is recorded as an explicit unresolved decision with a default-deny
+enforcement rule, never as an invented answer.
+
+### Problem statement
+
+Without a ratified AI boundary, every future feature that wants model
+assistance would embed its own provider calls, its own prompts, its own
+secrets handling and its own review shortcuts. That would fragment provenance,
+make governance unauditable, risk prohibited data crossing provider
+boundaries, and erode the human-authorship invariants already ratified for
+Knowledge and Localization.
+
+### Decision
+
+AI Platform is designed as a standard four-project bounded context
+(Domain/Application/Infrastructure/API) following the established house
+patterns: PostgreSQL-ready but deliberately stateless at this gate (decision
+9), MassTransit over RabbitMQ via `CommunityOS.EventBus` available from birth
+but carrying zero events at this gate (decision 8), MediatR CQRS with
+FluentValidation, AuthorizationGuard over the Authorization check API,
+RS256-only JWT with mandatory subject propagation, fail-closed permission
+evaluation, Serilog, ASP.NET versioning, Testcontainers integration tests.
+The ratified decisions follow.
+
+1. **Ownership model.** Classification of every AI-related capability:
+
+   | Capability | Class |
+   |------------|-------|
+   | Provider/model abstraction and adapter seam | OWNED |
+   | Inference execution via configured providers | OWNED |
+   | Provider configuration and credential custody (never logged; standard configuration/secret mechanisms only) | OWNED |
+   | Prompt/template management (versioned configuration) | OWNED |
+   | Assistance capability classes: translation assistance, summarization, classification | OWNED (generic assist surface; per-consumer activation deferred) |
+   | Provenance metadata generation (`human` \| `machine:<provider>`) | OWNED |
+   | Safety/policy enforcement (pre-send checks, output policy checks, fail-closed) | OWNED |
+   | Usage/cost metadata capture (structured logs only at this gate) | OWNED |
+   | Durable AI job queue / asynchronous job execution | DEFERRED (first gate is synchronous request/response within strict timeouts) |
+   | Retrieval-augmented generation orchestration | DEFERRED (no ratified consumer need) |
+   | Embeddings generation (as a utility on request) | OWNED if ever activated; vector storage/retrieval remain NOT OWNED |
+   | Persisted suggestions, drafts, review state | NOT OWNED — consuming contexts own them (Localization `translation_suggestions` precedent) |
+   | Human review workflow | NOT OWNED — consumers run their own ratified workflows |
+   | Semantic search, indices, vector stores | NOT OWNED — Search owns search infrastructure (ADR-026) |
+   | Document storage, version immutability, extraction pipeline | NOT OWNED — Documents owns artifacts; AI may receive metadata + extracted text only, never originals |
+   | Authoritative content of any kind (Writings, records, official letters) | NOT OWNED |
+
+2. **Explicit non-ownership / preserved boundaries.** Knowledge remains sole
+   owner of the Library and authoritative translations (ADR-021 verbatim);
+   Documents remains owner of artifact storage and immutability (ADR-022);
+   Search remains owner of indexing and search mechanics (ADR-026); Community
+   remains owner of people; Organization of structure; Records of official
+   records; Localization of the locale registry and resource catalog;
+   Audit of the compliance journal. AI Platform holds no write access to any
+   other context's store — ever.
+
+3. **Governance constraints (ratified invariants).** AI must not: make
+   administrative decisions; determine truth claims; replace authorized human
+   roles; publish anything silently; bypass any service API; bypass
+   authorization. AI-generated suggestions must always be distinguishable
+   from authoritative content via retained provenance; human approval is
+   required wherever authoritative state could be affected (ADR-029 decision
+   19 preserved verbatim; ADR-021 rules preserved verbatim: authoritative
+   religious text is never produced, edited or arbitrated by AI). PII and
+   data-classification boundaries are governed by decision 5. Model/provider
+   failures must be fail-visible — an AI failure must never silently become
+   authoritative success.
+
+4. **Human-review model.** The only path from AI output to authoritative
+   state is: authorized principal requests assistance → AI Platform returns
+   an ephemeral result with provenance → the consuming context persists it as
+   a draft/suggestion in its own store under its own schema → humans act
+   through that context's existing ratified workflow → publication happens
+   exclusively through that context's authorized commands. AI results are
+   either ephemeral (default) or consumer-persisted drafts; they are never
+   directly authoritative. Invocation requires end-user subject propagation —
+   anonymous or principal-less inference does not exist.
+
+5. **Data classification / provider transmission boundary.** The enforcement
+   boundary is: AI Platform may transmit to external providers ONLY data
+   classes explicitly cleared by a ratified transmission policy. Because the
+   authoritative classification specification has not been imported
+   (see Context), that matrix is UNRESOLVED, and default-deny applies: until
+   resolved, nothing beyond non-sensitive operational content needed for a
+   concrete ratified capability may leave the platform trust boundary to an
+   external provider; local/self-hosted processing remains possible for data
+   the calling context is already authorized to process. Absolutely
+   prohibited from transmission regardless of any future policy: credentials,
+   provider secrets, authorization tokens, audit-journal contents, document
+   originals, Library authoritative texts as generation input, bulk person
+   records. Individual display-field values continue to flow only through
+   consuming contexts' own ratified by-reference models (e.g., Localization
+   entity translations). Implementation must treat the missing policy as
+   prohibition, not permission. The following operational rules are binding
+   until the authoritative classification matrix is ratified:
+
+   1. External-provider transmission is DENY-BY-DEFAULT.
+   2. No implementation may transmit repository data to an external AI
+      provider while the classification matrix is unresolved.
+   3. No provider-specific implementation may bypass this rule.
+   4. AI functionality must remain capable of operating without an
+      external provider.
+   5. Human-approved AI suggestions remain non-authoritative and must
+      never auto-publish into Knowledge, Library, Records, Localization,
+      or any other authoritative context.
+   6. Consumer-owned data classification remains the responsibility of
+      the owning bounded context.
+   7. Any future provider activation requires an explicit
+      architectural/governance amendment identifying: permitted data
+      classes, prohibited data classes, allowed provider destinations,
+      residency requirements, retention requirements, logging
+      restrictions, user/administrator consent or authorization
+      requirements where applicable, deletion/retention semantics, and
+      audit requirements.
+
+6. **Provider architecture.** AI Platform owns a provider-neutral gateway
+   seam: providers and models are declared in configuration; adapters
+   implement the seam contract; no SDK is mandated or installed by this ADR
+   (no OpenAI/Azure/Gemini/Ollama/local-LLM commitment is made here).
+   Failure semantics: bounded retries with backoff, per-call timeouts, typed
+   failure taxonomy surfaced fail-visibly to callers, per-provider rate
+   limiting by configuration, static config-declared capability listing at
+   this gate. Provider credentials live in standard configuration/secret
+   mechanisms and are never logged.
+
+7. **Consumer integrations.**
+
+   | Relationship | Class | Basis |
+   |--------------|-------|-------|
+   | Localization | READY (relationship), FUTURE (wiring) | ADR-029 decision 19/20 seam exists disabled; AI Platform will provide the provider implementation behind it; wiring is Localization-gate work, explicitly not part of this gate or the first implementation |
+   | Documents | FUTURE | metadata + extracted text only, never originals (documents.md boundary); no consumption ratified yet |
+   | Search | NOT ALLOWED to displace | Search owns indices/vector storage; no second search platform |
+   | Knowledge | NOT ALLOWED for authoring | discovery/organization assistance only within Knowledge's authorized APIs; hard ADR-021 boundary stands |
+   | Records | FUTURE | non-authoritative assist only; `records.record.ai.review` stays a reserved non-core string |
+   | Audit | DEFERRED | if AI activity ever needs compliance journaling, the recorded ADR-027 amendment path executes at its own gate |
+   | Community/Organization/Correspondence/Notifications/Workflow | NOT REQUIRED at this gate | no ratified need |
+
+8. **Eventing.** Zero events published and zero consumed at this gate —
+   explicitly ratified; no event names are invented. When a future amendment
+   introduces events, outbox-first publication (ADR-015), inbox/inert
+   conventions, idempotency and DLQ behavior follow the house patterns then.
+   No producer-reliability prerequisites exist because there are no
+   producers.
+
+9. **Persistence.** Deliberately STATELESS at this gate: no database is
+   created (`communityos_ai` is intentionally absent from docker/init),
+   no migrations exist, and no durable state belongs to AI Platform.
+   All durable artifacts (suggestions, drafts, review outcomes, retention)
+   live in consuming contexts. Operational telemetry is structured logs only
+   (decision 11). If durable jobs, usage accounting or request archives are
+   ever ratified, a future amendment adds a database following house patterns.
+
+10. **Authorization matrix (ratified).** Exactly two new permissions —
+    no more, no fewer:
+
+    | Permission | Grant |
+    |------------|-------|
+    | `ai.assist.invoke` | GlobalAdministrator, NationalAdministrator, LocalAdministrator, CommitteeMember, Member |
+    | `ai.platform.manage` | GlobalAdministrator, NationalAdministrator |
+
+    Exact ordinal membership only; manage does NOT imply invoke; Volunteer/
+    Guest/PlatformServicePrincipal hold none (fail closed). Every invocation
+    carries the end-user subject; the evaluator, scope resolution,
+    uniform-404 anti-enumeration, no-local-RBAC and no-cross-service-DB rules
+    all apply unchanged. Permission registration and role seeds happen at the
+    implementation gate — nothing is registered now. The reserved
+    `records.record.ai.review` string remains Records-document prose and is
+    not adopted.
+
+11. **Privacy / logging.** Logs may record: correlation ids, subject ids,
+    capability names, provider/model identifiers, token counts, latency,
+    outcome codes. Logs must NEVER contain: prompts or completions, generated
+    content, credentials, tokens, provider secrets, or any prohibited PII.
+    Complete retention durations remain unresolved pending the authoritative
+    specifications (recorded limitation).
+
+12. **API boundary (categories, not endpoints-by-symmetry).** Three
+    categories at v1: assistance invocation (`POST .../ai/assist/{capability}`
+    — subject-propagated), capability listing (requires invoke), and
+    administration of providers/models/templates plus usage summaries
+    (requires manage). No jobs endpoints, no synchronous batch surfaces, and
+    no additional categories are ratified at this gate.
+
+13. **RAG / search / embeddings boundary (explicit resolution).** Vector
+    storage, semantic retrieval and index ownership remain Search's (ADR-026);
+    embeddings generation may be owned by AI Platform purely as a utility if
+    Search or another context ever ratifies the need; chunking belongs to the
+    context owning the source content; retrieval augmentation — when someday
+    ratified — flows through source-service APIs under the requesting
+    principal's authority; AI Platform never queries other contexts' stores
+    directly; stale-index handling remains the index owner's concern. RAG
+    orchestration itself is deferred until a consumer need is ratified.
+
+14. **Failure semantics.** Provider unavailable / timeout / malformed output /
+    pre-send policy block / unsafe output / unsupported capability / rate
+    limiting each map to a distinct typed failure surfaced fail-visibly;
+    execution is atomic per request (no partial adoption semantics); duplicate
+    protection is caller-side (optional correlation ids); retries are
+    caller-controlled; human rejection/correction happens entirely inside the
+    consumer's workflow with provenance retained per that context's retention
+    rules.
+
+15. **Documentation deliverables (deferred to the implementation gate).**
+    `docs/ai.md`, `docs/api/ai.md`, `docs/runbooks/ai.md`. They must
+    eventually cover: the ownership table in force, provider/model
+    configuration keys, the two-permission matrix and seeds, capability
+    catalogue, failure-code reference, logging field list, subject-propagation
+    requirements, and the explicit statement of what remains unresolved
+    (transmission matrix) at implementation time.
+
+16. **Implementation prerequisites.**
+
+    MUST BEFORE IMPLEMENTATION:
+    - ADR-030 ratification status confirmed (this document).
+    - Default-deny external-provider rule recorded (decision 5, rules 1–7).
+    - Exactly two ratified permissions remain: `ai.assist.invoke`,
+      `ai.platform.manage` (decision 10); registered at implementation
+      gate start.
+    - No external provider is enabled.
+    - AI Platform can operate without external-provider transmission
+      (disabled/no-op provider as sole default).
+    - OQ-3 remains explicitly unresolved (authoritative governance
+      material has not been supplied).
+    - Provider selection remains deferred (OQ-8).
+
+    MUST BEFORE EXTERNAL-PROVIDER ACTIVATION:
+    - Authoritative data-classification matrix exists and is ratified
+      (import of specifications/06 and/or specifications/10, or explicit
+      ratifier direction recorded).
+    - Provider-specific data-flow decision is ratified.
+    - Provider/residency/retention requirements are ratified.
+    - Required security/privacy/audit decisions are ratified.
+
+    CAN BE IMPLEMENTED LATER (own gates/amendments): Localization seam
+    wiring; Documents/RAG integrations; Audit catalog amendment; persisted
+    usage accounting/job execution/database; embeddings utility activation;
+    concrete provider selection and external-provider adapter; event
+    consumers/producers.
+
+    OPTIONAL/FUTURE: further capability classes (duplicate detection,
+    recommendations) require their own ratification.
+
+17. **Unresolved decisions (explicit, carried forward):**
+    U-1 the data-transmission classification matrix (default-deny meanwhile);
+    U-2 concrete providers/models; U-3 complete log/event retention
+    durations; U-4 whether AI Platform ever publishes integration events.
+
+18. **Prohibition.** No implementation of this context may begin before the
+    MUST BEFORE IMPLEMENTATION prerequisites above are satisfied and an
+    implementation gate is explicitly authorized. No external provider may
+    be activated before the MUST BEFORE EXTERNAL-PROVIDER ACTIVATION
+    prerequisites above are satisfied. Nothing in this ADR registers
+    permissions, creates projects, contracts, databases or documentation,
+    or wires any consumer seam.
+
+Future amendments explicitly identified by this ADR: import of the
+authoritative AI-governance and data-classification specifications;
+Localization-gate wiring of the machine-translation seam; potential ADR-027
+Audit amendment if AI activity is ever journaled.
+
+Superseded decisions: none. ADR-030 extends (does not amend) ADR-004/006/
+009/010/011/015/016/017/020/021/026/029 constraints into concrete AI-gate
+decisions and preserves verbatim the ADR-021 Knowledge/Library exclusivity,
+the Documents originals boundary, Search's index ownership, and ADR-029's
+suggestion-only AI posture.
+
+### Ratification record (Prompt 16I)
+
+- **OQ-1 — Scope and ownership classification:** APPROVED. Decision 1's
+  OWNED/CONSUMED/DEFERRED/NOT OWNED table is ratified exactly as written;
+  AI-related does not mean AI-owned.
+- **OQ-2 — Proceeding despite the absent authoritative AI-governance
+  specification:** APPROVED. The architecture is ratified from existing
+  repository constraints; the absence is recorded in Context and decision 3,
+  and the resulting limitations are binding, not silent gaps.
+- **OQ-3 — Data-transmission classification matrix:** UNRESOLVED. Default-
+  deny applies until the authoritative policy exists (decision 5, U-1).
+  This is a genuine unresolved question, not a deferral of judgment.
+- **OQ-4 — Stateless first gate / no database:** APPROVED. Decision 9.
+  No `communityos_ai` database is created.
+- **OQ-5 — Zero integration events at this gate:** APPROVED. Decision 8.
+- **OQ-6 — Exactly two permissions (`ai.assist.invoke`,
+  `ai.platform.manage`):** APPROVED. Decision 10; registered at the
+  implementation gate only.
+- **OQ-7 — Service-mediated invocation with end-user subject propagation
+  (no direct anonymous inference surface):** APPROVED. Decisions 4 and 12.
+- **OQ-8 — Concrete provider selection:** DEFERRED to the implementation
+  gate. No SDK or vendor is mandated by this ADR (decision 6).
+- **OQ-9 — Embeddings/vector/index ownership split:** APPROVED. Search owns
+  storage and retrieval; AI Platform may generate embeddings as a utility
+  only (decision 13).
+- **OQ-10 — Companion documentation deferral:** APPROVED, mirroring the
+  OQ-4 precedent of ADR-029 (decision 15).
+- **OQ-11 — Narrowly scoped ADR-017 status correction (slots 13–14 factual
+  sync, slots line updated to 15–19):** APPROVED. Recorded at the top of
+  this file's ADR-017 section; unrelated sequence history untouched.
+
+### Governance resolution (Prompt 16J)
+
+Prompt 16J executed the implementation-readiness gate against ADR-030.
+
+**OQ-3 disposition:** UNRESOLVED. Both `specifications/06-Data-Classification-Model.md`
+and `specifications/10-AI-Governance.md` remain declared placeholders; no
+authoritative governance material has been supplied. No ratifier direction
+has been recorded. OQ-3 remains a genuine unresolved question.
+
+**Decision 5 amendment:** Seven operational enforcement rules formalized
+(decision 5, rules 1–7) binding until the authoritative classification
+matrix is ratified. These rules do NOT resolve OQ-3; they enforce default-
+deny while OQ-3 remains open.
+
+**Decision 16 amendment:** Implementation prerequisites separated into
+MUST BEFORE IMPLEMENTATION (satisfiable under default-deny) and MUST
+BEFORE EXTERNAL-PROVIDER ACTIVATION (require the classification matrix).
+The separation clarifies that the provider abstraction seam can ship
+without the classification matrix, but external-provider activation cannot.
+
+**Decision 18 amendment:** Prohibition updated to reference the two-tier
+prerequisite structure.
+
+**Authoritative governance sources:** NOT AVAILABLE. Neither specification
+has been imported. Both files remain untouched placeholders.
+
+**Verdict:** GOVERNANCE PREREQUISITE STILL BLOCKING. OQ-3 is unresolved;
+external-provider activation remains prohibited; the implementation gate
+cannot proceed until the authoritative classification matrix is supplied
+or an explicit ratifier direction is recorded.

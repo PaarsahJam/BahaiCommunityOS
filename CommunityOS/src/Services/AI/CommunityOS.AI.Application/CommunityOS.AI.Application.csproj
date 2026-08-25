@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CommunityOS.AI.Application</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CommunityOS.AI.Domain\CommunityOS.AI.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Abstractions\CommunityOS.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Contracts\CommunityOS.Contracts.csproj" />
+    <ProjectReference Include="..\..\Authorization\CommunityOS.Authorization.Application\CommunityOS.Authorization.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+</Project>
