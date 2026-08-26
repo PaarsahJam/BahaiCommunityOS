@@ -261,7 +261,10 @@ Implementation-sequence status:
 - Slot 15 (**AI Platform**) is **implemented** (ADR-030, Prompt 16K) and
   **closed** by the Prompt 16L final read-only closure verification (verdict:
   CLOSED). The integration test suite is stateless (no Docker required).
-- Slots 16–19 are not started.
+- Slot 16 (**Shared Integration Infrastructure**) is **redefined** by
+  ADR-031: no dedicated bounded context justified; scope narrowed to
+  shared `HttpAuthorizationEvaluator` deduplication (low priority).
+- Slots 17–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -2980,3 +2983,256 @@ has been imported. Both files remain untouched placeholders.
 external-provider activation remains prohibited; the implementation gate
 cannot proceed until the authoritative classification matrix is supplied
 or an explicit ratifier direction is recorded.
+
+## ADR-031 — Integrations slot disposition: no dedicated bounded context
+
+**Status:** Accepted (ratified at the Prompt 16P architecture/design gate).
+
+### Context
+
+Slot 16 in the ADR-017 implementation sequence is labeled "Integrations."
+Prompt 16N identified it as the next candidate for architecture and
+implementation. Prompt 16P executed the architecture/design gate and
+independently audited every integration mechanism in the repository.
+
+The audit revealed the following facts:
+
+1. **Zero external-system integrations exist at this gate.** Every
+   service-to-service communication is internal HTTP within the modular
+   monolith (primarily `HttpAuthorizationEvaluator` calling the
+   Authorization API). The only genuinely external-capable integration is
+   S3/MinIO object storage, which is already cleanly owned by Documents
+   (ADR-022, `IDocumentObjectStorage`).
+
+2. **Every integration seam is already owned by its bounded context.**
+
+   | Seam | Owner | ADR |
+   |------|-------|-----|
+   | Event bus (MassTransit + RabbitMQ) | Shared infrastructure (`CommunityOS.EventBus`) | ADR-004 |
+   | Transactional outbox / inbox | Each service's own `DbContext` registration | ADR-015 |
+   | External notification channels (Email/SMS/Push) | Notifications (`INotificationChannelDispatcher`) | ADR-025 decision 5 |
+   | External correspondence dispatch | Correspondence (`IDeliveryProvider`, future) | ADR-028 decision 17 |
+   | AI provider abstraction | AI Platform (`IAiModelGateway`) | ADR-030 decision 6 |
+   | Object storage (S3/MinIO) | Documents (`IDocumentObjectStorage`) | ADR-022 |
+   | Machine-translation provider | Localization (seam) + AI Platform (infrastructure) | ADR-029 decisions 19-20, ADR-030 decision 7 |
+   | Malware scanning | Documents (`IDocumentScanService`, no-op) | ADR-022 decision 9 |
+   | External identity providers | Identity (self-hosted OIDC; external federation deferred) | ADR-018 |
+
+3. **The only integration duplication is `HttpAuthorizationEvaluator`,**
+   which is copy-pasted identically across 10 services. This is a code
+   organization problem solvable by moving a shared HTTP client into
+   `CommunityOS.Abstractions` or `CommunityOS.EventBus` — it does not
+   require a dedicated bounded context.
+
+4. **The ADR-017 sequence is a rough dependency-ordered list, not a
+   micro-sequencing.** Knowledge (slot 12) was implemented out of order
+   before Correspondence (slot 13), proving the sequence is flexible.
+   The slot name "Integrations" is a structural placeholder that never
+   received a ratified boundary definition.
+
+### Problem statement
+
+The question is whether "Integrations" represents a genuine bounded context
+with its own domain ownership, invariants, data, lifecycle, authorization
+boundary, and a meaningful reason to exist independently — or whether the
+slot name is a placeholder from the original sequencing exercise that should
+be redefined or removed.
+
+### Decision
+
+**No dedicated "Integrations" bounded context is justified.**
+
+The anti-dumping test fails: if every existing bounded context continued to
+own its own business data, business operations, and external-system seams,
+there is no coherent domain responsibility remaining for a separate
+"Integrations" context to own. Creating one would produce one of three
+anti-patterns:
+
+1. **Ownership redistribution** — moving existing seams from their rightful
+   owners into a central service, violating the bounded-context principle
+   that each context owns its own domain.
+2. **Infrastructure duplication** — reimplementing what `CommunityOS.EventBus`,
+   the transactional outbox, and per-service HTTP clients already do.
+3. **God-service anti-pattern** — a catch-all for everything that does not
+   fit elsewhere, eroding architectural boundaries.
+
+The specific integration responsibilities and why they remain with their
+current owners:
+
+| Responsibility | Remains with | Reason |
+|----------------|-------------|--------|
+| Event bus configuration | `CommunityOS.EventBus` (shared library) | Infrastructure, not domain |
+| Outbox/inbox registration | Each consuming service | Tied to service's own `DbContext` and transaction boundary |
+| Notification channel delivery | Notifications | Domain-owned dispatch orchestration; `INotificationChannelDispatcher` seam is architecturally placed |
+| Letter dispatch delivery | Correspondence | Domain-owned delivery lifecycle; `IDeliveryProvider` seam is architecturally placed |
+| AI provider calls | AI Platform | Domain-owned provider seam governed by ADR-030 and OQ-3 |
+| Object storage | Documents | Domain-owned binary lifecycle; `IDocumentObjectStorage` is the abstraction |
+| Machine-translation providers | Localization (contract) + AI Platform (infrastructure) | Split ownership defined by ADR-029 and ADR-030 |
+| Malware scanning | Documents | Domain-owned scan lifecycle; `IDocumentScanService` is the seam |
+| External identity federation | Identity | Domain-owned; external providers are future extensions of Identity's own OIDC boundary |
+| `HttpAuthorizationEvaluator` deduplication | `CommunityOS.Abstractions` or shared library | Code organization, not bounded context |
+
+### What about future external providers?
+
+When future external providers are activated (email/SMS/Push for
+Notifications, delivery for Correspondence, AI providers for AI Platform,
+machine-translation for Localization), the provider adapters belong within
+the bounded context that already owns the seam. Notifications installs
+an `INotificationChannelDispatcher` implementation. Correspondence installs
+an `IDeliveryProvider` implementation. AI Platform installs an
+`IAiModelGateway` implementation. Each context controls its own provider
+lifecycle, credential custody, and failure semantics.
+
+No central "integration registry" or "adapter orchestration service" is
+needed because each context already defines its own extension point,
+failure model, and configuration pattern.
+
+### What about the `HttpAuthorizationEvaluator` duplication?
+
+The 10× copy-paste of `HttpAuthorizationEvaluator` is a real problem but
+the solution is a shared HTTP client library in `CommunityOS.Abstractions`
+(or a thin `CommunityOS.Authorization.HttpClient` package), not a bounded
+context. This is a build-time code sharing concern, not a runtime domain
+ownership concern.
+
+### Slot 16 disposition
+
+Slot 16 in ADR-017 is redefined as follows:
+
+**Old label:** Integrations
+**New label:** Shared Integration Infrastructure
+
+**Scope:** Consolidation of the duplicated `HttpAuthorizationEvaluator`
+into a shared library within `CommunityOS.Abstractions` or a dedicated
+thin package. This is a code-quality improvement, not a bounded context.
+No database, no permissions, no events, no API surface, no documentation
+beyond the ADR itself.
+
+**Priority:** Low — the duplication is a maintenance burden but not a
+functional blocker. It may be addressed opportunistically during any
+future service's implementation gate, or as a standalone refactoring
+prompt.
+
+### Non-ownership boundaries (explicit)
+
+The following remain explicitly NOT owned by any "Integrations" context:
+
+- Event bus infrastructure (ADR-004, `CommunityOS.EventBus`)
+- Transactional outbox/inbox (ADR-015, per-service)
+- Notification delivery orchestration (ADR-025, Notifications)
+- Correspondence delivery lifecycle (ADR-028, Correspondence)
+- AI provider abstraction and default-deny enforcement (ADR-030, AI Platform)
+- Object storage lifecycle (ADR-022, Documents)
+- Machine-translation seam and provider infrastructure (ADR-029/030, Localization + AI Platform)
+- External identity federation (ADR-018, Identity)
+- Audit journaling of integration events (ADR-027, Audit)
+- Search indexing of integration data (ADR-026, Search)
+
+### Relationship to future contexts
+
+- **Finance (Slot 17):** Finance will own its own external-system adapters
+  (payment processors, banking APIs) within its own bounded context, not
+  through an Integrations intermediary.
+- **Communications/VoIP (Slot 18):** If ratified, Communications will own
+  its own telephony/WebRTC infrastructure within its own bounded context.
+- **Analytics (Slot 19):** Analytics will consume integration events via
+  the existing MassTransit bus, not through an Integrations intermediary.
+
+### Relationship to AI Platform (ADR-030)
+
+AI Platform's provider architecture (ADR-030 decision 6) is explicitly
+NOT routed through any Integrations context. AI external-provider
+communication remains governed solely by ADR-030 and its unresolved
+governance requirements (OQ-3). No indirect bypass is permitted.
+
+### Audit / observability
+
+Integration event audit journaling remains the responsibility of Audit
+(ADR-027). Each service's own operational telemetry (connection failures,
+provider errors, retry outcomes) is logged within that service's own
+structured logs per its own ADR. No centralized integration audit trail
+is justified.
+
+### Persistence
+
+No database. No migrations. No persistent state. The shared
+`HttpAuthorizationEvaluator` library is a build-time artifact with no
+runtime persistence.
+
+### Eventing
+
+Zero events published. Zero consumers. Zero outbox/inbox. The shared
+library is a synchronous HTTP client, not an event-driven component.
+
+### Authorization
+
+No new permissions. The shared HTTP client calls the existing Authorization
+API under the caller's existing JWT. No additional permission matrix is
+needed.
+
+### Security / credentials
+
+The shared HTTP client inherits the existing JWT-based authentication
+pattern. No new credential types, secrets, or API keys are introduced.
+
+### API boundary
+
+No API surface. The shared library is consumed by other services as a
+NuGet package reference, not exposed as HTTP endpoints.
+
+### Failure semantics
+
+The shared `HttpAuthorizationEvaluator` library will preserve the existing
+fail-closed behavior: if the Authorization API is unreachable, the
+caller's operation fails with 401/403. No silent degradation.
+
+### Implementation prerequisites
+
+The shared library consolidation requires:
+
+1. ADR-031 ratification (this document).
+2. Identification of the 10 services with duplicated
+   `HttpAuthorizationEvaluator` code.
+3. Extraction of the shared HTTP client into a package within
+   `CommunityOS.Abstractions` or a dedicated thin package.
+4. Migration of each service to reference the shared package.
+5. Verification that all 10 services continue to pass their unit and
+   integration tests.
+
+This may be executed as a standalone refactoring prompt or opportunistically
+during any future service's gate.
+
+### Open questions
+
+- **OQ-1 (DEFERRED):** Should the shared `HttpAuthorizationEvaluator`
+  package live in `CommunityOS.Abstractions` (general shared library) or
+  in a dedicated `CommunityOS.Authorization.HttpClient` package? The
+  decision is deferred to implementation time; either option is architecturally
+  acceptable.
+
+- **OQ-2 (DEFERRED):** Are there other HTTP client duplications across
+  services that should be consolidated at the same time? The audit identified
+  `HttpDocumentsServiceClient` (duplicated in Workflow and Records) and
+  `HttpCommunityServiceClient` (used in Workflow only). A broader
+  deduplication pass may be warranted but is not required for Slot 16.
+
+### Prohibition
+
+No implementation of the shared library may begin before ADR-031
+ratification. No bounded context named "Integrations" with its own
+database, permissions, events, or API surface may be created. The
+scope is strictly limited to the shared HTTP client deduplication.
+
+### Ratification record (Prompt 16P)
+
+- **OQ-1 — Shared library package location:** DEFERRED to implementation
+  time. Either `CommunityOS.Abstractions` or a dedicated thin package is
+  acceptable.
+- **OQ-2 — Broader HTTP client deduplication scope:** DEFERRED. May be
+  included opportunistically but is not a blocking requirement.
+
+Superseded decisions: none. ADR-031 redefines Slot 16 in ADR-017 from
+"Integrations" (a placeholder label without a ratified boundary) to
+"Shared Integration Infrastructure" (a narrowly scoped code-quality
+improvement). No existing ADR is amended; no existing bounded context
+ownership is changed.
