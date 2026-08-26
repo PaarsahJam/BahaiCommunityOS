@@ -1,8 +1,8 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Organization.Domain.Repositories;
 using CommunityOS.Organization.Infrastructure.Integration;
-using CommunityOS.Organization.Infrastructure.Integration.Authorization;
 using CommunityOS.Organization.Infrastructure.Persistence;
 using CommunityOS.Organization.Infrastructure.Repositories;
 using MediatR;
@@ -40,15 +40,8 @@ public static class OrganizationInfrastructureServiceExtensions
         // Authorization integration: the Organization service never reads the
         // Authorization database. The guard is bound to an HTTP evaluator that
         // calls the Authorization service's check API (ADR-018).
-        services.ConfigureAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
+        services.AddAuthorizationHttpClient(config, "communityos-organization", includeGuard: true);
         services.AddScoped<IOrganizationContextProvider, DefaultOrganizationContextProvider>();
-        services.AddScoped<AuthorizationGuard>();
 
         return services;
     }

@@ -2,11 +2,11 @@ using Amazon.Runtime;
 using Amazon.S3;
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Documents.Application.Abstractions;
 using CommunityOS.Documents.Application.Pipeline;
 using CommunityOS.Documents.Domain.Repositories;
 using CommunityOS.Documents.Infrastructure.Integration;
-using CommunityOS.Documents.Infrastructure.Integration.Authorization;
 using CommunityOS.Documents.Infrastructure.Integration.Organization;
 using CommunityOS.Documents.Infrastructure.Integration.Scanning;
 using CommunityOS.Documents.Infrastructure.Integration.Storage;
@@ -73,14 +73,7 @@ public static class DocumentsInfrastructureServiceExtensions
         // Authorization integration: the Documents service never reads the
         // Authorization database. Every decision is delegated to the
         // Authorization service's check endpoint over HTTP (ADR-018/ADR-019).
-        services.ConfigureAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
-        services.AddScoped<AuthorizationGuard>();
+        services.AddAuthorizationHttpClient(config, "communityos-documents", includeGuard: true);
 
         return services;
     }

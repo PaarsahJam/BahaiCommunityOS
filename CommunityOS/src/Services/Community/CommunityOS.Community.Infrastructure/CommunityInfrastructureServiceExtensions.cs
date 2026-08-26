@@ -1,8 +1,8 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Community.Domain.Repositories;
 using CommunityOS.Community.Infrastructure.Integration;
-using CommunityOS.Community.Infrastructure.Integration.Authorization;
 using CommunityOS.Community.Infrastructure.Integration.Organization;
 using CommunityOS.Community.Infrastructure.Persistence;
 using CommunityOS.Community.Infrastructure.Repositories;
@@ -48,14 +48,7 @@ public static class CommunityInfrastructureServiceExtensions
         // Authorization integration: the Community service never reads the
         // Authorization database. Every decision is delegated to the
         // Authorization service's check endpoint over HTTP (ADR-018/ADR-019).
-        services.ConfigureAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
-        services.AddScoped<AuthorizationGuard>();
+        services.AddAuthorizationHttpClient(config, "communityos-community", includeGuard: true);
 
         return services;
     }

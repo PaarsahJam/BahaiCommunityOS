@@ -1,10 +1,10 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Records.Application.Abstractions;
 using CommunityOS.Records.Application.Options;
 using CommunityOS.Records.Domain.Repositories;
 using CommunityOS.Records.Infrastructure.Integration;
-using CommunityOS.Records.Infrastructure.Integration.Authorization;
 using CommunityOS.Records.Infrastructure.Integration.Documents;
 using CommunityOS.Records.Infrastructure.Integration.Organization;
 using CommunityOS.Records.Infrastructure.Persistence;
@@ -65,14 +65,7 @@ public static class RecordsInfrastructureServiceExtensions
         // Authorization integration: the Records service never reads the
         // Authorization database. Every decision is delegated to the
         // Authorization service's check endpoint over HTTP (ADR-018/019).
-        services.ConfigureRecordsAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
-        services.AddScoped<AuthorizationGuard>();
+        services.AddAuthorizationHttpClient(config, "communityos-records", includeGuard: true);
 
         return services;
     }

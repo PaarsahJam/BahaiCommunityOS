@@ -2,11 +2,10 @@ using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Infrastructure.Integration;
 using CommunityOS.Audit.Infrastructure.Persistence;
 using CommunityOS.Audit.Infrastructure.Retention;
-using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace CommunityOS.Audit.Infrastructure;
 
@@ -28,10 +27,7 @@ public static class AuditInfrastructureServiceExtensions
         services.AddSingleton<IRetentionPolicy, AuditRetentionPolicy>();
 
         services.Configure<AuditOptions>(config.GetSection(AuditOptions.SectionName));
-        services.Configure<AuditAuthorizationOptions>(config.GetSection("AuthorizationService"));
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<AuditAuthorizationOptions>>().Value.BaseUrl));
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
+        services.AddAuthorizationHttpClient(config, "communityos-audit");
 
         return services;
     }

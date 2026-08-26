@@ -6,5 +6,6 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.EventBus\CommunityOS.EventBus.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\CommunityOS.Authorization.HttpClient\CommunityOS.Authorization.HttpClient.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" /><PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" /><PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" /><PackageReference Include="MassTransit.EntityFrameworkCore" /><PackageReference Include="Microsoft.Extensions.Http.Resilience" /></ItemGroup>
 </Project>

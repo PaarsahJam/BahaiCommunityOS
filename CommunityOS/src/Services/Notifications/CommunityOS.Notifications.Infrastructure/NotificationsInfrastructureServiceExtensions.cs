@@ -1,10 +1,10 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Notifications.Application.Options;
 using CommunityOS.Notifications.Domain.Repositories;
 using CommunityOS.Notifications.Infrastructure.Background;
 using CommunityOS.Notifications.Infrastructure.Integration;
-using CommunityOS.Notifications.Infrastructure.Integration.Authorization;
 using CommunityOS.Notifications.Infrastructure.Integration.Community;
 using CommunityOS.Notifications.Infrastructure.Integration.Organization;
 using CommunityOS.Notifications.Infrastructure.Integration.Workflow;
@@ -52,14 +52,7 @@ public static class NotificationsInfrastructureServiceExtensions
         // Authorization integration: the Notifications service never reads the
         // Authorization database. Every decision is delegated to the
         // Authorization service's check endpoint over HTTP (ADR-018/019).
-        services.ConfigureNotificationsAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
-        services.AddScoped<AuthorizationGuard>();
+        services.AddAuthorizationHttpClient(config, "communityos-notifications", includeGuard: true);
 
         // Community configuration is reserved for future channel-destination
         // resolution at dispatch time (ADR-025 decision 5). InApp needs no

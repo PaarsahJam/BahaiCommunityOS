@@ -6,21 +6,21 @@ using CommunityOS.Authorization.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace CommunityOS.Notifications.Infrastructure.Integration.Authorization;
+namespace CommunityOS.Authorization.HttpClient.Integration;
 
 /// <summary>
 /// HTTP <see cref="IAuthorizationEvaluator"/> that delegates every decision to
-/// the Authorization service's check endpoint. Notifications never accesses the
-/// Authorization database; decisions are always answered by the owning service
-/// over its API (ADR-018). Fail-closed: any transport, authentication or
-/// validation failure denies.
+/// the Authorization service's check endpoint. Consuming services never access
+/// the Authorization database; decisions are always answered by the owning
+/// service over its API (ADR-018). Fail-closed: any transport, authentication
+/// or validation failure denies.
 /// </summary>
 public sealed class HttpAuthorizationEvaluator(
-    HttpClient httpClient,
-    IOptions<AuthorizationServiceOptions> options,
+    System.Net.Http.HttpClient httpClient,
+    IOptions<AuthorizationHttpEvaluatorOptions> options,
     ILogger<HttpAuthorizationEvaluator> logger) : IAuthorizationEvaluator
 {
-    private readonly AuthorizationServiceOptions _options = options.Value;
+    private readonly AuthorizationHttpEvaluatorOptions _options = options.Value;
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
     public async Task<AuthorizationDecision> EvaluateAsync(
@@ -34,11 +34,9 @@ public sealed class HttpAuthorizationEvaluator(
         if (request.SubjectId == Guid.Empty)
             return AuthorizationDecision.Deny(decisionId, AuthorizationDecisionReason.MissingSubject, now);
 
-        var uri = new Uri(_options.BaseUrl.TrimEnd('/') + "/api/v1/authz/check");
-
         try
         {
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, uri)
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/authz/check")
             {
                 Content = JsonContent.Create(new CheckRequestDto(
                     request.SubjectId,
@@ -84,11 +82,11 @@ public sealed class HttpAuthorizationEvaluator(
     {
         ArgumentNullException.ThrowIfNull(requests);
 
-        var decisions = new List<AuthorizationDecision>(requests.Count);
+        var tasksList = new List<Task<AuthorizationDecision>>(requests.Count);
         foreach (var request in requests)
-            decisions.Add(await EvaluateAsync(request, ct));
+            tasksList.Add(EvaluateAsync(request, ct));
 
-        return decisions;
+        return [.. await Task.WhenAll(tasksList)];
     }
 
     private static AuthorizationDecisionReason MapReason(string reason) =>
@@ -112,7 +110,7 @@ public sealed class HttpAuthorizationEvaluator(
         DateTime EvaluatedOn);
 }
 
-internal static partial class NotificationsHttpAuthorizationEvaluatorLogging
+internal static partial class HttpAuthorizationEvaluatorLogging
 {
     [LoggerMessage(
         EventId = 0,

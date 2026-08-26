@@ -1,4 +1,4 @@
-using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Correspondence.Application;
 using CommunityOS.Correspondence.Infrastructure.Integration;
 using CommunityOS.Correspondence.Infrastructure.Persistence;
@@ -7,7 +7,6 @@ using CommunityOS.EventBus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace CommunityOS.Correspondence.Infrastructure;
 
@@ -46,10 +45,7 @@ public static class CorrespondenceInfrastructureServiceExtensions
             CorrespondenceIntegrationEventPublisher>();
 
         services.Configure<CorrespondenceOptions>(config.GetSection(CorrespondenceOptions.SectionName));
-        services.Configure<CorrespondenceAuthorizationOptions>(config.GetSection("AuthorizationService"));
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-            client.BaseAddress = new Uri(sp.GetRequiredService<IOptions<CorrespondenceAuthorizationOptions>>().Value.BaseUrl));
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
+        services.AddAuthorizationHttpClient(config, "communityos-correspondence");
 
         return services;
     }

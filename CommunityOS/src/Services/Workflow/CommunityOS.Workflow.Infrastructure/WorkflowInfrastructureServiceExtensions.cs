@@ -1,10 +1,10 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.Authorization.HttpClient.Integration;
 using CommunityOS.Workflow.Application.Abstractions;
 using CommunityOS.Workflow.Application.Options;
 using CommunityOS.Workflow.Domain.Repositories;
 using CommunityOS.Workflow.Infrastructure.Integration;
-using CommunityOS.Workflow.Infrastructure.Integration.Authorization;
 using CommunityOS.Workflow.Infrastructure.Integration.Community;
 using CommunityOS.Workflow.Infrastructure.Integration.Documents;
 using CommunityOS.Workflow.Infrastructure.Integration.Knowledge;
@@ -78,14 +78,7 @@ public static class WorkflowInfrastructureServiceExtensions
         // Authorization integration: the Workflow service never reads the
         // Authorization database. Every decision is delegated to the
         // Authorization service's check endpoint over HTTP (ADR-018/019).
-        services.ConfigureWorkflowAuthorizationService(config);
-        services.AddHttpClient<HttpAuthorizationEvaluator>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthorizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
-        services.AddScoped<IAuthorizationEvaluator>(sp => sp.GetRequiredService<HttpAuthorizationEvaluator>());
-        services.AddScoped<AuthorizationGuard>();
+        services.AddAuthorizationHttpClient(config, "communityos-workflow", includeGuard: true);
 
         return services;
     }
