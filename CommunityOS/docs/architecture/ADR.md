@@ -258,8 +258,10 @@ Implementation-sequence status:
 - Slot 14 (**Localization**) is **implemented** (ADR-029), its blocking
   findings were remediated, and it is **closed** by the recorded final
   read-only closure verification (verdict: CLOSED).
-- Slots 15–19 are not started. Slot 15 (**AI Platform**) was ratified at the
-  Prompt 16I architecture/design gate (ADR-030); implementation has not begun.
+- Slot 15 (**AI Platform**) is **implemented** (ADR-030, Prompt 16K) and
+  **closed** by the Prompt 16L final read-only closure verification (verdict:
+  CLOSED). The integration test suite is stateless (no Docker required).
+- Slots 16–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
