@@ -35,6 +35,9 @@ This directory contains ADRs for CommunityOS.
 | ADR-027 | Audit bounded context and compliance-journal boundary | Accepted |
 | ADR-028 | Correspondence bounded context and communication-lifecycle boundary | Accepted |
 | ADR-029 | Localization bounded context and multilingual-resource boundary | Accepted; implemented (16F) |
+| ADR-030 | AI Platform bounded context and assistance boundary | Accepted; implemented (16K) |
+| ADR-031 | Integrations slot disposition: no dedicated bounded context | Accepted |
+| ADR-032 | Finance bounded context and financial-truth boundary | Accepted (16T) |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -264,7 +267,9 @@ Implementation-sequence status:
 - Slot 16 (**Shared Integration Infrastructure**) is **redefined** by
   ADR-031: no dedicated bounded context justified; scope narrowed to
   shared `HttpAuthorizationEvaluator` deduplication (low priority).
-- Slots 17–19 are not started.
+- Slot 17 (**Finance**) completed its architecture/design assessment at the
+  Prompt 16T gate (ADR-032): ratified as a justified bounded context;
+  **implementation not started**. Slots 18–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -3236,3 +3241,363 @@ Superseded decisions: none. ADR-031 redefines Slot 16 in ADR-017 from
 "Shared Integration Infrastructure" (a narrowly scoped code-quality
 improvement). No existing ADR is amended; no existing bounded context
 ownership is changed.
+
+## ADR-032 — Finance bounded context and financial-truth boundary
+
+**Status:** Accepted (ratified at the Prompt 16T architecture/design gate).
+
+### Context
+
+Finance is slot 17 in the ratified implementation sequence (ADR-017). This
+gate independently determines whether Finance deserves a dedicated bounded
+context before any implementation.
+
+The assessment verified at Prompt 16T that Finance is greenfield in the
+repository sense: no source projects, tests, contracts, `finance.*`
+permissions, database, configuration, or companion documentation exist
+anywhere in the repository. The sole prior mentions are forward references
+and boundary statements in ratified material:
+
+- **ADR-022 (Documents)** — Finance is a named consumer of Documents
+  (receipts/attachments via `DocumentReference`, reserved `finance.invoice`
+  `SourceContext` / `receipt` reference type); Documents never attaches
+  financial meaning (docs/documents.md).
+- **ADR-023 (Records)** — "financial meaning" is explicitly not owned by
+  Records; Records never attaches financial meaning to its official records
+  (docs/records.md reserves a "Financial record | **Finance (future)**" row).
+- **ADR-031 (Shared Integration Infrastructure)** — Finance will own its own
+  external-system adapters (payment processors, banking APIs) within its own
+  bounded context, not through an Integrations intermediary.
+- **codebase forward reference** — `DocumentReference` (Documents Domain)
+  names Finance among the SourceContext consumers.
+
+### Problem statement
+
+Is "Finance" a genuine bounded context with its own domain ownership,
+invariants, data, lifecycle and authorization boundary — or merely an
+administrative capability, or a label for work that already belongs to an
+existing context?
+
+### Decision
+
+**Finance IS justified as a dedicated bounded context.**
+
+Tests applied:
+
+1. **Anti-dumping test — PASSES.** After every existing bounded context
+   continues to own its business data, a coherent, high-value domain
+   responsibility remains: the community's monetary facts (funds,
+   contributions, expenses, transfers, derived balances). No existing context
+   owns financial meaning — Records explicitly disclaims it (ADR-023),
+   Documents explicitly disclaims it (ADR-022), and Audit owns the compliance
+   journal but never a replacement source of truth for any domain fact
+   (ADR-027 decision 1).
+2. **Coherence test — PASSES.** Finance has distinct invariants no existing
+   context enforces: append-only immutable ledger entries, derived (never
+   stored) balances, separation of duties (recorder ≠ approver), and
+   financial confidentiality (contributor attribution is confidential and
+   optional).
+3. **Boundary test — PASSES.** Finance's seams are already reserved by
+   ratified ADRs: Documents (artifacts), Records (official records), Audit
+   (compliance journal), Workflow (approval task orchestration), Analytics
+   (cross-domain reporting, Slot 19), and ADR-031 (payment-provider adapter
+   seam owned by Finance).
+4. **Not merely administrative.** Finance is a domain with monetary truth and
+   lifecycle; it is not a service-management/admin capability. No
+   "Administration" bounded context exists anywhere in the ratified sequence,
+   and the per-service admin controllers (Correspondence, AI) do not
+   constitute one. Administration/Ticketing remains a non-ratified future
+   placeholder with no boundary; financial operations belong to Finance, not
+   Ticketing.
+
+### Ownership
+
+Finance owns:
+
+- **Fund** — aggregate root. An organization-scoped financial account (a
+  general fund or a designated fund). Identity, name, organization-unit
+  scope, status, lifecycle (`Active → Closed`).
+- **FinancialTransaction** — aggregate root. An immutable, append-only
+  recorded financial movement: a **Contribution** (money in), an **Expense /
+  Disbursement / Reimbursement** (money out), or a **Transfer** (between
+  funds). Amount as a positive monetary value with a direction, fund
+  reference, transaction type, occurred-on, optional category, optional
+  document references (receipts/supporting documents via Documents
+  `DocumentReference`), and optional confidential attribution reference
+  (OQ-2). Ledger entries are never mutated; a correction appends a reversal
+  entry; the balance derives from the entry stream.
+- **Balance** — derived read projection over the transaction stream; never
+  stored as authoritative state.
+- **Budget** — OWNED conceptually (planning against funds); implementation
+  DEFERRED to a later gate.
+- The **Organization read-model projection** (consumed unit events,
+  ADR-016 pattern).
+
+### Non-ownership boundaries (explicit)
+
+- **Document artifacts / storage** — Documents (ADR-022). Finance references
+  via `DocumentReference` (reserved `finance.*` SourceContext namespace) only.
+  Finance never stores binary, never owns document lifecycle, retention
+  schedules or holds.
+- **Official records** — Records (ADR-023). Records never attaches financial
+  meaning; Finance never owns official records or their lifecycle; Finance
+  may reference verified records for reconciliation (future).
+- **Compliance/audit journal** — Audit (ADR-027). Finance owns its ledger
+  (authoritative domain data); Audit owns the append-only compliance journal.
+  No Finance-owned audit trail is created; Finance integration events may
+  enter the Audit catalog only through the recorded ADR-027 amendment path at
+  a future gate.
+- **Approval task orchestration** — Workflow (ADR-024). The *decision
+  authority* for financial approval is Finance domain semantics; the *human
+  task surface* (assign, due date, escalate) may be driven by Workflow in the
+  future. Task state stays in Workflow; financial approval authority stays in
+  Finance.
+- **Person/identity facts** — Community/Identity. Finance stores stable ids
+  only; names resolve through the Community API at read time and only where
+  non-confidential attribution is used.
+- **Organizational hierarchy** — Organization. Finance scopes to organization
+  units through the ADR-016 read-model projection; no second hierarchy; no
+  unit overrides without architectural justification.
+- **Cross-domain analytics / enterprise reporting** — Analytics (Slot 19,
+  future). Finance owns finance-scoped reporting over its own data; Analytics
+  consumes integration events via the bus and owns cross-context aggregation.
+- **AI decisions** — AI Platform (ADR-030). AI is advisory only.
+
+### Persistence
+
+YES — Finance requires persistence and owns a dedicated database.
+
+- Database `communityos_finance`, schema `finance` (PostgreSQL; ADR-006/018).
+- Migrations owned by Finance; no cross-context FK (ADR-018) — references to
+  funds, units, persons and documents are id-typed only.
+- Identifier strategy: Guid, platform-generated.
+- Append-only for `FinancialTransaction`; no in-place mutation; balance is
+  derived.
+- Concurrency: optimistic for mutable aggregates (Fund metadata, Budget);
+  none required for append-only entries beyond the single DB transaction.
+- Retention/deletion: no hard-delete through normal operations. Fund
+  soft-deactivation is guarded; ledger entries are never hard-deleted. No
+  destructive purge is ratified at this gate; any future compliance purge
+  must follow the Audit/Correspondence guarded-purge precedent as a separate
+  ratified decision.
+
+### Authorization
+
+Exact-match permission model (ADR-009/010/011), fail-closed (ADR-010),
+centralized via `AuthorizationGuard` bound to the shared
+`HttpAuthorizationEvaluator` (ADR-031). No `[Authorize(Roles="...")]`, no
+local RBAC, no direct Authorization database access. Resource-level
+authorization mandatory (`resourceType = "fund" | "transaction"`).
+
+Baseline permission set — registered in `PermissionCatalog` only at the
+Finance implementation gate (mirroring the AI Platform OQ-6 pattern):
+
+| Permission | Purpose | Read/write | Administrative implication |
+|------------|---------|-----------|---------------------------|
+| `finance.fund.read` | View fund metadata and derived balances | read | none |
+| `finance.fund.manage` | Create/update/close fund accounts | write | does NOT imply transaction read/record |
+| `finance.transaction.read` | View ledger entries (non-confidential fields) | read | none |
+| `finance.transaction.record` | Record a contribution/expense/transfer | write | none |
+| `finance.transaction.approve` | Approve/reject a flagged transaction (human authority) | write (decision) | does NOT imply record |
+| `finance.transaction.admin` | Administrative override for correction/restoration | write (admin) | does NOT imply read/record |
+
+Deferred (defined here; registered only when the capability is implemented):
+
+- `finance.transaction.read.anonymous` — confidential contributor-attribution
+  fields (second-pass sensitive read, mirroring the established
+  `*.read.sensitive` pattern). Registered when/if the attribution model
+  (OQ-2) ships.
+- `finance.budget.read` / `finance.budget.manage` — with the Budget
+  capability.
+- `finance.report.read` — with the finance-reporting capability.
+
+Rules: no broad wildcards; read and write are distinct; administration never
+implies operational access; approval never implies recording (separation of
+duties); no capability implies another.
+
+### API boundary
+
+Finance needs an API. High-level categories map to owned responsibilities:
+
+- **Funds** — create/find/get/update/close fund accounts; derived balance
+  reads.
+- **Transactions** — record contribution/expense/transfer; list/get ledger
+  entries; derived balance queries.
+- **Approval surface** — submit-for-approval / approve / reject (explicit
+  human authority).
+- **Deferred categories** (not in the first gate unless a later gate ratifies
+  them): budget management, finance reporting, anonymous-view reads, external
+  payment execution.
+
+### Eventing
+
+- **Producer events** (transactional outbox, ADR-015): baseline integration
+  event `FinanceTransactionRecorded` (stable ids + lifecycle metadata only);
+  future `FundCreated` / `FundClosed`. Payload boundary mirrors Records: never
+  binary, never secrets, never names, never donor attribution, never
+  confidential amounts.
+- **First-gate consumer:** Organization unit events
+  (`OrganizationUnitCreated/Updated/ParentChanged`) into the read-model
+  projection (ADR-016 pattern) — guaranteed delivery → the Finance outbox is
+  enabled at the Finance implementation gate.
+- **Future consumers (subscribe only after the outbox gate):** Audit (via the
+  recorded ADR-027 amendment path), Notifications (approval alerts), Search
+  (metadata indexing, confidentiality-constrained), Workflow (approval-task
+  reconciliation). No consumer beyond Organization is ratified at this gate.
+- **Distributed-transaction rule:** none. Outbox-first; exactly-once via inbox
+  where consumers require it. No new event contracts are created in this gate.
+
+### Security / privacy
+
+- **No financial data in logs.** Structured logs carry only stable ids and
+  lifecycle status; amounts, attribution and payee details never enter log
+  output.
+- **Contributor attribution is confidential and anonymous by default**
+  (OQ-2). Attribution, if stored at all, is optional, encrypted at rest, and
+  readable only with `finance.transaction.read.anonymous`.
+- **Subject references:** stable ids only; names resolved via the Community
+  API at read time where permitted.
+- **Authorization before data access:** every guarded operation calls
+  `AuthorizationGuard` (fail-closed; ADR-010).
+- **Auditability:** append-only ledger; integration events journaled by Audit
+  (future).
+- **Retention:** no irreversible destruction; no hard-delete of ledger
+  entries.
+- **Separation of duties:** the subject who records a transaction cannot be
+  the subject who approves it (mirrors ADR-023).
+
+### External payment providers
+
+- Finance **owns the adapter seam** (ADR-031). No provider is selected, no
+  SDK is added, and no network integration is created at this gate.
+- **Activation is prohibited until:** provider selection (mirrors ADR-030
+  OQ-8), a regulatory/jurisdiction review (OQ-4), and the governance/
+  classification posture mirroring ADR-030 OQ-3 default-deny is satisfied for
+  any external financial data transmission.
+- Provider adapters execute through the Finance API under Finance
+  authorization; direct database access by a provider is prohibited.
+
+### Reporting / Analytics boundary
+
+- Finance owns finance-scoped reporting computed from its own data
+  (`finance.*` read permissions).
+- Analytics (Slot 19, future) owns cross-domain aggregation and enterprise
+  reporting; it consumes integration events via the bus and never reads the
+  Finance database.
+- The Reporting scaffold folder remains an inert, non-ratified
+  pre-ratification remnant (ADR-017); it is neither approved nor extended by
+  this ADR.
+
+### Governance / human authority
+
+- Financial approvals are **explicit domain decisions** performed by
+  authorized human roles holding the matching capability. Approval authority
+  is never delegated to AI.
+- **AI (ADR-030) hard prohibitions for Finance:** AI must not authorize
+  financial transactions, approve payments, determine financial truth, bypass
+  Finance authorization, or write authoritative financial state. Any future
+  AI assistance is a clearly marked, non-authoritative suggestion requiring
+  human review under ADR-030 OQ-3 governance.
+
+### Dependency matrix
+
+| Context | Classification | Rationale |
+|---------|---------------|-----------|
+| Identity | REQUIRED | Authentication (JWT) |
+| Authorization | REQUIRED | AuthorizationGuard, fail-closed decisions |
+| Organization | REQUIRED | Unit events → read-model projection; scoping |
+| Shared Integration Infrastructure (ADR-031) | REQUIRED | Shared `HttpAuthorizationEvaluator` |
+| Community | OPTIONAL | Person/household name resolution at read time only |
+| Documents | OPTIONAL | Receipt/invoice references via `DocumentReference` |
+| Records | FUTURE | Official-record references for reconciliation |
+| Audit | FUTURE | Compliance-journal subscription (ADR-027 amendment) |
+| Workflow | FUTURE | Approval-task orchestration |
+| Notifications | FUTURE | Approval/alarm alerts |
+| Search | FUTURE | Metadata index (confidentiality-constrained) |
+| Knowledge | NOT REQUIRED | No overlap |
+| Correspondence | NOT REQUIRED | No overlap |
+| Localization | OPTIONAL | Finance UI localization strings only |
+| AI Platform | NOT REQUIRED | Advisory only; gated by future decision |
+
+### Ownership / non-ownership table
+
+| Responsibility | Finance | Other context | Rationale |
+|----------------|---------|---------------|-----------|
+| Monetary facts (transactions, balances) | OWNED | — | Core domain invariant |
+| Funds / accounts | OWNED | — | Core aggregate |
+| Budgets | OWNED (deferred) | — | Planning against funds |
+| Financial approvals (authority) | OWNED | — | Human domain decision |
+| Document contents / storage | NOT OWNED | Documents | ADR-022 artifact ownership |
+| Receipt/invoice document references | OWNED (reference only) | Documents (artifact) | `DocumentReference` seam |
+| Official records | NOT OWNED | Records | ADR-023; Records never attaches financial meaning |
+| Compliance/audit journal | NOT OWNED | Audit | ADR-027 decision 1 |
+| Approval task orchestration | CONSUMED (future) | Workflow | Task state in Workflow |
+| Person/identity facts | NOT OWNED | Community/Identity | Stable ids only |
+| Organization hierarchy/scoping | CONSUMED | Organization | ADR-016 projection |
+| Notifications | CONSUMED (future) | Notifications | Approval/alarm delivery |
+| Correspondence | NOT OWNED | Correspondence | No overlap |
+| Payment-provider adapters | OWNED (seam; activation deferred) | — | ADR-031 |
+| Cross-domain analytics | NOT OWNED | Analytics (future) | Slot 19 |
+| AI assistance | NOT OWNED | AI Platform | ADR-030 advisory-only |
+| Localization | CONSUMED (optional) | Localization | UI strings |
+
+### Open questions
+
+- **OQ-1 — First-gate domain depth:** minimal Fund + FinancialTransaction vs.
+  a fuller ledger. DEFERRED to the implementation gate.
+- **OQ-2 — Contributor attribution model:** anonymous-by-default vs. optional
+  attributable contributions; whether attribution is stored at all and how it
+  is encrypted. DEFERRED. `finance.transaction.read.anonymous` is registered
+  only after this resolves.
+- **OQ-3 — Payment-provider boundary/selection:** DEFERRED; activation
+  prohibited until the prerequisites below are satisfied.
+- **OQ-4 — Regulatory/jurisdiction requirements:** UNRESOLVED. No
+  authoritative regulatory source is imported (mirrors the ADR-020 placeholder
+  posture). Binding for external payment processing, not for the first
+  internal gate.
+- **OQ-5 — Financial retention requirements:** DEFERRED to the implementation
+  gate or regulatory input; no destructive purge is ratified.
+- **OQ-6 — Finance vs. Analytics reporting split:** DEFERRED to the Analytics
+  gate (Slot 19); this ADR's seam prevents Finance from becoming the
+  enterprise reporting owner.
+- **OQ-7 — Invoice/payables depth:** DEFERRED.
+- **OQ-8 — Bookkeeping depth (single-entry vs. double-entry):** DEFERRED.
+  First gate uses a single immutable entry stream with a derived balance;
+  double-entry is not precluded.
+
+### Implementation prerequisites
+
+- **MUST BEFORE IMPLEMENTATION:** ADR-032 ratification (this document); scope
+  approval (this document); persistence decision (this document);
+  authorization matrix (this document); eventing posture (this document);
+  outbox-gate decision (enabled at the implementation gate); and the ADR-017
+  sequence status update for Slot 17.
+- **MUST BEFORE EXTERNAL-PAYMENT-PROVIDER ACTIVATION:** provider selection
+  (OQ-3); regulatory/jurisdiction review (OQ-4); and the
+  governance/classification posture mirroring ADR-030 OQ-3 satisfied before
+  any external financial data transmission.
+- **CAN-LATER:** Documents receipt references; Records event consumption;
+  Community name resolution; Notifications; Audit catalog amendment;
+  Localization.
+- **OPTIONAL:** Budget management; anonymous-attribution view (OQ-2);
+  double-entry accounting (OQ-8); finance reporting; AI assist
+  (ADR-030-gated).
+
+### Prohibition
+
+No Finance implementation may begin before: (1) ADR-032 ratification (this
+document), and (2) the MUST BEFORE IMPLEMENTATION prerequisites are accepted.
+Until then: no `src/Services/Finance`, no `tests/*Finance*`, no
+`CommunityOS.Contracts.Finance`, no `communityos_finance` database, no
+`finance.*` permission in `PermissionCatalog`, no controller, no provider SDK,
+no migration, and no Docker change. At this gate the only file modified is
+this ADR.
+
+### Ratification record (Prompt 16T)
+
+- **OQ-1 through OQ-8** recorded above with their honest classifications.
+- Superseded decisions: none. ADR-032 is the first ADR to ratify Slot 17; it
+  records the Slot 17 assessment status (architecture complete, implementation
+  not started) in ADR-017. No existing bounded-context ownership is changed.
+  ADR-030 (OQ-3 UNRESOLVED; OQ-8 DEFERRED) and ADR-031 remain in force
+  unchanged.
