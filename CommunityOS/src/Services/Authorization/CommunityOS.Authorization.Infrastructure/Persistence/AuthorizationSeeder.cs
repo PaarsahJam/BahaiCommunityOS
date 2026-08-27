@@ -54,7 +54,13 @@ public static class AuthorizationSeeder
             "localization.resource.read", "localization.resource.propose",
             "localization.resource.review",
 
-            "ai.assist.invoke", "ai.platform.manage"
+            "ai.assist.invoke", "ai.platform.manage",
+
+            // Finance baseline capabilities (ADR-032 decision 12): the global
+            // administrator holds all six at every scope.
+            "finance.fund.read", "finance.fund.manage",
+            "finance.transaction.read", "finance.transaction.record",
+            "finance.transaction.approve", "finance.transaction.admin"
         ]),
         ("PlatformService", "Platform Service Principal",
         [
@@ -99,7 +105,13 @@ public static class AuthorizationSeeder
             "localization.resource.read", "localization.resource.propose",
             "localization.resource.review",
 
-            "ai.assist.invoke", "ai.platform.manage"
+            "ai.assist.invoke", "ai.platform.manage",
+
+            // Finance baseline capabilities (ADR-032 decision 12): national
+            // administrators hold all six at every scope they administer.
+            "finance.fund.read", "finance.fund.manage",
+            "finance.transaction.read", "finance.transaction.record",
+            "finance.transaction.approve", "finance.transaction.admin"
         ]),
         ("LocalAdministrator", "Local Administrator",
         [

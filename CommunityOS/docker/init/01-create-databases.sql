@@ -19,3 +19,4 @@ CREATE DATABASE communityos_search;
 CREATE DATABASE communityos_audit;
 CREATE DATABASE communityos_correspondence;
 CREATE DATABASE communityos_localization;
+CREATE DATABASE communityos_finance;

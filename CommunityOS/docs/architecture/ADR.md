@@ -268,8 +268,13 @@ Implementation-sequence status:
   ADR-031: no dedicated bounded context justified; scope narrowed to
   shared `HttpAuthorizationEvaluator` deduplication (low priority).
 - Slot 17 (**Finance**) completed its architecture/design assessment at the
-  Prompt 16T gate (ADR-032): ratified as a justified bounded context;
-  **implementation not started**. Slots 18–19 are not started.
+  Prompt 16T gate (ADR-032) and is **implemented** at the Prompt 16U gate
+  (Domain, Application, Infrastructure, API; the transactional outbox enabled
+  per ADR-032 eventing posture; EF migration `InitialCreateFinance`; the
+  ADR-016 Organization projection consumer) and **closed** by the Prompt 16V
+  final read-only closure verification (verdict: CLOSED). The Finance
+  integration test suite derives the EF model offline (no Docker required).
+  Slots 18–19 are not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be

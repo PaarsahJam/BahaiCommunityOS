@@ -123,6 +123,21 @@ public static class PermissionCatalog
     public const string AiAssistInvoke = "ai.assist.invoke";
     public const string AiPlatformManage = "ai.platform.manage";
 
+    // Finance capabilities (finance.*, ratified ADR-032 decision 12). Exactly
+    // six baseline capabilities and no more; every capability is evaluated at
+    // its fund's organizational scope and no capability implies another — a
+    // finance.transaction.admin grant never implies record or approve, and
+    // fund.manage never implies transaction.record. Deferred capabilities
+    // (confidential attribution, wallet references, category, document
+    // references, budget management) are NOT registered. Registered at the
+    // implementation gate (Prompt 16U).
+    public const string FinanceFundRead = "finance.fund.read";
+    public const string FinanceFundManage = "finance.fund.manage";
+    public const string FinanceTransactionRead = "finance.transaction.read";
+    public const string FinanceTransactionRecord = "finance.transaction.record";
+    public const string FinanceTransactionApprove = "finance.transaction.approve";
+    public const string FinanceTransactionAdmin = "finance.transaction.admin";
+
     /// <summary>
     /// Permissions that govern authorization administration. Grants of these
     /// permissions participate in the organization scope hierarchy; a global
