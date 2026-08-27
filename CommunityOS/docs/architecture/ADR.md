@@ -38,6 +38,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-030 | AI Platform bounded context and assistance boundary | Accepted; implemented (16K) |
 | ADR-031 | Integrations slot disposition: no dedicated bounded context | Accepted |
 | ADR-032 | Finance bounded context and financial-truth boundary | Accepted (16T) |
+| ADR-033 | Communications / VoIP slot disposition: no dedicated bounded context | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -274,7 +275,16 @@ Implementation-sequence status:
   ADR-016 Organization projection consumer) and **closed** by the Prompt 16V
   final read-only closure verification (verdict: CLOSED). The Finance
   integration test suite derives the EF model offline (no Docker required).
-  Slots 18–19 are not started.
+- Slot 18 (**Communications / VoIP**) completed its architecture/design
+  assessment at the Prompt 16W gate (ADR-033): **no dedicated bounded context
+  justified**; the slot is **deferred** — no service, no permissions, no
+  events, no database, no provider integration. Communication capabilities
+  that exist remain owned by Community (contact methods, meetings, activities,
+  events, participation), Notifications (channel dispatch), Correspondence
+  (letter delivery) and Workflow (task orchestration) per
+  ADR-016/025/028/024. Any future telephony/virtual-meeting requirement
+  requires a new ADR before implementation (ADR-025 decision 15 precedent).
+  Slot 19 (**Analytics**) is not started.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -3606,3 +3616,265 @@ this ADR.
   not started) in ADR-017. No existing bounded-context ownership is changed.
   ADR-030 (OQ-3 UNRESOLVED; OQ-8 DEFERRED) and ADR-031 remain in force
   unchanged.
+
+## ADR-033 — Communications / VoIP slot disposition: no dedicated bounded context
+
+**Status:** Accepted (ratified at the Prompt 16W architecture/design gate).
+
+### Context
+
+Slot 18 in the ADR-017 implementation sequence is labeled "Communications /
+VoIP." Prompt 16W executed the architecture/design gate and independently
+audited every communication-related capability and seam in the repository. No
+"Communications" service folder, source, tests, contracts, permissions,
+migration, database, API or provider SDK exists anywhere in the repository
+(verified at this gate): the slot is greenfield as a candidate.
+
+### Existing communication ownership inventory (verified at this gate)
+
+| Capability | Owner | Evidence |
+|------------|-------|----------|
+| Contact methods (email / phone / postal) on persons | Community | `ContactMethod` + `ContactMethodType` (ADR-016; `docs/community.md`) |
+| Meeting / activity / event / participation domain meaning (participants, agenda items, action items, attendance, draft minutes) | Community | `Meeting`/`Activity`/`CommunityEvent`/`Participation` aggregates + `MeetingCreated/Updated/Recorded`, `ActivityCreated`, `CommunityEventCreated`, `ParticipationRecorded` (ADR-016) |
+| Destination resolution for notifications (names/emails/phones) | Notifications resolves via Community API at dispatch time; never stored | `docs/notifications.md` channels/destinations rules |
+| Notification channels — InApp domain-owned and implemented; Email/SMS/Push state-model owned, providers deferred | Notifications | ADR-025 decision 5; `INotificationChannelDispatcher` seam; `docs/notifications.md` |
+| Formal institutional letter lifecycle + dispatch/delivery recording | Correspondence | ADR-028 decisions 1/3/17; `IDeliveryProvider` seam (future) |
+| Task / approval / process orchestration | Workflow | ADR-024; explicit non-ownership of delivery/channels (`docs/workflow.md`) |
+| Event bus / transactional outbox / shared HTTP integration mechanism | Shared Integration Infrastructure | ADR-004/015/031 |
+
+### Audit facts
+
+1. **Zero voice/telephony capabilities exist.** No "Communications"/"VoIP"
+   folder or code, no SIP/Asterisk/WebRTC/Twilio/Vonage/PSTN/presence/
+   conferencing constructs anywhere in source, tests, contracts, permissions
+   or configuration.
+2. **Every communication-adjacent seam is already owned** by an existing
+   bounded context (table above).
+3. **Phone numbers and contact details are Community-owned** (`ContactMethod`,
+   ADR-016) — the destination facts a telephony feature would need are already
+   Community data, resolved at read/dispatch time like every other context.
+4. **Meetings are Community-owned** including participants, agenda, actions,
+   attendance and minutes; the *medium* of a meeting (remote vs. in person) is
+   not a ratified domain concept.
+
+### Anti-dumping test (PASSES — nothing dumps onto the slot)
+
+> If Slot 18 — Communications / VoIP is removed from the sequence, does any
+> existing bounded context become architecturally incomplete or lose an
+> ownership responsibility?
+
+**No.** No ADR, documentation, contract, API or test declares voice or
+real-time communication as a required capability of any ratified context.
+Removing the slot leaves Community, Notifications, Correspondence, Workflow
+and Shared Integration Infrastructure fully complete. There is no unowned
+responsibility waiting for a "Communications" context.
+
+### Boundary / coherence test (FAILS for a dedicated bounded context)
+
+A dedicated bounded context is justified by a distinct domain concept and
+invariant set — its own evolving vocabulary, lifecycle, data, and
+authorization boundary. A "calls"/telephony feature set introduces:
+
+- **No ratified CommunityOS domain concept.** No requirement for calling,
+  presence, call records, recordings or conferencing exists in the ratified
+  architecture or companion documentation (forward-reference analysis below).
+- **Infrastructure** — media plane, signaling (SIP), WebRTC gateways,
+  TURN/STUN, PBX/extension estates.
+- **Integration / adapter concerns** — telephony providers (Twilio, Vonage,
+  Freeswitch, Asterisk-as-technology).
+- **Future optional capabilities** — call records (CDR), recordings,
+  presence, chat/IM.
+
+None of these is a *domain ownership responsibility* of the platform. Creating
+a Communications/VoIP service would reproduce the three anti-patterns already
+rejected for "Integrations" in ADR-031:
+
+1. **Ownership redistribution** — moving the meeting medium, contact data or
+   delivery semantics from their rightful owners into a central service.
+2. **Infrastructure duplication** — a media/telephony engine is deployment
+   infrastructure, not a bounded context; there is no shared component to
+   consolidate (unlike the `HttpAuthorizationEvaluator` case).
+3. **God-service anti-pattern** — a catch-all for "voice and anything that
+   does not fit elsewhere."
+
+### VoIP domain-vs-infrastructure analysis (A/B/C/D)
+
+| Item | Class | Disposition |
+|------|-------|-------------|
+| SIP, Asterisk, extensions, PBX | B — infrastructure | Deployment technology; never domain ownership by itself |
+| Conference rooms / media sessions | C/B — adapter + infrastructure | The *meeting* domain meaning is Community's; the *medium* is infrastructure |
+| Call sessions / call routing | B/C — infrastructure + adapter | Owned by the provider seam of the feature that uses it, not a service |
+| Call records (CDRs) / recordings | D — future optional | If certified evidence: Documents artifact pattern (ADR-022) + Audit facts; no ratified requirement |
+| Presence | D — future optional | Unarticulated product feature; deferred |
+| WebRTC | B/C — client tech + adapter | Client/deployment capability; autojoin etc. is an adapter concern |
+| PSTN | C — adapter concern | Analogous to `INotificationChannelDispatcher` / `IDeliveryProvider` seams |
+| External telephony providers | C — adapter concern | Seam owned by the context whose feature uses the provider (ADR-031) |
+| Provider credentials | C — adapter concern | Credential custody per owning context (standard config/secret mechanism) |
+| Telecom regulatory requirements | governance gate | Like OQ-3/OQ-4: defers provider selection; does not define a bounded context |
+
+### Existing-context separation (explicit)
+
+- **Notifications** — channel delivery, notification dispatch, notification
+  lifecycle. Unidirectional asynchronous informing; complete; provider seams
+  deferred in-context (ADR-025).
+- **Correspondence** — formal letters/messages and their documented delivery;
+  complete; `IDeliveryProvider` seam deferred in-context (ADR-028).
+- **Community** — persons, contact information, activities, events, meetings,
+  participation; owns the domain meaning of any community session (ADR-016).
+- **Workflow** — approval/task/process orchestration; no media role (ADR-024).
+- **Shared Integration Infrastructure** — integration mechanisms only
+  (ADR-031); unlike Slot 16, no residual duplicated component exists here, so
+  there is nothing to "redefine" into a low-priority infrastructure item.
+
+VoIP introduces no genuinely new domain ownership beyond these contexts.
+
+### Forward-reference analysis
+
+- **ADR-017 line 235** — the sequence label "18. Communications / VoIP." A
+  structural placeholder, exactly as "Integrations" was (ADR-031 §facts 4):
+  the sequence is a rough dependency-ordered list, not a micro-sequencing, and
+  this slot never received a ratified boundary definition.
+- **ADR-031 lines 3146–3147** — the conditional phrase *"If ratified,
+  Communications will own its own telephony/WebRTC infrastructure within its
+  own bounded context."* This is a conditional forward reference, not a
+  dependency. ADR-033 is the resolution of that condition at this gate: **not
+  ratified** — therefore no telephony/WebRTC infrastructure ownership is
+  created.
+- No documentation, source, test, contract or runbook references a
+  Communications context as producer or consumer.
+
+No actual architectural dependencies exist.
+
+### Decision
+
+**No dedicated "Communications / VoIP" bounded context is justified at this
+gate.**
+
+Slot 18 in ADR-017 is dispositioned as follows:
+
+- **Old label:** Communications / VoIP
+- **New label:** Deferred — no dedicated bounded context (ADR-033)
+- **Scope:** none. No source projects, no tests, no contracts, no permissions,
+  no migrations, no database, no Docker change, no API surface, no provider
+  SDK, no documentation beyond this ADR.
+- **Edge case:** if a remote phone number or a contact method is never a
+  "call" — contact methods stay Community-owned (ADR-016), e.g. a person's
+  listed phone number is a Community contact fact like every other contact
+  method; nothing in this ADR moves it.
+
+**Conditional resolution path** (the only circumstances under which any future
+telephony/virtual-meeting work may begin, each gated on a new ratified ADR —
+ADR-025 decision 15 precedent):
+
+1. The **meeting/session domain meaning** (who, what act, attendance, agenda,
+   action items) belongs to **Community** — an ADR-016 amendment extends the
+   ratified `Meeting` semantics if a real-time/virtual meeting is ever a
+   ratified product requirement. Never a new service.
+2. The **medium/infrastructure** (WebRTC/media/voice engines, TURN/STUN) is a
+   client/deployment capability, not a bounded context.
+3. The **provider seam** sits in the owning context (the Community feature or a
+   client-level seam), mirroring Notifications' `INotificationChannelDispatcher`
+   and Correspondence's `IDeliveryProvider`.
+4. **Recordings/CDRs as evidence** become Documents artifacts (immutable
+   version pattern, ADR-022) with Audit facts (ADR-027) — not a new record
+   store.
+5. **Invites/reminders** flow through Notifications (ADR-025 consumed-event
+   pattern).
+6. Any external telephony provider activation additionally requires the
+   governance posture analogous to ADR-030 OQ-3 and Finance OQ-4 before any
+   external transmission.
+
+This mirrors the ADR-031 reasoning standard ("Integrations bounded context NOT
+JUSTIFIED"): a placeholder slot name is not justification for a service.
+
+### Non-ownership boundaries (explicit)
+
+The following remain explicitly **not owned** by any "Communications/VoIP"
+context (and no such context exists):
+
+- Contact methods and destinations (Community; ADR-016)
+- Meeting/session domain meaning, attendance, agenda, actions (Community;
+  ADR-016)
+- Notification channels, dispatch and lifecycle (Notifications; ADR-025)
+- Formal letter lifecycle and delivery recording (Correspondence; ADR-028)
+- Task/approval orchestration (Workflow; ADR-024)
+- Media/voice infrastructure and telephony providers (deferred; provider seams
+  belong to their owning contexts when they exist — ADR-031)
+
+### Relationship to existing contexts
+
+- **Notifications:** no change. Future invite/reminder needs consume the owning
+  context's events per ADR-025 catalog rules.
+- **Correspondence:** no change. `IDeliveryProvider` remains a letter/
+  correspondence delivery seam, not a telephony capability.
+- **Community:** no change. Remains the owner of persons, contacts, meetings,
+  activities, events and participation; a future virtual-meeting requirement
+  is an ADR-016 amendment, not a new context.
+- **Workflow:** no change.
+- **Shared Integration Infrastructure (ADR-031):** no change. Unlike Slot 16,
+  there is no residual component to consolidate; the slot is deferred outright.
+- **AI Platform (ADR-030):** no change. No real-time transcription,
+  meeting-assistant or chat capability is introduced; any such future feature
+  is governed by ADR-030 default-deny / OQ-3 posture and requires a new ADR.
+
+### Persistence / Eventing / Authorization / API / Security
+
+- **Persistence:** none. No database, no migrations, no tables.
+- **Eventing:** zero events published; zero consumers; zero outbox/inbox; no
+  new contracts.
+- **Authorization:** no new permissions. No `communications.*` or `voip.*`
+  matrix is registered; nothing added to `PermissionCatalog` or
+  `AuthorizationSeeder`.
+- **API boundary:** none.
+- **Security / credentials:** no telephony credentials, no provider secrets,
+  no SDKs. Community contact data (including phone numbers) remains gated by
+  Community's privacy permissions and never leaves its existing boundary.
+
+### Implementation prerequisites
+
+None for this gate. The conditional resolution path describes the only
+circumstances under which future work could begin; each step requires a new
+ratified ADR before any implementation.
+
+### Open questions
+
+- **OQ-1 (DEFERRED):** whether a future ratified product requirement will ever
+  introduce real-time/virtual meeting or telephony capability. Not decided at
+  this gate.
+- **OQ-2 (DEFERRED):** if such a requirement materializes, whether the medium/
+  provider seam is anchored in Community (ADR-016 amendment) or as a
+  client-level capability. Deferred until a real requirement exists; no
+  position is ratified prematurely.
+
+Consistent with ADR-030 OQ-3 (UNRESOLVED), Finance OQ-4 (UNRESOLVED) and
+OQ-8 (DEFERRED), no telephony provider selection, regulatory review or
+external-transmission consideration is opened at this gate.
+
+### Prohibition
+
+No implementation of any "Communications"/"VoIP" bounded context or feature
+may begin before a new ratified ADR that adds the capability to the ADR-017
+sequence (ADR-025 decision 15 precedent). Until then: no
+`src/Services/Communications`, no `tests/*Communications*`, no
+`CommunityOS.Contracts.Communications`, no `communityos_communications`
+database, no `communications.*`/`voip.*` permission, no API, no provider SDK,
+no migration, and no Docker change. At this gate the only file modified is
+this ADR.
+
+### Ratification record (Prompt 16W)
+
+- **Verdict: Slot 18 — Communications / VoIP — NOT JUSTIFIED as a dedicated
+  bounded context at this gate. DEFERRED.**
+- Consistent prerequisites: anti-dumping PASSES (nothing is incomplete when the
+  slot is removed); boundary/coherence FAILS for a dedicated context; every
+  VoIP element classifies as infrastructure, integration-adapter, or
+  future-optional capability; forward references are conditional or structural
+  placeholders.
+- Preserved decisions: ADR-030 (OQ-3 UNRESOLVED; OQ-8 DEFERRED), ADR-031
+  (Integrations disposition), ADR-032 (Finance; OQ-4 UNRESOLVED) remain in
+  force unchanged; ADR-016/025/028 ownership is not amended; no OQ was
+  reopened.
+- Superseded decisions: none. ADR-033 redefines the ADR-017 Slot 18 label
+  "Communications / VoIP" to "Deferred — no dedicated bounded context" (with
+  no residual component to consolidate, unlike ADR-031). No existing bounded
+  context ownership is changed.
