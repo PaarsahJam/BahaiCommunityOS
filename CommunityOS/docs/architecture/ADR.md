@@ -39,6 +39,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-031 | Integrations slot disposition: no dedicated bounded context | Accepted |
 | ADR-032 | Finance bounded context and financial-truth boundary | Accepted (16T) |
 | ADR-033 | Communications / VoIP slot disposition: no dedicated bounded context | Accepted |
+| ADR-034 | Analytics / cross-domain reporting slot disposition: no dedicated bounded context | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -284,7 +285,19 @@ Implementation-sequence status:
   (letter delivery) and Workflow (task orchestration) per
   ADR-016/025/028/024. Any future telephony/virtual-meeting requirement
   requires a new ADR before implementation (ADR-025 decision 15 precedent).
-  Slot 19 (**Analytics**) is not started.
+  Slot 19 (**Analytics**) was not started; disposed by ADR-034 (Prompt 16Y). A
+  dedicated Analytics bounded context is **not ratified** at the Analytics
+  gate; the slot is **deferred** (conditional) — no service, no permissions,
+  no events, no contracts, no database, no API and no deployment artifact. The
+  forward references to Analytics (ADR-025 NotificationDispatched outbox
+  gating, ADR-031 bus-consumer posture, ADR-032 cross-domain reporting
+  boundary) remain valid as future-consumer constraints but create no
+  dependency requiring a context. ADR-032 OQ-6 (Finance vs. Analytics
+  reporting split) is resolved at this gate: Finance remains the sole owner of
+  finance-scoped reporting and financial meaning; no Analytics context is
+  created. A future cross-domain reporting/analytics function requires new
+  ratification with defined product requirements and data governance before
+  implementation.
 - The **Content, Enrollment, Events and Reporting** service folders are inert
   pre-ratification scaffold remnants. They are **not part of the ADR-017
   sequence**, are not ratified implementation candidates, and must not be
@@ -3878,3 +3891,209 @@ this ADR.
   "Communications / VoIP" to "Deferred — no dedicated bounded context" (with
   no residual component to consolidate, unlike ADR-031). No existing bounded
   context ownership is changed.
+
+## ADR-034 — Analytics / cross-domain reporting slot disposition: no dedicated bounded context
+
+**Status:** Accepted (ratified at Prompt 16Y on the Slot 19 Analytics gate).
+
+**Decision:** No dedicated Analytics bounded context is ratified at this gate.
+Slot 19 (Analytics) is **deferred** (conditional): a future cross-domain
+reporting/analytics function may be ratified only when both prerequisites
+exist — (PR-1) a ratified product-requirements statement defining the
+cross-domain reports/metrics CommunityOS must produce (consumers, granularity,
+cadence, exports), and (PR-2) ratified data governance for derived
+cross-domain datasets (minimization, granularity/aggregation thresholds,
+retention, classification — the classification element depends on ADR-030
+OQ-3, which remains UNRESOLVED). Until then, no service, no permissions, no
+events, no contracts, no database, no API and no deployment artifact are
+created.
+
+### Justification
+
+**Anti-dumping test — PASSES.** Removing Slot 19 leaves every ratified bounded
+context architecturally complete. Every domain fact, metric and report already
+has an owner, and every reference to Analytics identified below is a
+one-directional future-consumer reference, an informational reference, or a
+sequence placeholder — none creates a dependency that requires a context.
+
+**Boundary / coherence test — FAILS for a dedicated context today.** The
+candidate surface (cross-domain aggregation, projections, dashboards, exports,
+scheduled reports) does not constitute an irreducible domain:
+- metric *meaning* is owned by its source domain — Finance (financial meaning,
+  ADR-032), Community (membership/participation), Notifications (delivery
+  state, ADR-025), Audit (compliance truth, ADR-027) — so Analytics has no
+  domain vocabulary of its own, only re-aggregations of other domains' facts;
+- the remaining surface is projection/read-model infrastructure, BI/export
+  integration, or client product surface — the categories ADR-031 and ADR-033
+  eliminated as bounded-context material;
+- generic reporting, dashboards, charting, export and SQL aggregation are
+  expressly excluded as standalone justification by the Analytics gate
+  instructions.
+
+**Dumping-ground / god-service test — FAILS.** Cross-domain aggregation is
+exactly where PII and meaning from Community (persons/hierarchy),
+Finance (revenues/expenses), Notifications (recipient counts), Audit and
+Search coalesce. Without ratified governance the slot degenerates into a
+service that "reads everything", bypasses owning APIs (ADR-018: no
+cross-context database reads) and owns nothing confidently.
+
+**Forward references are future-consumer postures only.** Unlike ADR-033
+(which had no anticipating decisions), three ratified records name a *possible*
+future consumer: ADR-025 outbox-gates `NotificationDispatched` so Audit *and
+Analytics* may subscribe; ADR-031 states Analytics would consume integration
+events via the existing MassTransit bus (not an Integrations intermediary);
+ADR-032 defines the Reporting/Analytics boundary and deferred OQ-6 to this
+gate. These constrain a *future ratified* function; none ratifies a context,
+and none changes existing ownership.
+
+### Ownership (conditional — applies only if PR-1 and PR-2 are later ratified)
+
+A future cross-domain reporting/analytics function, if ratified:
+- consumes integration events via the bus (ADR-031 posture) and reads current
+  facts through owning APIs under owning permissions (ADR-018);
+- owns analytical projections and the cross-domain metric catalog, where
+  metric meaning is delegated from and ratified by each source domain, never
+  invented;
+- owns its analytical read-model store, cadence/scheduled reports, exports and
+  the read-only analytics API surface.
+
+### Non-ownership
+
+- **Finance:** financial truth, financial meaning and finance-scoped reporting
+  (sole owner, ADR-032).
+- **Audit:** compliance-journal truth; any analytical use is derived, under the
+  same permissions as operational reading.
+- **Notifications:** delivery state; only the identifier-and-count facts of
+  `NotificationDispatched` may ever be aggregated (ADR-025 privacy rule).
+- **Search:** the full-text projection and query index.
+- **Community, Documents, Records, Knowledge, Workflow, Correspondence,
+  Localization, Organization, Identity, Authorization:** their own facts.
+- **AI Platform:** the AI provider seam and assistance; any AI-assisted
+  analysis is governed by ADR-030 default-deny and is never authoritative.
+
+### Persistence
+
+None today. A future ratified function owns a projection store fed only by bus
+events under the outbox/inbox rules — never a direct read of another
+context's database (ADR-018).
+
+### Eventing
+
+Consumer-only posture. Existing ratified events (`NotificationDispatched`,
+the Finance event catalog, Community/Audit/Workflow facts) are outbox-
+protected; a future consumer subscribes under established ADR-015/ADR-025
+rules. No Analytics-produced events exist or are added now; production, if any
+ever arises, would be outbox-protected.
+
+### Authorization
+
+No permissions today. A future function ratifies an exact-match `analytics.*`
+matrix (for example `analytics.report.view`, `analytics.report.export`) in the
+centralized permission tables — never `Roles=`-embedded claims — scoped per
+ADR-011 and delegatable only per ADR-013.
+
+### API boundary
+
+None today. A future surface is read-only (`/api/v1/analytics/...` projections,
+reports, exports); operational and analytical channels remain distinct; it
+never mutates source facts.
+
+### Privacy / data boundary
+
+No derived dataset may exist until minimization, granularity and retention are
+ratified (PR-2). Cross-domain derived data is the highest
+PII/meaning-coalescence surface in the platform; nothing is exposed at this
+gate, and this ADR introduces no new PII collection or exposure.
+
+### Relationship to existing bounded contexts
+
+- **Finance:** ADR-032 OQ-6 is resolved at this gate — Finance is and remains
+  the sole owner of finance-scoped reporting and financial meaning
+  (`finance.report.read`); no Analytics context is created; a future
+  cross-domain function consumes Finance facts by API/event and never
+  fabricates financial meaning.
+- **Audit:** Audit owns the compliance journal; any future analytical use is
+  derived, under the same permissions, and never duplicates audit authority.
+- **Notifications:** `NotificationDispatched` remains the only ratifiable
+  notification input to a future consumer, and carries ids and a count only.
+- **Search:** Search owns full-text query; Analytics (future) owns numeric/
+  metric aggregation; no overlap and no shared storage.
+- **AI Platform:** AI-assisted analysis is a capability seam owned by the AI
+  Platform and governed by ADR-030; Analytics (future) is never AI-truth or a
+  decision authority.
+
+### Reporting-scaffold disposition
+
+`src/Services/Reporting` (Reporting.API/Application/Infrastructure/Domain) is
+an inert, non-ratified pre-ratification scaffold remnant (ADR-017; ADR-025,
+decision 15). It is registered in CommunityOS.sln, including the empty
+`CommunityOS.Reporting.Tests` and `CommunityOS.Reporting.IntegrationTests`
+projects (csproj only — no test code; "NO RESULT" in test runs). The
+`communityos_reporting` database created by docker/init is scaffold-era and
+unused; no service reads or writes it. The scaffold's prototype report types
+(MemberGrowth, EventParticipation, StudyCircleProgress, CommunityActivity) are
+non-normative strings from the premature scaffold era and ratify nothing.
+Disposition:
+- retained as-is; never extended, wired, completed, or treated as ratified;
+- it is **not** the ADR-034 implementation and must not be completed in place;
+- if a future cross-domain reporting function is ratified under PR-1/PR-2, it
+  is a greenfield ratification that supersedes the scaffold, not an extension
+  of it.
+
+### Dependencies
+
+For any future consumer only, the standard platform dependencies: Identity and
+Authorization (identity and permission evaluation), Organization (scoping,
+ADR-016), and the event bus with the transactional outbox (ADR-015). None of
+these is introduced at this gate.
+
+### Open questions (recorded; unresolved by design at this gate)
+
+- **OQ-1:** Ratified product requirement for cross-domain reporting? (PR-1).
+- **OQ-2:** Dataset granularity / minimization / retention governance? (PR-2).
+- **OQ-3:** Derived-dataset classification under ADR-030 OQ-3 (UNRESOLVED).
+- **OQ-4:** Metric-meaning ratification process between source domains and a
+  future analytics function.
+- **OQ-5:** Product-surface placement (internal dashboards, client apps,
+  external BI exporters).
+- **OQ-6 (ADR-032):** Finance vs. Analytics reporting split — dispositioned at
+  this gate as "no Analytics context; Finance is the sole finance-reporting
+  owner; cross-domain reporting deferred until PR-1/PR-2".
+
+### Implementation prerequisites
+
+None. A future ratification requires reopening the sequence by a new ADR
+(ADR-025, decision 15 precedent) that states PR-1 (product requirements), PR-2
+(data governance), the exact-match `analytics.*` permission matrix, the
+event-catalog subscriptions, the API contract and the documentation updates.
+
+### Explicit prohibitions
+
+- No Analytics/Reporting service, project, test project, contract, permission,
+  event, migration, database, Docker service or API endpoint is created at
+  this gate.
+- The Reporting scaffold and the `communityos_reporting` database are not
+  extended, wired, or completed.
+- Cross-context database reads remain prohibited (ADR-018); financial meaning
+  remains exclusively Finance's (ADR-032); audit truth remains exclusively
+  Audit's (ADR-027); no derived dataset is created without PR-2 governance;
+  Analytics never becomes AI-truth or decision authority.
+
+### Ratification record (Prompt 16Y)
+
+- **Verdict: Slot 19 — Analytics — NOT RATIFIED as a dedicated bounded context
+  at this gate. DEFERRED (conditional on PR-1 and PR-2).**
+- Anti-dumping PASSES; boundary/coherence FAILS today; dumping-ground test
+  FAILS; the architecture records conditional future-consumer postures only
+  (ADR-025, ADR-031, ADR-032), none of which ratifies a context.
+- ADR-032 OQ-6 dispositioned: Finance is the sole owner of finance-scoped
+  reporting and financial meaning; no Analytics context is created;
+  cross-domain reporting is DEFERRED pending PR-1/PR-2.
+- Preserved decisions: ADR-030 (OQ-3 UNRESOLVED; OQ-8 DEFERRED), ADR-031
+  (Integrations disposition; OQ-2 DEFERRED), ADR-032 (Finance; OQ-4
+  UNRESOLVED) remain in force unchanged; ADR-025/027/033 ownership is not
+  amended; no OQ was reopened.
+- Superseded decisions: none. ADR-034 redefines the ADR-017 Slot 19 label
+  "Analytics" to "Deferred — no dedicated bounded context" and resolves the
+  deferral clause of ADR-032 OQ-6. No existing bounded context ownership is
+  changed.
