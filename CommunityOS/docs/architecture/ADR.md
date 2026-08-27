@@ -3089,7 +3089,7 @@ failure model, and configuration pattern.
 
 ### What about the `HttpAuthorizationEvaluator` duplication?
 
-The 10× copy-paste of `HttpAuthorizationEvaluator` is a real problem but
+The 11× copy-paste of `HttpAuthorizationEvaluator` is a real problem but
 the solution is a shared HTTP client library in `CommunityOS.Abstractions`
 (or a thin `CommunityOS.Authorization.HttpClient` package), not a bounded
 context. This is a build-time code sharing concern, not a runtime domain
@@ -3191,7 +3191,7 @@ caller's operation fails with 401/403. No silent degradation.
 The shared library consolidation requires:
 
 1. ADR-031 ratification (this document).
-2. Identification of the 10 services with duplicated
+2. Identification of the 11 services with duplicated
    `HttpAuthorizationEvaluator` code.
 3. Extraction of the shared HTTP client into a package within
    `CommunityOS.Abstractions` or a dedicated thin package.
