@@ -4,6 +4,7 @@ using CommunityOS.Documents.Application;
 using CommunityOS.Documents.Application.Options;
 using CommunityOS.Documents.Infrastructure;
 using CommunityOS.Documents.Infrastructure.Integration.Organization;
+using CommunityOS.Documents.Infrastructure.Persistence;
 using CommunityOS.EventBus;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,7 +26,7 @@ internal static class ServiceCollectionExtensions
         services.AddOptions<DocumentsIntegrityOptions>()
             .Bind(config.GetSection(DocumentsIntegrityOptions.SectionName));
 
-        services.AddCommunityOSEventBus(
+        services.AddCommunityOSEventBusWithOutbox<DocumentsDbContext>(
             config,
             bus => bus.AddConsumer<OrganizationIntegrationEventConsumer>());
 

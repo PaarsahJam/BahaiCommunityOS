@@ -1,4 +1,5 @@
 using CommunityOS.Documents.Domain.Aggregates;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace CommunityOS.Documents.Infrastructure.Persistence;
@@ -14,6 +15,11 @@ public sealed class DocumentsDbContext(DbContextOptions<DocumentsDbContext> opti
     {
         modelBuilder.HasDefaultSchema("documents");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DocumentsDbContext).Assembly);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+
         base.OnModelCreating(modelBuilder);
     }
 }

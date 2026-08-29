@@ -1,8 +1,9 @@
 # Documents Service API
 
-> **STATUS: RATIFIED (Prompt 07A-R).** Contract for the future Documents service,
-> aligned with ratified ADR-022 and `docs/documents.md`. Not implemented;
-> implementation proceeds in Prompt 07B.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 07B).** Contract for the
+> Documents service, aligned with ratified ADR-022 and `docs/documents.md`.
+> The service is implemented at `src/Services/Documents/CommunityOS.Documents.API`;
+> Documents publishes through the transactional outbox (Documents outbox gate).
 
 All endpoints are versioned under `/api/v1/documents`, require a valid access
 token (`[Authorize]`), and return DTOs — **EF entities are never exposed**.

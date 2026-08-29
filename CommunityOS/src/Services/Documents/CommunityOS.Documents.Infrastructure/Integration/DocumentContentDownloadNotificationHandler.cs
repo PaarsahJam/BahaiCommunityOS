@@ -1,7 +1,9 @@
 using CommunityOS.Contracts.Documents;
 using CommunityOS.Documents.Application.Pipeline;
+using CommunityOS.Documents.Infrastructure.Persistence;
 using MassTransit;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace CommunityOS.Documents.Infrastructure.Integration;
 
@@ -12,7 +14,9 @@ namespace CommunityOS.Documents.Infrastructure.Integration;
 /// (ADR-022). No binary content or secrets are ever exported. A future Audit
 /// service may consume this; Documents has no direct Audit dependency.
 /// </summary>
-public sealed class DocumentContentDownloadNotificationHandler(IPublishEndpoint publishEndpoint)
+public sealed class DocumentContentDownloadNotificationHandler(
+    IPublishEndpoint publishEndpoint,
+    DocumentsDbContext dbContext)
     : INotificationHandler<DocumentContentDownloadNotification>
 {
     public async Task Handle(DocumentContentDownloadNotification notification, CancellationToken cancellationToken)
@@ -24,5 +28,7 @@ public sealed class DocumentContentDownloadNotificationHandler(IPublishEndpoint 
                 notification.ActorId,
                 DateTime.UtcNow),
             cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

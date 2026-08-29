@@ -124,7 +124,11 @@ high-priority audit events.
 
 ## ADR-015 — Reliable event publication via transactional outbox
 
-**Status:** Accepted (documented decision; implementation deferred).
+**Status:** Accepted (ratified; the transactional outbox is implemented and
+enabled via the MassTransit EF Core outbox at the **Records integration gate**
+(Prompt 08B) and at every later guaranteed-delivery producer gate — Workflow,
+Notifications, Finance, Correspondence, Localization — and the **Documents
+producer** was upgraded at the **Documents outbox gate**).
 
 CommunityOS requires reliable event publication. Any domain change that raises
 domain/integration events must not lose those events if the message broker is
@@ -481,6 +485,14 @@ enable any Documents consumer before that gate completes. The upgrade is a
 producer-side change scheduled with the Audit implementation work; nothing here
 changes Documents' current best-effort behavior before that gate. See ADR-027
 decisions 4–5.
+
+**Resolution note (Documents outbox gate):** the upgrade has been executed.
+Documents publishes through the transactional outbox
+(`AddCommunityOSEventBusWithOutbox<DocumentsDbContext>`, outbox entities in the
+`documents` schema), so the compliance subset above is guaranteed-delivery; the
+ADR-022 decision-10 phrasing "the transactional outbox is not implemented"
+below is superseded for Documents by this gate. No Documents consumer is
+registered by this gate.
 
 Ratified decisions (Prompt 07A-R):
 
@@ -1479,8 +1491,8 @@ RATIFIED (Prompt 11B), then to IMPLEMENTED (Prompt 11C gate).
 
 ## ADR-027 — Audit bounded context and compliance-journal boundary
 
-**Status:** Accepted (ratified at the Prompt 12B gate; implementation not
-started).
+**Status:** Accepted (ratified at the Prompt 12B gate; implemented at the
+Prompt 12C gate, with the integration gate closed at Prompt 12F).
 
 ### Context
 
@@ -1574,6 +1586,13 @@ replacement source of truth** for any domain fact.
      implementation work (Prompt 12C or a dedicated remediation step inside
      that gate). Until a producer's gate completes, Audit's implementation
      must not register that producer's consumers.
+   - **Resolution note (Documents outbox gate):** the Documents producer has
+     been upgraded to transactional outbox publication
+     (`AddCommunityOSEventBusWithOutbox<DocumentsDbContext>`, outbox entities
+     in the `documents` schema), so ADR-027's Documents precondition for Audit
+     subscription is satisfied. The **Authorization outbox gate** remains
+     open; Audit must not register Authorization-event consumers until it
+     completes. No Documents consumer is registered by this gate.
 
 5. **First-gate event catalog.** Every event in every existing contract
    (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
@@ -1600,7 +1619,7 @@ replacement source of truth** for any domain fact.
 
    | Producer | Gate | Events |
    |----------|------|--------|
-   | Documents (5) | Documents outbox gate | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
+   | Documents (5) | Documents outbox gate — **completed at the Documents outbox gate** (compliance events are now guaranteed-delivery; no consumers are registered by that gate) | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
    | Authorization (7) | Authorization outbox gate | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as
@@ -2045,9 +2064,14 @@ follow.
      before Correspondence is implemented"). Until that producer gate
      completes, the `Submitted → Materialized` edge cannot ship; the
      implementation prompt must either complete the Documents outbox upgrade
-     first or stage the lifecycle behind the gate exactly as ADR-027 staged
-     gated events. This gate is a producer-side change; it is **not** executed
-     in this prompt.
+first or stage the lifecycle behind the gate exactly as ADR-027 staged
+      gated events. This gate is a producer-side change; it is **not** executed
+      in this prompt.
+   - **Resolution note (Documents outbox gate):** the Documents producer was
+     upgraded to transactional outbox publication in a dedicated remediation
+     step (the Documents outbox gate), so the `Submitted → Materialized` edge
+     may ship and Correspondence may register its `DocumentVersionAdded`
+     consumer.
    - **Authorization events:** no Authorization-event consumption is
      contemplated; the symmetric Authorization outbox gate (ADR-027 decision
      4) therefore does not apply to Correspondence at this gate.

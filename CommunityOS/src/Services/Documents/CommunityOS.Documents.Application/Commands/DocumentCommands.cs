@@ -62,10 +62,10 @@ internal sealed class CreateDocumentCommandHandler(
                 occurredOn: DateTime.UtcNow);
         }
 
+        await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
         await documents.AddAsync(document, ct);
         logger.DocumentCreated(document.Id, document.Title);
 
-        await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
         return document.ToDto();
     }
 
@@ -100,8 +100,8 @@ internal sealed class UpdateDocumentMetadataCommandHandler(
             ContextFor(document), ct);
 
         document.UpdateMetadata(cmd.Title, cmd.Description, cmd.ActorId, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -136,8 +136,8 @@ internal sealed class ClassifyDocumentCommandHandler(
             cmd.AdministrativeHoldReference,
             cmd.ActorId,
             DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -164,8 +164,8 @@ internal sealed class AddDocumentScopeCommandHandler(
         await CreateDocumentCommandHandler.EnsureUnitExistsAsync(units, cmd.OrganizationUnitId, ct);
 
         document.AddOrganizationScope(cmd.OrganizationUnitId, cmd.ActorId, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -189,8 +189,8 @@ internal sealed class RemoveDocumentScopeCommandHandler(
             ContextFor(document), ct);
 
         document.RemoveOrganizationScope(cmd.OrganizationUnitId, cmd.ActorId, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -259,9 +259,10 @@ internal sealed class UploadDocumentVersionCommandHandler(
                 cmd.FileName,
                 DocumentSources.Member,
                 cmd.ActorId,
-                DateTime.UtcNow,
+DateTime.UtcNow,
                 scanStatus);
 
+            await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
             await documents.UpdateAsync(document, ct);
         }
         catch
@@ -272,7 +273,6 @@ internal sealed class UploadDocumentVersionCommandHandler(
         }
 
         logger.DocumentVersionAdded(document.Id, version.VersionNumber, version.ContentHash);
-        await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
 
         return version.ToDto();
     }
@@ -318,8 +318,8 @@ internal sealed class ArchiveDocumentCommandHandler(
             ContextFor(document), ct);
 
         document.Archive(cmd.ActorId, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -347,8 +347,8 @@ internal sealed class DeactivateDocumentCommandHandler(
             await guard.RequireAsync(cmd.ActorId, DocumentsPermissions.DocumentAdmin, context, ct);
 
         document.Deactivate(cmd.ActorId, cmd.AdminOverride, cmd.Reason, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -369,8 +369,8 @@ internal sealed class RestoreDocumentCommandHandler(
             ContextFor(document), ct);
 
         document.Restore(cmd.ActorId, DateTime.UtcNow);
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return document.ToDto();
     }
@@ -398,8 +398,8 @@ internal sealed class CreateDocumentReferenceCommandHandler(
         var reference = document.AddReference(
             cmd.SourceContext, cmd.SourceEntityId, cmd.ReferenceType, cmd.ActorId, DateTime.UtcNow);
 
-        await documents.UpdateAsync(document, ct);
         await DocumentEventsPublisher.PublishAsync(document, mediator, ct);
+        await documents.UpdateAsync(document, ct);
 
         return reference.ToDto();
     }

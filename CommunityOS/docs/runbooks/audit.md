@@ -24,7 +24,7 @@
   |----------|--------------------------------------------------|
   | Records, Workflow, Notifications | None — already outbox-protected |
   | Organization | None — projection feed only |
-  | Documents | **Documents outbox gate**: upgrade Documents to transactional outbox publication for the compliance subset (ADR-022 amendment, ADR-027 decision 4) |
+  | Documents | **Documents outbox gate — complete** (Documents now publishes through the transactional outbox; compliance events are guaranteed-delivery and eligible for Audit subscription) |
   | Authorization | **Authorization outbox gate**: upgrade Authorization to outbox publication for the security subset (break-glass is ADR-014-mandatory) |
 
 ## Ratified implementation steps (Prompt 12C)

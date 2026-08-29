@@ -48,11 +48,9 @@ semantics.
 Published (outbox, guaranteed): `LetterSubmitted`, `LetterDispatched`,
 `LetterDeliveryConfirmed`, `LetterDeliveryFailed`, `LetterCancelled`.
 Consumed first gate: Organization unit projections (inbox). Consumed after the
-**Documents outbox gate**: correlated `DocumentVersionAdded`
-(`SourceContext="correspondence"`) closing materialization. Until that producer
-gate completes, no Documents consumer may be registered and letters will
-remain in `Submitted` after submission — this is expected behavior under the
-gate, not an incident.
+**Documents outbox gate** (complete — Documents publishes through the
+transactional outbox): correlated `DocumentVersionAdded`
+(`SourceContext="correspondence"`) closing materialization may be registered.
 
 ## Standard operating procedures
 
@@ -107,7 +105,7 @@ bus health via RabbitMQ management; database via connection + migration checks.
 
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
-| Letters stuck in `Submitted` | Documents outbox gate incomplete, or Documents consumer down | If gate incomplete: expected. Otherwise run reconcile SOP |
+| Letters stuck in `Submitted` | Documents consumer down (Documents outbox gate complete) | Run reconcile SOP |
 | `409` storms on submit | Client retrying already-submitted letters | Treat as success; fetch letter state |
 | Purge returns `purgedCount` 0 forever | All expired letters held | Review holds; holds intentionally block purge |
 | Dead-letter queue growth | Unmappable events (contract drift) | Inspect DLQ payload shapes; fix mapping behind an amendment, replay safely (natural-key guards make redelivery convergent) |

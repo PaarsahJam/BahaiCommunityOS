@@ -1,10 +1,13 @@
 # Documents Service
 
-> **STATUS: RATIFIED (Prompt 07A-R).** The architectural decisions for the
-> Documents bounded context have been ratified in ADR-022 (Accepted) and
-> recorded in this document. The service itself is **not yet implemented**;
-> implementation proceeds in Prompt 07B. Decisions are binding unless a later
-> ratified ADR amends them.
+> **STATUS: RATIFIED AND IMPLEMENTED (Prompt 07B; transactional outbox at the
+> Documents outbox gate).** The architectural decisions for the Documents
+> bounded context have been ratified in ADR-022 (Accepted) and recorded in
+> this document; the service is implemented at
+> `src/Services/Documents/CommunityOS.Documents.API` with Domain / Application /
+> Infrastructure projects plus unit and integration test projects, and it
+> publishes through the transactional outbox. Decisions are binding unless a
+> later ratified ADR amends them.
 
 The Documents bounded context owns document **artifacts** and their metadata:
 the named, versioned, immutable binary content that other bounded contexts
@@ -278,24 +281,27 @@ sensitive metadata; consumers resolve it through the API) and per-title edits.
 
 ### Event delivery and outbox readiness
 
-Publication is best-effort in-process today (ADR-015 outbox deferred). For
-Documents this is **safe for every event at implementation time**, because no
-Documents event has a live consumer yet — a dropped event today can only delay
-a future read model, never corrupt authoritative state.
+Documents publishes through the transactional outbox
+(`AddCommunityOSEventBusWithOutbox<DocumentsDbContext>`, ADR-015) since the
+**Documents outbox gate**. Every integration event is committed atomically with
+the business write, and the compliance subset (`DocumentClassified`,
+`DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`,
+`DocumentScanCompleted`) is guaranteed-delivery for Audit, Records and
+Correspondence.
 
 | Consumer | Guaranteed delivery required | When |
 |----------|------------------------------|------|
-| Search indexing | No — best-effort; re-index reconciles | always safe |
-| Workflow task reconciliation | No (recommended later) — workflow can re-query the Documents API | safe best-effort now |
-| Notifications | No — notification loss is tolerable | safe best-effort now |
-| **Audit (compliance trail)** | **Yes** — `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded` (sensitive reads), `DocumentScanCompleted` (rejected scans) must not be lost | required before Audit is implemented (outbox gate) |
-| **Records (hold/retention reconciliation)** | **Yes** — `DocumentDeactivated`/`DocumentRestored` protect held documents | required before Records integration |
-| **Correspondence (letter submission)** | **Yes** — the immutable submitted-letter version event must be reliable at submission time | required before Correspondence is implemented |
+| Search indexing | No — best-effort acceptable; re-index reconciles | already subscribable |
+| Workflow task reconciliation | No (recommended later) — workflow can re-query the Documents API | safe |
+| Notifications | No — notification loss is tolerable | safe |
+| **Audit (compliance trail)** | **Yes** — `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded` (sensitive reads), `DocumentScanCompleted` (rejected scans) must not be lost | outbox gate complete — guaranteed-delivery ready |
+| **Records (hold/retention reconciliation)** | **Yes** — `DocumentDeactivated`/`DocumentRestored` protect held documents | outbox gate complete — Records consumes outbox-protected |
+| **Correspondence (letter submission)** | **Yes** — the immutable submitted-letter version event must be reliable at submission time | outbox gate complete — the `Submitted → Materialized` edge may ship |
 
-Conclusion: no Documents event requires guaranteed delivery for the service
-itself. Per the ADR-015 amendment (Prompt 08A-R2), the outbox (ADR-015) becomes
-mandatory at the **Records integration gate** — the earliest guaranteed-delivery
-consumer — not at the Correspondence/Audit gate.
+Conclusion: the **Documents producer outbox gate** is complete. Documents
+publishes every integration event through the transactional outbox, so any
+guaranteed-delivery consumer can rely on delivery; each consumer context must
+still respect its own gate rules (e.g. ADR-027 decision 4 for Audit).
 
 ## Dependency map
 
