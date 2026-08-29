@@ -1,5 +1,4 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using CommunityOS.ServiceClients;
 
 namespace CommunityOS.Records.Infrastructure.Integration.Documents;
 
@@ -11,27 +10,12 @@ namespace CommunityOS.Records.Infrastructure.Integration.Documents;
 /// misconfigured base URL or token causes the outbound command to fail rather
 /// than silently leaving the Documents side inconsistent.
 /// </summary>
-public sealed class DocumentsServiceOptions
+public sealed class DocumentsServiceOptions : ServiceClientOptions
 {
     public const string SectionName = "DocumentsService";
 
-    /// <summary>Base URL of the Documents service API.</summary>
-    public string BaseUrl { get; set; } = string.Empty;
-
-    /// <summary>Bearer service token Records presents to the Documents service.</summary>
-    public string AccessToken { get; set; } = string.Empty;
-
-    /// <summary>Client identifier sent as the <c>X-Client-Id</c> header.</summary>
-    public string ClientId { get; set; } = "communityos-records";
-}
-
-public static class RecordsDocumentsServiceOptionsExtensions
-{
-    public static IServiceCollection ConfigureRecordsDocumentsService(
-        this IServiceCollection services, IConfiguration config)
+    public DocumentsServiceOptions()
     {
-        services.AddOptions<DocumentsServiceOptions>()
-            .Bind(config.GetSection(DocumentsServiceOptions.SectionName));
-        return services;
+        ClientId = "communityos-records";
     }
 }

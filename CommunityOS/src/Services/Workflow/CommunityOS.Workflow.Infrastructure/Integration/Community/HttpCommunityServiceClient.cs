@@ -1,5 +1,4 @@
-using System.Net.Http.Headers;
-using System.Text.Json;
+using CommunityOS.ServiceClients;
 using CommunityOS.Workflow.Application.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,17 +19,12 @@ public sealed class HttpCommunityServiceClient(
     ILogger<HttpCommunityServiceClient> logger) : ICommunityServiceClient
 {
     private readonly CommunityServiceOptions _options = options.Value;
-    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
     public async Task<bool> PersonExistsAsync(Guid personId, CancellationToken cancellationToken = default)
     {
         var path = $"/api/v1/persons/{personId}";
-        var uri = new Uri(_options.BaseUrl.TrimEnd('/') + path);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", _options.AccessToken);
-        request.Headers.TryAddWithoutValidation("X-Client-Id", _options.ClientId);
+        using var request = ServiceHttpClient.CreateRequest(_options, HttpMethod.Get, path);
 
         HttpResponseMessage response;
         try

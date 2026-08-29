@@ -9,6 +9,7 @@ using CommunityOS.Records.Infrastructure.Integration.Documents;
 using CommunityOS.Records.Infrastructure.Integration.Organization;
 using CommunityOS.Records.Infrastructure.Persistence;
 using CommunityOS.Records.Infrastructure.Repositories;
+using CommunityOS.ServiceClients;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -51,15 +52,8 @@ public static class RecordsInfrastructureServiceExtensions
         // Documents command surface (evidence + hold references). An
         // unconfigured base URL is a configuration error that fails closed
         // with a clear message rather than a confusing UriFormatException.
-        services.ConfigureRecordsDocumentsService(config);
-        services.AddHttpClient<HttpDocumentsServiceClient>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DocumentsServiceOptions>>().Value;
-            if (string.IsNullOrWhiteSpace(opts.BaseUrl))
-                throw new InvalidOperationException(
-                    "DocumentsService:BaseUrl is not configured; Records cannot command the Documents surface.");
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
+        services.AddServiceHttpClient<HttpDocumentsServiceClient, DocumentsServiceOptions>(
+            config, DocumentsServiceOptions.SectionName);
         services.AddScoped<IDocumentsServiceClient>(sp => sp.GetRequiredService<HttpDocumentsServiceClient>());
 
         // Authorization integration: the Records service never reads the

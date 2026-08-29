@@ -1,7 +1,6 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
 using CommunityOS.Records.Application.Abstractions;
+using CommunityOS.ServiceClients;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,7 +21,6 @@ public sealed class HttpDocumentsServiceClient(
     ILogger<HttpDocumentsServiceClient> logger) : IDocumentsServiceClient
 {
     private readonly DocumentsServiceOptions _options = options.Value;
-    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
     public async Task<DocumentClassificationState> GetClassificationAsync(
         Guid documentId, CancellationToken cancellationToken = default)
@@ -30,7 +28,8 @@ public sealed class HttpDocumentsServiceClient(
         var response = await SendAsync(
             HttpMethod.Get, $"/api/v1/documents/{documentId}", null, cancellationToken);
 
-        var dto = await response.Content.ReadFromJsonAsync<DocumentDto>(_json, cancellationToken)
+        var dto = await response.Content.ReadFromJsonAsync<DocumentDto>(
+            ServiceHttpClient.JsonOptions, cancellationToken)
             ?? throw new HttpRequestException("Documents service returned an empty document payload.");
 
         var c = dto.Classification;
@@ -67,15 +66,7 @@ public sealed class HttpDocumentsServiceClient(
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method, string path, object? body, CancellationToken ct)
     {
-        var uri = new Uri(_options.BaseUrl.TrimEnd('/') + path);
-
-        using var request = new HttpRequestMessage(method, uri);
-        if (body is not null)
-            request.Content = JsonContent.Create(body, options: _json);
-
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", _options.AccessToken);
-        request.Headers.TryAddWithoutValidation("X-Client-Id", _options.ClientId);
+        using var request = ServiceHttpClient.CreateRequest(_options, method, path, body);
 
         HttpResponseMessage response;
         try

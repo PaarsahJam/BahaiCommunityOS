@@ -5,10 +5,12 @@ using CommunityOS.Authorization.Infrastructure.Integration;
 using CommunityOS.Authorization.Infrastructure.Integration.Organization;
 using CommunityOS.Authorization.Infrastructure.Persistence;
 using CommunityOS.Authorization.Infrastructure.Repositories;
+using CommunityOS.ServiceClients;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace CommunityOS.Authorization.Infrastructure;
 
@@ -44,12 +46,10 @@ public static class AuthorizationInfrastructureServiceExtensions
         // calling the Organization service's covers endpoint over HTTP as a
         // service principal (ADR-018). This replaces the application-layer
         // default exact-match provider. Fail-closed on any error.
-        services.ConfigureOrganizationService(config);
-        services.AddHttpClient<HttpOrganizationContextProvider>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OrganizationServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
+        services.AddServiceHttpClient<HttpOrganizationContextProvider, OrganizationServiceOptions>(
+            config, OrganizationServiceOptions.SectionName,
+            o => o.Validate(opts => !string.IsNullOrWhiteSpace(opts.BaseUrl),
+                "OrganizationService:BaseUrl is required."));
         services.AddScoped<IOrganizationContextProvider>(sp => sp.GetRequiredService<HttpOrganizationContextProvider>());
 
         return services;

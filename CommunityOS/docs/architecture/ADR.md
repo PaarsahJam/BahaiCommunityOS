@@ -3262,7 +3262,19 @@ scope is strictly limited to the shared HTTP client deduplication.
   time. Either `CommunityOS.Abstractions` or a dedicated thin package is
   acceptable.
 - **OQ-2 — Broader HTTP client deduplication scope:** DEFERRED. May be
-  included opportunistically but is not a blocking requirement.
+  included opportunistically but is not a blocking requirement. The narrow
+  portion required for Slot 16 was implemented at the 16AE gate: a single
+  shared mechanics component (`CommunityOS.ServiceClients` under
+  `src/BuildingBlocks`) now carries the internal service-to-service HTTP
+  request mechanics. The four audited consumers rendezvoused onto it:
+  `HttpDocumentsServiceClient` (Workflow and Records),
+  `HttpCommunityServiceClient` (Workflow), and
+  `HttpOrganizationContextProvider` (Authorization). Failure semantics are
+  preserved per consumer (command clients throw fail-closed; the
+  organization-context provider denies on failure). AI Platform remains
+  free of any HTTP client or shared-service-client reference (ADR-030 OQ-3
+  UNRESOLVED, OQ-8 DEFERRED). Broader deduplication beyond these four
+  consumers remains DEFERRED and out of scope.
 
 Superseded decisions: none. ADR-031 redefines Slot 16 in ADR-017 from
 "Integrations" (a placeholder label without a ratified boundary) to

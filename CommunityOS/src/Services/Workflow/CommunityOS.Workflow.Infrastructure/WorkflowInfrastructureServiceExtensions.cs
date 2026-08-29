@@ -1,6 +1,7 @@
 using CommunityOS.Authorization.Application.Authorization;
 using CommunityOS.Authorization.Application.Interfaces;
 using CommunityOS.Authorization.HttpClient.Integration;
+using CommunityOS.ServiceClients;
 using CommunityOS.Workflow.Application.Abstractions;
 using CommunityOS.Workflow.Application.Options;
 using CommunityOS.Workflow.Domain.Repositories;
@@ -51,28 +52,14 @@ public static class WorkflowInfrastructureServiceExtensions
         // Documents command surface (task document references). An unconfigured
         // base URL is a configuration error that fails closed with a clear
         // message rather than a confusing UriFormatException.
-        services.ConfigureWorkflowDocumentsService(config);
-        services.AddHttpClient<HttpDocumentsServiceClient>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DocumentsServiceOptions>>().Value;
-            if (string.IsNullOrWhiteSpace(opts.BaseUrl))
-                throw new InvalidOperationException(
-                    "DocumentsService:BaseUrl is not configured; Workflow cannot create task document references.");
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
+        services.AddServiceHttpClient<HttpDocumentsServiceClient, DocumentsServiceOptions>(
+            config, DocumentsServiceOptions.SectionName);
         services.AddScoped<IDocumentsServiceClient>(sp => sp.GetRequiredService<HttpDocumentsServiceClient>());
 
         // Community command surface (assignee resolution at read time). An
         // unconfigured base URL is a configuration error that fails closed.
-        services.ConfigureWorkflowCommunityService(config);
-        services.AddHttpClient<HttpCommunityServiceClient>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CommunityServiceOptions>>().Value;
-            if (string.IsNullOrWhiteSpace(opts.BaseUrl))
-                throw new InvalidOperationException(
-                    "CommunityService:BaseUrl is not configured; Workflow cannot resolve assignee details.");
-            client.BaseAddress = new Uri(opts.BaseUrl);
-        });
+        services.AddServiceHttpClient<HttpCommunityServiceClient, CommunityServiceOptions>(
+            config, CommunityServiceOptions.SectionName);
         services.AddScoped<ICommunityServiceClient>(sp => sp.GetRequiredService<HttpCommunityServiceClient>());
 
         // Authorization integration: the Workflow service never reads the

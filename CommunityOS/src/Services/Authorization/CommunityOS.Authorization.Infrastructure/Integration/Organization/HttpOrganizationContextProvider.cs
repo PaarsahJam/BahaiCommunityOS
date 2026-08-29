@@ -1,8 +1,7 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using CommunityOS.Authorization.Application.Interfaces;
+using CommunityOS.ServiceClients;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -21,22 +20,15 @@ public sealed class HttpOrganizationContextProvider(
     ILogger<HttpOrganizationContextProvider> logger) : IOrganizationContextProvider
 {
     private readonly OrganizationServiceOptions _options = options.Value;
-    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
     public async Task<bool> IsAncestorOrSelfAsync(
         Guid candidateAncestorId, Guid orgUnitId, CancellationToken ct = default)
     {
-        var uri = new Uri(
-            _options.BaseUrl.TrimEnd('/')
-            + $"/api/v1/orgunits/{orgUnitId}/covers?ancestorId={candidateAncestorId}");
+        var path = $"/api/v1/orgunits/{orgUnitId}/covers?ancestorId={candidateAncestorId}";
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", _options.AccessToken);
-            request.Headers.TryAddWithoutValidation("X-Client-Id", _options.ClientId);
-
+            using var request = ServiceHttpClient.CreateRequest(_options, HttpMethod.Get, path);
             using var response = await httpClient.SendAsync(request, ct);
 
             if (!response.IsSuccessStatusCode)
@@ -45,7 +37,8 @@ public sealed class HttpOrganizationContextProvider(
                 return false;
             }
 
-            var result = await response.Content.ReadFromJsonAsync<OrganizationUnitCoverageDto>(_json, ct);
+            var result = await response.Content.ReadFromJsonAsync<OrganizationUnitCoverageDto>(
+                ServiceHttpClient.JsonOptions, ct);
             if (result is null)
                 return false;
 

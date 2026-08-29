@@ -66,6 +66,24 @@ public class NoExternalTransmissionTests
     }
 
     [Fact]
+    public void AiPlatform_ShouldNotReferenceSharedServiceClientsScaffolding()
+    {
+        var assemblies = new[]
+        {
+            typeof(IAiModelGateway).Assembly,
+            typeof(DisabledAiModelGateway).Assembly
+        };
+
+        foreach (var assembly in assemblies)
+        {
+            var references = assembly.GetReferencedAssemblies();
+            references.Should().NotContain(
+                a => a.Name == "CommunityOS.ServiceClients",
+                $"AI Platform assembly {assembly.GetName().Name} must not reference the internal service-client scaffolding (ADR-030)");
+        }
+    }
+
+    [Fact]
     public void AiPlatform_ShouldNotContainProviderUrls()
     {
         var assemblies = new[]
