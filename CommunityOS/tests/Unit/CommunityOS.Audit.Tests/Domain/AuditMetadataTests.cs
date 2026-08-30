@@ -25,6 +25,22 @@ public sealed class AuditMetadataTests
     }
 
     [Fact]
+    public void Accepts_the_authorization_metadata_keys_ratified_for_this_gate()
+    {
+        var metadata = AuditMetadata.Create(new Dictionary<string, object?>
+        {
+            ["role_code"] = "treasurer",
+            ["scope_type"] = "Local"
+        });
+
+        metadata.Values.Should().BeEquivalentTo(new Dictionary<string, object?>
+        {
+            ["role_code"] = "treasurer",
+            ["scope_type"] = "Local"
+        });
+    }
+
+    [Fact]
     public void Rejects_keys_outside_the_ratified_allowlist()
     {
         var create = () => AuditMetadata.Create(new Dictionary<string, object?> { ["title"] = "nope" });

@@ -1,6 +1,7 @@
 using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure.Integration;
+using CommunityOS.Contracts.Authorization;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Organization;
 using CommunityOS.Contracts.Records;
@@ -234,6 +235,122 @@ public sealed class IngestMappingTests
         });
     }
 
+    // ---- Authorization -----------------------------------------------------
+
+    [Fact]
+    public void RoleAssigned_maps_assignment_identity_metadata_and_org_unit_tier_scope()
+    {
+        var assignmentId = Guid.NewGuid();
+        var subject = Guid.NewGuid();
+        var unit = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new RoleAssigned(
+            assignmentId, subject, "treasurer", "Local", unit, DateTime.UtcNow, null, Now));
+
+        candidate.SourceService.Should().Be("authorization");
+        candidate.Action.Should().Be("role-assigned");
+        candidate.ResourceType.Should().Be("authz-role");
+        candidate.ResourceId.Should().Be(assignmentId);
+        candidate.SubjectId.Should().Be(subject);
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().Be(unit);
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        candidate.Metadata!.Values.Should().BeEquivalentTo(new Dictionary<string, object?>
+        {
+            ["role_code"] = "treasurer", ["scope_type"] = "Local"
+        });
+    }
+
+    [Fact]
+    public void RoleAssigned_global_and_resource_scopes_do_not_fabricate_an_org_unit_scope()
+    {
+        var assignmentId = Guid.NewGuid();
+        var subject = Guid.NewGuid();
+
+        var global = AuditEventMapper.Map(new RoleAssigned(
+            assignmentId, subject, "member", "Global", null, DateTime.UtcNow, null, Now));
+        global.OrganizationUnitId.Should().BeNull();
+        global.Metadata!.Values["scope_type"].Should().Be("Global");
+
+        var resource = AuditEventMapper.Map(new RoleAssigned(
+            assignmentId, subject, "editor", "Resource", Guid.NewGuid(), DateTime.UtcNow, null, Now));
+        resource.OrganizationUnitId.Should().BeNull();
+    }
+
+    [Fact]
+    public void RoleRevoked_maps_assignment_identity_and_role_code_without_fabricating_scope()
+    {
+        var assignmentId = Guid.NewGuid();
+        var subject = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new RoleRevoked(assignmentId, subject, "treasurer", Now));
+
+        candidate.Action.Should().Be("role-revoked");
+        candidate.ResourceType.Should().Be("authz-role");
+        candidate.ResourceId.Should().Be(assignmentId);
+        candidate.SubjectId.Should().Be(subject);
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Metadata!.Values.Should().ContainKey("role_code");
+    }
+
+    [Fact]
+    public void Delegation_events_map_delegate_subject_and_delegator_actor_with_global_scope()
+    {
+        var delegationId = Guid.NewGuid();
+        var delegator = Guid.NewGuid();
+        var delegatee = Guid.NewGuid();
+
+        var granted = AuditEventMapper.Map(new DelegationGranted(delegationId, delegator, delegatee, Now));
+        granted.Action.Should().Be("delegation-granted");
+        granted.ResourceType.Should().Be("authz-delegation");
+        granted.ResourceId.Should().Be(delegationId);
+        granted.SubjectId.Should().Be(delegatee);
+        granted.ActorId.Should().Be(delegator);
+        granted.OrganizationUnitId.Should().BeNull();
+        granted.Metadata.Should().BeNull();
+
+        var revoked = AuditEventMapper.Map(new DelegationRevoked(delegationId, delegator, delegatee, Now));
+        revoked.Action.Should().Be("delegation-revoked");
+        revoked.ResourceId.Should().Be(delegationId);
+        revoked.SubjectId.Should().Be(delegatee);
+        revoked.ActorId.Should().Be(delegator);
+    }
+
+    [Fact]
+    public void Break_glass_events_map_request_identity_actors_and_are_sensitive()
+    {
+        var requestId = Guid.NewGuid();
+        var requester = Guid.NewGuid();
+        var approver = Guid.NewGuid();
+        var revokedBy = Guid.NewGuid();
+
+        var requested = AuditEventMapper.Map(new BreakGlassRequested(requestId, requester, Now));
+        requested.Action.Should().Be("break-glass-requested");
+        requested.ResourceType.Should().Be("break-glass-request");
+        requested.ResourceId.Should().Be(requestId);
+        requested.SubjectId.Should().BeNull();
+        requested.ActorId.Should().Be(requester);
+        requested.OrganizationUnitId.Should().BeNull();
+        requested.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
+        requested.Metadata.Should().BeNull();
+
+        var approved = AuditEventMapper.Map(new BreakGlassApproved(
+            requestId, requester, approver, DateTime.UtcNow.AddHours(1), Now));
+        approved.Action.Should().Be("break-glass-approved");
+        approved.ResourceId.Should().Be(requestId);
+        approved.SubjectId.Should().BeNull();
+        approved.ActorId.Should().Be(approver);
+        approved.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
+
+        var revoked = AuditEventMapper.Map(new BreakGlassRevoked(requestId, requester, revokedBy, Now));
+        revoked.Action.Should().Be("break-glass-revoked");
+        revoked.ResourceId.Should().Be(requestId);
+        revoked.SubjectId.Should().BeNull();
+        revoked.ActorId.Should().Be(revokedBy);
+        revoked.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
+    }
+
     // ---- Hash semantics --------------------------------------------------------
 
     [Fact]
@@ -251,6 +368,19 @@ public sealed class IngestMappingTests
         var e1 = new RecordArchived(Guid.NewGuid(), Now);
         var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
 
+        AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);
+    }
+
+    [Fact]
+    public void Authorization_identical_fact_hashes_identically_and_restatement_is_distinct()
+    {
+        var e1 = new RoleAssigned(
+            Guid.NewGuid(), Guid.NewGuid(), "treasurer", "Local", Guid.NewGuid(), DateTime.UtcNow, null, Now);
+        var e2 = e1 with { };
+
+        AuditEventMapper.Map(e1).SourceEventHash.Should().Be(AuditEventMapper.Map(e2).SourceEventHash);
+
+        var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
         AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);
     }
 }

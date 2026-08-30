@@ -108,7 +108,8 @@ never subscribed without an ADR amendment.
 | Classification | Count | Events |
 |----------------|-------|--------|
 | CONSUMED AND PERSISTED — first gate | 22 | Records: all 16 lifecycle/compliance events. Workflow: `WorkflowTaskCreated`, `WorkflowTaskAssigned`, `WorkflowTaskCompleted`, `WorkflowTaskCancelled`, `WorkflowTaskEscalated`. Notifications: `NotificationDispatched` |
-| CONSUMED AND PERSISTED — gated on producer outbox gate | 12 | Documents (Documents outbox gate): `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted`. Authorization (Authorization outbox gate): `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+| CONSUMED AND PERSISTED — Authorization security subset | 7 | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+| CONSUMED AND PERSISTED — gated on producer outbox gate | 5 | Documents (Documents outbox gate): `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
 | CONSUMED BUT NOT PERSISTED — projection only | 3 | Organization: `OrganizationUnitCreated`, `OrganizationUnitUpdated`, `OrganizationUnitParentChanged` |
 | DEFERRED | 17 | `WorkflowTaskStarted`; Identity account-security subset (`UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`); Organization governance facts (`DelegationFactGranted`, `DelegationFactRevoked`); Knowledge moderation/AI subset (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`, `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`); `DocumentArchived` |
 | NOT AN AUDIT EVENT | 41 | Documents: `DocumentCreated`, `DocumentMetadataUpdated`, `DocumentVersionAdded`. Identity: `UserAccountRegistered` (carries email), `UserAccountVerified`, `UserAccountDeactivated`, `DeviceRegistered` (carries device name), `RefreshTokenIssued` (session telemetry). Organization: `OrganizationCreated/Updated`, `Committee*`, `AppointmentAssigned/Ended`. Community: all 14 person/household/membership/activity/event/meeting/participation events (official membership/appointment facts belong to Records). Knowledge: Library pipeline and answer/category events (`WorkImported`, `EditionImported`, `EditionVerified`, `PassageImported`, `PassageCorrected`, `QuestionSubmitted`, `QuestionPublished`, `AnswerAdded`, `AnswerUpdated`, `AnswerAccepted`, `CategoryCreated`, `CategoryUpdated`) |
@@ -126,10 +127,10 @@ Rationale highlights:
 - **Documents — compliance subset, gated.** Exactly the five events
   `docs/documents.md` has always marked guaranteed-delivery-required.
   Existence/metadata/version events are not compliance facts.
-- **Authorization — security subset, gated.** Role/delegation changes are
+- **Authorization — security subset, active.** Role/delegation changes are
   privilege facts; break-glass auditing is mandated by ADR-014 ("high-priority
-  audit events"). Both producers currently publish best-effort, so their gates
-  must land before consumers enable (below).
+  audit events"). The producer gate completed and the seven consumers are
+  registered (below); Documents remains the only gated set.
 
 ### Producer delivery gates
 
@@ -139,12 +140,34 @@ Rationale highlights:
 | Workflow | Outbox-protected | none — clear |
 | Notifications | Outbox-protected | none — clear |
 | Documents | Best-effort (`AddCommunityOSEventBus`) | **Documents outbox gate**: upgrade to transactional outbox publication for the compliance subset (ADR-022 amendment note) |
-| Authorization | Best-effort (open-generic publisher, plain bus) | **Authorization outbox gate**: upgrade to outbox publication for the security subset — break-glass compliance cannot rest on best-effort delivery |
+| Authorization | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, authorization outbox gate) | **Complete** — the seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Organization | n/a (projection feed) | none — projection consumers may register immediately |
 
 Until a producer's gate completes, the Audit implementation must not register
 that producer's consumers. This upgrades documented policy into concrete,
 scheduled prerequisites; it does not change any producer's behavior silently.
+
+### Consumer configuration gate — Authorization ×7
+
+Registered through Audit's inbox-only configuration
+(`AddConsumer<AuthorizationAuditConsumer>` inside
+`AddCommunityOSEventBusWithInbox<AuditDbContext>`); Audit remains inbox-only and
+publishes nothing. The seven mappings use only payload fields the contracts
+already carry:
+
+| Event | Action | ResourceType / ResourceId | SubjectId | ActorId | OrganizationUnitId | Metadata | Sensitivity |
+|-------|--------|---------------------------|-----------|---------|--------------------|----------|-------------|
+| `RoleAssigned` | `role-assigned` | `authz-role` / `AssignmentId` | `SubjectId` | null (no assigner field) | `ScopeId` only when the scope is an org-unit tier | `role_code`, `scope_type` | Normal |
+| `RoleRevoked` | `role-revoked` | `authz-role` / `AssignmentId` | `SubjectId` | null | null | `role_code` | Normal |
+| `DelegationGranted` | `delegation-granted` | `authz-delegation` / `DelegationId` | `DelegateId` | `DelegatorId` | null (global) | — | Normal |
+| `DelegationRevoked` | `delegation-revoked` | `authz-delegation` / `DelegationId` | `DelegateId` | `DelegatorId` | null (global) | — | Normal |
+| `BreakGlassRequested` | `break-glass-requested` | `break-glass-request` / `RequestId` | null | `RequesterId` | null (global) | — | **Sensitive** |
+| `BreakGlassApproved` | `break-glass-approved` | `break-glass-request` / `RequestId` | null | `ApproverId` | null (global) | — | **Sensitive** |
+| `BreakGlassRevoked` | `break-glass-revoked` | `break-glass-request` / `RequestId` | null | `RevokedBy` | null (global) | — | **Sensitive** |
+
+`role_code` and `scope_type` are the **only** metadata keys newly allowlisted by
+this gate. No `ActorId` is invented where the contract carries none, no
+fabricated scope is persisted, and `CorrelationId`/`CausationId` remain null.
 
 ## Ingest Pipeline
 

@@ -25,7 +25,7 @@
   | Records, Workflow, Notifications | None — already outbox-protected |
   | Organization | None — projection feed only |
   | Documents | **Documents outbox gate — complete** (Documents now publishes through the transactional outbox; compliance events are guaranteed-delivery and eligible for Audit subscription) |
-  | Authorization | **Authorization outbox gate — complete** (Authorization now publishes through the transactional outbox; the security subset — roles, delegations, break-glass — is guaranteed-delivery and eligible for Audit subscription) |
+  | Authorization | **Authorization outbox gate — complete** (Authorization now publishes through the transactional outbox; the security subset — roles, delegations, break-glass — is guaranteed-delivery and eligible for Audit subscription). The seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 
 ## Ratified implementation steps (Prompt 12C)
 
@@ -41,14 +41,19 @@
    **the immutability triggers** rejecting `UPDATE`/`DELETE` on `audit_entries`
    unless `app.audit_purge_authorized = 'on'` (ADR-027 decisions 2 and 17).
 4. Wire `AddCommunityOSEventBusWithInbox<AuditDbContext>` (inbox-only;
-   ADR-027 decision 9) and register exactly the first-gate consumers:
+   ADR-027 decision 9) and register exactly the ratified consumers:
    - Records ×16 (all lifecycle/compliance events),
    - Workflow ×5 (`WorkflowTaskCreated/Assigned/Completed/Cancelled/Escalated`),
    - Notifications ×1 (`NotificationDispatched`),
-   - Organization ×3 (projection into `organization_unit_references` only).
-   Do **not** register Documents or Authorization consumers until their
-   producer gates complete; do not register any deferred or not-classified
-   event (ADR-027 decision 5).
+   - Organization ×3 (projection into `organization_unit_references` only),
+   - Authorization ×7 (consumer configuration gate: `RoleAssigned`,
+     `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`,
+     `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked`; break-glass
+     rows journaled Sensitive; `role_code`/`scope_type` are the only newly
+     allowlisted metadata keys).
+   Do **not** register Documents consumers until the Documents producer gate's
+   consumers are enabled; do not register any deferred or not-classified event
+   (ADR-027 decision 5).
 5. Register the ratified `audit.*` permissions in `PermissionCatalog.cs`
    (`audit.entry.read`, `audit.entry.read.sensitive`, `audit.entry.export`,
    `audit.entry.admin`) and add them to the GlobalAdministrator and

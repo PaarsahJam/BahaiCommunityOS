@@ -1603,6 +1603,15 @@ replacement source of truth** for any domain fact.
      guaranteed-delivery. Audit may schedule its gated Authorization-event
      consumers under its own consumer-gate discipline; no Authorization
      consumer is registered by this gate.
+    - **Resolution note (Authorization → Audit consumer configuration gate):**
+      the seven ratified Authorization consumers (`RoleAssigned`, `RoleRevoked`,
+      `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`,
+      `BreakGlassApproved`, `BreakGlassRevoked`) are registered through Audit's
+      inbox-only configuration (`AddConsumer<AuthorizationAuditConsumer>` inside
+      `AddCommunityOSEventBusWithInbox<AuditDbContext>`), mapped exactly per
+      decisions 5/6/10 with `role_code`/`scope_type` as the only newly
+      allowlisted metadata keys. Break-glass rows are journaled Sensitive.
+      No Authorization contract or producer change accompanies this gate.
 
 5. **First-gate event catalog.** Every event in every existing contract
    (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
@@ -1625,12 +1634,12 @@ replacement source of truth** for any domain fact.
    accountability (ADR-024); task *start* adds review-latency detail only.
    Dispatch completion is the sole exportable notification fact (ADR-025).
 
-   **CONSUMED AND PERSISTED — gated on producer outbox gate (12):**
+   **CONSUMED AND PERSISTED — producer-gated (12):**
 
    | Producer | Gate | Events |
    |----------|------|--------|
    | Documents (5) | Documents outbox gate — **completed at the Documents outbox gate** (compliance events are now guaranteed-delivery; no consumers are registered by that gate) | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
-   | Authorization (7) | Authorization outbox gate — **completed at the Authorization outbox gate** (security events are now guaranteed-delivery; no consumers are registered by that gate) | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+   | Authorization (7) | Authorization outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the seven consumers are registered. **Active** | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as
    guaranteed-delivery-required, plus the entire authorization-security set

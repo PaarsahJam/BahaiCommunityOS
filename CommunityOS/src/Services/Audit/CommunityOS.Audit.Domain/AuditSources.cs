@@ -9,6 +9,7 @@ public static class AuditSources
     public const string Records = "records";
     public const string Workflow = "workflow";
     public const string Notifications = "notifications";
+    public const string Authorization = "authorization";
     public const string Audit = "audit";
 
     /// <summary>Producers whose compliance events persist at the first gate.</summary>
@@ -20,14 +21,20 @@ public static class AuditSources
         public const string Record = "record";
         public const string WorkflowTask = "workflow-task";
         public const string Notification = "notification";
+        public const string AuthzRole = "authz-role";
+        public const string AuthzDelegation = "authz-delegation";
+        public const string BreakGlassRequest = "break-glass-request";
         public const string AuditEntry = "audit-entry";
         public const string AuditHold = "audit-entry-hold";
         public const string AuditExport = "audit-export";
 
-        /// <summary>Resource types emitted by the first-gate ingest mappings.</summary>
+        /// <summary>Resource types emitted by the ratified ingest mappings.</summary>
         public static readonly IReadOnlySet<string> All =
             new HashSet<string>(StringComparer.Ordinal)
-            { Record, WorkflowTask, Notification, AuditEntry, AuditHold, AuditExport };
+            {
+                Record, WorkflowTask, Notification, AuthzRole, AuthzDelegation,
+                BreakGlassRequest, AuditEntry, AuditHold, AuditExport
+            };
     }
 }
 

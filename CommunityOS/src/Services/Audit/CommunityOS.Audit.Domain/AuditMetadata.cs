@@ -89,6 +89,8 @@ public sealed class AuditMetadata
         "definition_code", "domain_type", "assignee_count", "escalated_to_count",
         // Notifications
         "type_code", "channel", "source_type", "recipient_count",
+        // Authorization
+        "role_code", "scope_type",
         // Audit-of-audit journal entries
         "format", "row_count", "filters", "entry_count", "reason_code",
         "purged_count", "retention_classes", "exported_count", "hold_ids_count", "released_count"

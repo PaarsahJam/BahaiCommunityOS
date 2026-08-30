@@ -1,6 +1,7 @@
 using System.Globalization;
 using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
+using CommunityOS.Contracts.Authorization;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Records;
 using CommunityOS.Contracts.Workflow;
@@ -252,6 +253,79 @@ public static class AuditEventMapper
         NotificationHash(nameof(NotificationDispatched), e.NotificationId, e.SourceId, e.OccurredOn,
             $"{e.TypeCode}|{e.Channel}|{e.SourceType}|n{e.RecipientCount}"));
 
+    // ---- Authorization -----------------------------------------------------
+
+    public static IngestCandidate Map(RoleAssigned e) => new(
+        AuditSources.Authorization, nameof(RoleAssigned), "role-assigned",
+        AuditSources.ResourceTypes.AuthzRole, e.AssignmentId,
+        null, e.SubjectId, null, OrganizationScopeId(e.ScopeType, e.ScopeId),
+        AuditSensitivity.Normal, null,
+        Build(("role_code", e.RoleCode), ("scope_type", e.ScopeType)),
+        e.OccurredOn,
+        AuthorizationHash(nameof(RoleAssigned), AuditSources.ResourceTypes.AuthzRole, e.AssignmentId, null, e.OccurredOn,
+            $"{e.RoleCode}|{e.ScopeType}|{(e.ScopeId?.ToString("D", CultureInfo.InvariantCulture) ?? "-")}|" +
+            $"{e.EffectiveFrom:O}|{(e.EffectiveUntil?.ToString("O", CultureInfo.InvariantCulture) ?? "-")}"));
+
+    public static IngestCandidate Map(RoleRevoked e) => new(
+        AuditSources.Authorization, nameof(RoleRevoked), "role-revoked",
+        AuditSources.ResourceTypes.AuthzRole, e.AssignmentId,
+        null, e.SubjectId, null, null,
+        AuditSensitivity.Normal, null,
+        Build(("role_code", e.RoleCode)),
+        e.OccurredOn,
+        AuthorizationHash(nameof(RoleRevoked), AuditSources.ResourceTypes.AuthzRole, e.AssignmentId, null, e.OccurredOn,
+            $"{e.RoleCode}|{e.SubjectId:D}"));
+
+    public static IngestCandidate Map(DelegationGranted e) => new(
+        AuditSources.Authorization, nameof(DelegationGranted), "delegation-granted",
+        AuditSources.ResourceTypes.AuthzDelegation, e.DelegationId,
+        null, e.DelegateId, e.DelegatorId, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn,
+        AuthorizationHash(nameof(DelegationGranted), AuditSources.ResourceTypes.AuthzDelegation, e.DelegationId, null, e.OccurredOn,
+            $"{e.DelegatorId:D}|{e.DelegateId:D}"));
+
+    public static IngestCandidate Map(DelegationRevoked e) => new(
+        AuditSources.Authorization, nameof(DelegationRevoked), "delegation-revoked",
+        AuditSources.ResourceTypes.AuthzDelegation, e.DelegationId,
+        null, e.DelegateId, e.DelegatorId, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn,
+        AuthorizationHash(nameof(DelegationRevoked), AuditSources.ResourceTypes.AuthzDelegation, e.DelegationId, null, e.OccurredOn,
+            $"{e.DelegatorId:D}|{e.DelegateId:D}"));
+
+    public static IngestCandidate Map(BreakGlassRequested e) => new(
+        AuditSources.Authorization, nameof(BreakGlassRequested), "break-glass-requested",
+        AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId,
+        null, null, e.RequesterId, null,
+        AuditSensitivity.Sensitive, null,
+        null,
+        e.OccurredOn,
+        AuthorizationHash(nameof(BreakGlassRequested), AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId, null, e.OccurredOn,
+            $"{e.RequesterId:D}"));
+
+    public static IngestCandidate Map(BreakGlassApproved e) => new(
+        AuditSources.Authorization, nameof(BreakGlassApproved), "break-glass-approved",
+        AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId,
+        null, null, e.ApproverId, null,
+        AuditSensitivity.Sensitive, null,
+        null,
+        e.OccurredOn,
+        AuthorizationHash(nameof(BreakGlassApproved), AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId, null, e.OccurredOn,
+            $"{e.RequesterId:D}|{e.ApproverId:D}|{e.ApprovedUntil:O}"));
+
+    public static IngestCandidate Map(BreakGlassRevoked e) => new(
+        AuditSources.Authorization, nameof(BreakGlassRevoked), "break-glass-revoked",
+        AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId,
+        null, null, e.RevokedBy, null,
+        AuditSensitivity.Sensitive, null,
+        null,
+        e.OccurredOn,
+        AuthorizationHash(nameof(BreakGlassRevoked), AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId, null, e.OccurredOn,
+            $"{e.RequesterId:D}|{e.RevokedBy:D}"));
+
     // ---- Helpers -------------------------------------------------------------
 
     /// <summary>Canonical identity hash for a Records-sourced fact.</summary>
@@ -268,6 +342,29 @@ public static class AuditEventMapper
     private static string NotificationHash(string eventType, Guid notificationId, Guid? secondary, DateTime occurredOn, string discriminator) =>
         SourceEventHash.Compute(AuditSources.Notifications, eventType, AuditSources.ResourceTypes.Notification,
             notificationId, secondary, occurredOn, discriminator);
+
+    /// <summary>Canonical identity hash for an Authorization-sourced fact.</summary>
+    private static string AuthorizationHash(string eventType, string resourceType, Guid resourceId, Guid? secondary, DateTime occurredOn, string discriminator) =>
+        SourceEventHash.Compute(AuditSources.Authorization, eventType, resourceType,
+            resourceId, secondary, occurredOn, discriminator);
+
+    /// <summary>Organization-unit tier scopes select the hierarchy scope id as the
+    /// entry's organization scope; global and resource scopes do not.</summary>
+    private static Guid? OrganizationScopeId(string scopeType, Guid? scopeId)
+    {
+        if (scopeId is null || scopeType is null)
+        {
+            return null;
+        }
+
+        return scopeType.Equals("National", StringComparison.OrdinalIgnoreCase)
+            || scopeType.Equals("Regional", StringComparison.OrdinalIgnoreCase)
+            || scopeType.Equals("Local", StringComparison.OrdinalIgnoreCase)
+            || scopeType.Equals("OrganizationUnit", StringComparison.OrdinalIgnoreCase)
+            || scopeType.Equals("Committee", StringComparison.OrdinalIgnoreCase)
+            ? scopeId
+            : null;
+    }
 
     /// <summary>Builds allowlisted metadata, silently dropping absent values.</summary>
     private static AuditMetadata? Build(params (string Key, object? Value)[] entries)
