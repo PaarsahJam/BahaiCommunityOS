@@ -78,7 +78,11 @@ Clients never send roles or permissions in a check; they send only context
 - **Events** — domain events are published as integration events on RabbitMQ
   via MassTransit (`RoleAssigned`, `RoleRevoked`, `DelegationGranted`,
   `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`,
-  `BreakGlassRevoked`).
+  `BreakGlassRevoked`). Publication is protected by the transactional outbox
+  (`AddCommunityOSEventBusWithOutbox<AuthorizationDbContext>`, ADR-015) since
+  the **Authorization outbox gate**: each security event is committed
+  atomically with the business write and is guaranteed-delivery (ADR-027
+  decision 4, ADR-014).
 - **Organization** — the Organization service owns hierarchy; Authorization
   resolves organization-scoped grants by calling the Organization service's
   `/api/v1/orgunits/{id}/covers` endpoint over HTTP

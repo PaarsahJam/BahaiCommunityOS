@@ -128,7 +128,8 @@ high-priority audit events.
 enabled via the MassTransit EF Core outbox at the **Records integration gate**
 (Prompt 08B) and at every later guaranteed-delivery producer gate — Workflow,
 Notifications, Finance, Correspondence, Localization — and the **Documents
-producer** was upgraded at the **Documents outbox gate**).
+producer** was upgraded at the **Documents outbox gate** and the
+**Authorization producer** at the **Authorization outbox gate**).
 
 CommunityOS requires reliable event publication. Any domain change that raises
 domain/integration events must not lose those events if the message broker is
@@ -1590,9 +1591,18 @@ replacement source of truth** for any domain fact.
      been upgraded to transactional outbox publication
      (`AddCommunityOSEventBusWithOutbox<DocumentsDbContext>`, outbox entities
      in the `documents` schema), so ADR-027's Documents precondition for Audit
-     subscription is satisfied. The **Authorization outbox gate** remains
-     open; Audit must not register Authorization-event consumers until it
-     completes. No Documents consumer is registered by this gate.
+     subscription is satisfied. The **Authorization outbox gate** was open at
+     that gate; Audit must not register Authorization-event consumers until it
+     completes. No Documents consumer is registered by that gate.
+   - **Resolution note (Authorization outbox gate):** the Authorization
+     producer has been upgraded to transactional outbox publication
+     (`AddCommunityOSEventBusWithOutbox<AuthorizationDbContext>`, outbox
+     entities in the `authorization` schema), so ADR-027's Authorization
+     precondition for Audit subscription is satisfied. The security subset —
+     roles, delegations and the ADR-014-mandated break-glass events — is now
+     guaranteed-delivery. Audit may schedule its gated Authorization-event
+     consumers under its own consumer-gate discipline; no Authorization
+     consumer is registered by this gate.
 
 5. **First-gate event catalog.** Every event in every existing contract
    (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
@@ -1620,7 +1630,7 @@ replacement source of truth** for any domain fact.
    | Producer | Gate | Events |
    |----------|------|--------|
    | Documents (5) | Documents outbox gate — **completed at the Documents outbox gate** (compliance events are now guaranteed-delivery; no consumers are registered by that gate) | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
-   | Authorization (7) | Authorization outbox gate | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+   | Authorization (7) | Authorization outbox gate — **completed at the Authorization outbox gate** (security events are now guaranteed-delivery; no consumers are registered by that gate) | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as
    guaranteed-delivery-required, plus the entire authorization-security set

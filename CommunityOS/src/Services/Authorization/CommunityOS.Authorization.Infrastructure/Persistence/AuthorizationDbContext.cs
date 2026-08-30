@@ -1,4 +1,5 @@
 using CommunityOS.Authorization.Domain.Aggregates;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace CommunityOS.Authorization.Infrastructure.Persistence;
@@ -16,6 +17,11 @@ public sealed class AuthorizationDbContext(DbContextOptions<AuthorizationDbConte
     {
         modelBuilder.HasDefaultSchema("authorization");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AuthorizationDbContext).Assembly);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+
         base.OnModelCreating(modelBuilder);
     }
 }

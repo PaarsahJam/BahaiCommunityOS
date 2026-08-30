@@ -47,8 +47,8 @@ internal sealed class RequestBreakGlassCommandHandler(
             TimeSpan.FromMinutes(request.RequestedDurationMinutes),
             DateTime.UtcNow);
 
-        await requests.AddAsync(requestEntity, ct);
         await DomainEventPublisher.PublishAsync(requestEntity, mediator, ct);
+        await requests.AddAsync(requestEntity, ct);
 
         return Map(requestEntity);
     }
@@ -101,8 +101,8 @@ internal sealed class ApproveBreakGlassCommandHandler(
 
         requestEntity.Approve(request.ActorId, DateTime.UtcNow, requestEntity.RequestedDuration);
 
-        await requests.UpdateAsync(requestEntity, ct);
         await DomainEventPublisher.PublishAsync(requestEntity, mediator, ct);
+        await requests.UpdateAsync(requestEntity, ct);
 
         return RequestBreakGlassCommandHandler.Map(requestEntity);
     }
@@ -131,8 +131,8 @@ internal sealed class RejectBreakGlassCommandHandler(
 
         requestEntity.Reject(request.ActorId, request.Reason);
 
-        await requests.UpdateAsync(requestEntity, ct);
         await DomainEventPublisher.PublishAsync(requestEntity, mediator, ct);
+        await requests.UpdateAsync(requestEntity, ct);
 
         return RequestBreakGlassCommandHandler.Map(requestEntity);
     }
@@ -166,8 +166,8 @@ internal sealed class RevokeBreakGlassCommandHandler(
 
         requestEntity.Revoke(request.ActorId, request.Reason);
 
-        await requests.UpdateAsync(requestEntity, ct);
         await DomainEventPublisher.PublishAsync(requestEntity, mediator, ct);
+        await requests.UpdateAsync(requestEntity, ct);
 
         return RequestBreakGlassCommandHandler.Map(requestEntity);
     }

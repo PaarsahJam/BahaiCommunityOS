@@ -65,8 +65,8 @@ internal sealed class GrantDelegationCommandHandler(
             expiresOn,
             request.Reason);
 
-        await delegations.AddAsync(delegation, ct);
         await DomainEventPublisher.PublishAsync(delegation, mediator, ct);
+        await delegations.AddAsync(delegation, ct);
 
         return Map(delegation);
     }
@@ -113,8 +113,8 @@ internal sealed class RevokeDelegationCommandHandler(
 
         delegation.Revoke(request.ActorId, request.Reason);
 
-        await delegations.UpdateAsync(delegation, ct);
         await DomainEventPublisher.PublishAsync(delegation, mediator, ct);
+        await delegations.UpdateAsync(delegation, ct);
 
         return GrantDelegationCommandHandler.Map(delegation);
     }

@@ -29,8 +29,8 @@ internal sealed class CreateRoleCommandHandler(
             throw new RoleCodeAlreadyExistsException(request.Code);
 
         var role = Role.Create(request.Code, request.DisplayName, request.Description, request.Permissions);
-        await roles.AddAsync(role, ct);
         await DomainEventPublisher.PublishAsync(role, mediator, ct);
+        await roles.AddAsync(role, ct);
 
         return Map(role);
     }
@@ -66,8 +66,8 @@ internal sealed class UpdateRoleCommandHandler(
         role.UpdateDetails(request.DisplayName, request.Description);
         role.UpdatePermissions(request.Permissions);
 
-        await roles.UpdateAsync(role, ct);
         await DomainEventPublisher.PublishAsync(role, mediator, ct);
+        await roles.UpdateAsync(role, ct);
 
         return CreateRoleCommandHandler.Map(role);
     }
@@ -117,8 +117,8 @@ internal sealed class AssignRoleCommandHandler(
             request.EffectiveUntil,
             request.Reason);
 
-        await assignments.AddAsync(assignment, ct);
         await DomainEventPublisher.PublishAsync(assignment, mediator, ct);
+        await assignments.AddAsync(assignment, ct);
 
         return Map(assignment);
     }
@@ -164,8 +164,8 @@ internal sealed class RevokeRoleCommandHandler(
 
         assignment.Revoke(request.ActorId, request.Reason);
 
-        await assignments.UpdateAsync(assignment, ct);
         await DomainEventPublisher.PublishAsync(assignment, mediator, ct);
+        await assignments.UpdateAsync(assignment, ct);
 
         return AssignRoleCommandHandler.Map(assignment);
     }

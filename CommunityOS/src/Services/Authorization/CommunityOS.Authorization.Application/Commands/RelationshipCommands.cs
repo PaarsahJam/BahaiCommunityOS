@@ -36,8 +36,8 @@ internal sealed class WriteRelationshipCommandHandler(
             request.ObjectId,
             request.Permissions);
 
-        await relationships.AddAsync(relationship, ct);
         await DomainEventPublisher.PublishAsync(relationship, mediator, ct);
+        await relationships.AddAsync(relationship, ct);
 
         return Map(relationship);
     }
