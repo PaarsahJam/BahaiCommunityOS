@@ -2,6 +2,7 @@ using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure.Integration;
 using CommunityOS.Contracts.Authorization;
+using CommunityOS.Contracts.Documents;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Organization;
 using CommunityOS.Contracts.Records;
@@ -351,6 +352,110 @@ public sealed class IngestMappingTests
         revoked.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
     }
 
+    // ---- Documents -------------------------------------------------------
+
+    [Fact]
+    public void DocumentClassified_maps_classification_and_is_sensitive_only_when_payload_flags_it()
+    {
+        var documentId = Guid.NewGuid();
+
+        var sensitive = AuditEventMapper.Map(new DocumentClassified(documentId, "restricted", true, Now));
+        sensitive.SourceService.Should().Be("documents");
+        sensitive.Action.Should().Be("document-classified");
+        sensitive.ResourceType.Should().Be("document");
+        sensitive.ResourceId.Should().Be(documentId);
+        sensitive.SubjectId.Should().BeNull();
+        sensitive.ActorId.Should().BeNull();
+        sensitive.OrganizationUnitId.Should().BeNull();
+        sensitive.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
+        sensitive.Metadata!.Values.Should().BeEquivalentTo(new Dictionary<string, object?>
+        {
+            ["classification_code"] = "restricted"
+        });
+
+        var normal = AuditEventMapper.Map(new DocumentClassified(documentId, "public", false, Now));
+        normal.Sensitivity.Should().Be(AuditSensitivity.Normal);
+    }
+
+    [Fact]
+    public void DocumentClassified_with_null_code_omits_metadata_but_stays_normal()
+    {
+        var normal = AuditEventMapper.Map(new DocumentClassified(Guid.NewGuid(), null, false, Now));
+        normal.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        normal.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public void DocumentDeactivated_maps_identity_without_fabricating_scope()
+    {
+        var documentId = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new DocumentDeactivated(documentId, Now));
+        candidate.Action.Should().Be("document-deactivated");
+        candidate.ResourceType.Should().Be("document");
+        candidate.ResourceId.Should().Be(documentId);
+        candidate.SubjectId.Should().BeNull();
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        candidate.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public void DocumentRestored_maps_identity_and_status_metadata()
+    {
+        var documentId = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new DocumentRestored(documentId, "Active", Now));
+        candidate.Action.Should().Be("document-restored");
+        candidate.ResourceType.Should().Be("document");
+        candidate.ResourceId.Should().Be(documentId);
+        candidate.SubjectId.Should().BeNull();
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        candidate.Metadata!.Values.Should().ContainKey("status");
+        candidate.Metadata!.Values["status"].Should().Be("Active");
+    }
+
+    [Fact]
+    public void DocumentContentDownloaded_maps_version_secondary_actor_and_is_sensitive()
+    {
+        var documentId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new DocumentContentDownloaded(documentId, versionId, actorId, Now));
+        candidate.Action.Should().Be("document-content-downloaded");
+        candidate.ResourceType.Should().Be("document");
+        candidate.ResourceId.Should().Be(documentId);
+        candidate.SecondaryResourceId.Should().Be(versionId);
+        candidate.SubjectId.Should().BeNull();
+        candidate.ActorId.Should().Be(actorId);
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Sensitive);
+        candidate.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public void DocumentScanCompleted_maps_version_secondary_scan_status_as_outcome_and_is_normal()
+    {
+        var documentId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new DocumentScanCompleted(documentId, versionId, "Clean", Now));
+        candidate.Action.Should().Be("document-scan-completed");
+        candidate.ResourceType.Should().Be("document");
+        candidate.ResourceId.Should().Be(documentId);
+        candidate.SecondaryResourceId.Should().Be(versionId);
+        candidate.SubjectId.Should().BeNull();
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        candidate.Outcome.Should().Be("Clean");
+        candidate.Metadata.Should().BeNull();
+    }
+
     // ---- Hash semantics --------------------------------------------------------
 
     [Fact]
@@ -379,6 +484,23 @@ public sealed class IngestMappingTests
         var e2 = e1 with { };
 
         AuditEventMapper.Map(e1).SourceEventHash.Should().Be(AuditEventMapper.Map(e2).SourceEventHash);
+
+        var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
+        AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);
+    }
+
+    [Fact]
+    public void Document_identical_fact_hashes_identically_and_occurrence_is_distinct()
+    {
+        var documentId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+        var e1 = new DocumentScanCompleted(documentId, versionId, "Clean", Now);
+        var e2 = e1 with { };
+
+        AuditEventMapper.Map(e1).SourceEventHash.Should().Be(AuditEventMapper.Map(e2).SourceEventHash);
+
+        var reScanned = e1 with { ScanStatus = "Rejected" };
+        AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(reScanned).SourceEventHash);
 
         var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
         AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);

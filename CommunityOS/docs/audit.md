@@ -109,7 +109,7 @@ never subscribed without an ADR amendment.
 |----------------|-------|--------|
 | CONSUMED AND PERSISTED — first gate | 22 | Records: all 16 lifecycle/compliance events. Workflow: `WorkflowTaskCreated`, `WorkflowTaskAssigned`, `WorkflowTaskCompleted`, `WorkflowTaskCancelled`, `WorkflowTaskEscalated`. Notifications: `NotificationDispatched` |
 | CONSUMED AND PERSISTED — Authorization security subset | 7 | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
-| CONSUMED AND PERSISTED — gated on producer outbox gate | 5 | Documents (Documents outbox gate): `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
+| CONSUMED AND PERSISTED — Documents compliance subset | 5 | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
 | CONSUMED BUT NOT PERSISTED — projection only | 3 | Organization: `OrganizationUnitCreated`, `OrganizationUnitUpdated`, `OrganizationUnitParentChanged` |
 | DEFERRED | 17 | `WorkflowTaskStarted`; Identity account-security subset (`UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`); Organization governance facts (`DelegationFactGranted`, `DelegationFactRevoked`); Knowledge moderation/AI subset (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`, `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`); `DocumentArchived` |
 | NOT AN AUDIT EVENT | 41 | Documents: `DocumentCreated`, `DocumentMetadataUpdated`, `DocumentVersionAdded`. Identity: `UserAccountRegistered` (carries email), `UserAccountVerified`, `UserAccountDeactivated`, `DeviceRegistered` (carries device name), `RefreshTokenIssued` (session telemetry). Organization: `OrganizationCreated/Updated`, `Committee*`, `AppointmentAssigned/Ended`. Community: all 14 person/household/membership/activity/event/meeting/participation events (official membership/appointment facts belong to Records). Knowledge: Library pipeline and answer/category events (`WorkImported`, `EditionImported`, `EditionVerified`, `PassageImported`, `PassageCorrected`, `QuestionSubmitted`, `QuestionPublished`, `AnswerAdded`, `AnswerUpdated`, `AnswerAccepted`, `CategoryCreated`, `CategoryUpdated`) |
@@ -124,13 +124,14 @@ Rationale highlights:
   `WorkflowTaskStarted` adds review-latency detail only and is deferred.
 - **Notifications — dispatch completion only.** The sole exportable fact;
   recipient distribution is deliberately absent from the contract (ADR-025).
-- **Documents — compliance subset, gated.** Exactly the five events
+- **Documents — compliance subset, active.** Exactly the five events
   `docs/documents.md` has always marked guaranteed-delivery-required.
-  Existence/metadata/version events are not compliance facts.
+  Existence/metadata/version events are not compliance facts. The producer gate
+  completed and the five consumers are registered (below); no gated set remains.
 - **Authorization — security subset, active.** Role/delegation changes are
   privilege facts; break-glass auditing is mandated by ADR-014 ("high-priority
   audit events"). The producer gate completed and the seven consumers are
-  registered (below); Documents remains the only gated set.
+  registered (below).
 
 ### Producer delivery gates
 
@@ -139,7 +140,7 @@ Rationale highlights:
 | Records | Outbox-protected (`AddCommunityOSEventBusWithOutbox`) | none — clear |
 | Workflow | Outbox-protected | none — clear |
 | Notifications | Outbox-protected | none — clear |
-| Documents | Best-effort (`AddCommunityOSEventBus`) | **Documents outbox gate**: upgrade to transactional outbox publication for the compliance subset (ADR-022 amendment note) |
+| Documents | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, Documents outbox gate) | **Complete** — the five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Authorization | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, authorization outbox gate) | **Complete** — the seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Organization | n/a (projection feed) | none — projection consumers may register immediately |
 
@@ -168,6 +169,27 @@ already carry:
 `role_code` and `scope_type` are the **only** metadata keys newly allowlisted by
 this gate. No `ActorId` is invented where the contract carries none, no
 fabricated scope is persisted, and `CorrelationId`/`CausationId` remain null.
+
+### Consumer configuration gate — Documents ×5
+
+Registered through Audit's inbox-only configuration
+(`AddConsumer<DocumentsAuditConsumer>` inside
+`AddCommunityOSEventBusWithInbox<AuditDbContext>`); Audit remains inbox-only and
+publishes nothing. The five mappings use only payload fields the contracts
+already carry and only the existing `classification_code`/`status` metadata keys:
+
+| Event | Action | ResourceType / ResourceId | SecondaryResourceId | SubjectId | ActorId | OrganizationUnitId | Outcome | Metadata | Sensitivity |
+|-------|--------|---------------------------|----------------------|-----------|---------|--------------------|---------|----------|-------------|
+| `DocumentClassified` | `document-classified` | `document` / `DocumentId` | null | null | null (no actor field) | null | — | `classification_code` | **Sensitive iff `IsSensitive`** |
+| `DocumentDeactivated` | `document-deactivated` | `document` / `DocumentId` | null | null | null | null | — | — | Normal |
+| `DocumentRestored` | `document-restored` | `document` / `DocumentId` | null | null | null | null | — | `status` | Normal |
+| `DocumentContentDownloaded` | `document-content-downloaded` | `document` / `DocumentId` | `VersionId` | null | `ActorId` | null | — | — | **Sensitive** |
+| `DocumentScanCompleted` | `document-scan-completed` | `document` / `DocumentId` | `VersionId` | null | null | null | `ScanStatus` | — | Normal |
+
+No `scan_status` metadata key is added: `ScanStatus` is represented through the
+existing `Outcome` field (ADR-027 decision 8 — the outcome column is defined for
+scan status). No `ActorId`/`SubjectId`/scope is invented where the contract
+carries none, and `CorrelationId`/`CausationId` remain null.
 
 ## Ingest Pipeline
 

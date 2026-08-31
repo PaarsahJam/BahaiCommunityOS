@@ -9,6 +9,7 @@ public static class AuditSources
     public const string Records = "records";
     public const string Workflow = "workflow";
     public const string Notifications = "notifications";
+    public const string Documents = "documents";
     public const string Authorization = "authorization";
     public const string Audit = "audit";
 
@@ -21,6 +22,7 @@ public static class AuditSources
         public const string Record = "record";
         public const string WorkflowTask = "workflow-task";
         public const string Notification = "notification";
+        public const string Document = "document";
         public const string AuthzRole = "authz-role";
         public const string AuthzDelegation = "authz-delegation";
         public const string BreakGlassRequest = "break-glass-request";
@@ -32,7 +34,7 @@ public static class AuditSources
         public static readonly IReadOnlySet<string> All =
             new HashSet<string>(StringComparer.Ordinal)
             {
-                Record, WorkflowTask, Notification, AuthzRole, AuthzDelegation,
+                Record, WorkflowTask, Notification, Document, AuthzRole, AuthzDelegation,
                 BreakGlassRequest, AuditEntry, AuditHold, AuditExport
             };
     }

@@ -2,6 +2,7 @@ using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure.Integration;
 using CommunityOS.Contracts.Authorization;
+using CommunityOS.Contracts.Documents;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Records;
 using FluentAssertions;
@@ -101,6 +102,74 @@ public sealed class AuditConsumerTests
         BreakGlassRevoked e => consumer.Consume(Context(e)),
         _ => throw new InvalidOperationException($"Unhandled event {message.GetType().Name}")
     };
+
+    [Fact]
+    public async Task Documents_consumer_ingests_exactly_the_five_ratified_events_mapped_and_tolerates_duplicates()
+    {
+        var ingestor = Substitute.For<IAuditIngestor>();
+        ingestor.IngestAsync(Arg.Any<IngestCandidate>(), Arg.Any<CancellationToken>())
+            .Returns(IngestOutcome.Duplicate);
+        var consumer = new DocumentsAuditConsumer(ingestor, NullLogger<DocumentsAuditConsumer>.Instance);
+
+        var versionId = Guid.NewGuid();
+        object[] events =
+        [
+            new DocumentClassified(Guid.NewGuid(), "restricted", true, DateTime.UtcNow),
+            new DocumentDeactivated(Guid.NewGuid(), DateTime.UtcNow),
+            new DocumentRestored(Guid.NewGuid(), "Active", DateTime.UtcNow),
+            new DocumentContentDownloaded(Guid.NewGuid(), versionId, Guid.NewGuid(), DateTime.UtcNow),
+            new DocumentScanCompleted(Guid.NewGuid(), versionId, "Clean", DateTime.UtcNow)
+        ];
+
+        var expected = new (string Action, bool Sensitive, Guid? Secondary, string? Outcome)[]
+        {
+            ("document-classified", true, null, null),
+            ("document-deactivated", false, null, null),
+            ("document-restored", false, null, null),
+            ("document-content-downloaded", true, versionId, null),
+            ("document-scan-completed", false, versionId, "Clean")
+        };
+
+        for (var i = 0; i < events.Length; i++)
+        {
+            await Dispatch(consumer, events[i]);
+            await ingestor.Received(1).IngestAsync(
+                Arg.Is<IngestCandidate>(c =>
+                    c.SourceService == "documents" && c.ResourceType == "document"
+                    && c.Action == expected[i].Action
+                    && c.Sensitivity == (expected[i].Sensitive ? AuditSensitivity.Sensitive : AuditSensitivity.Normal)
+                    && c.SecondaryResourceId == expected[i].Secondary
+                    && string.Equals(c.Outcome, expected[i].Outcome, StringComparison.Ordinal)),
+                Arg.Any<CancellationToken>());
+        }
+    }
+
+    private static Task Dispatch(DocumentsAuditConsumer consumer, object message) => message switch
+    {
+        DocumentClassified e => consumer.Consume(Context(e)),
+        DocumentDeactivated e => consumer.Consume(Context(e)),
+        DocumentRestored e => consumer.Consume(Context(e)),
+        DocumentContentDownloaded e => consumer.Consume(Context(e)),
+        DocumentScanCompleted e => consumer.Consume(Context(e)),
+        _ => throw new InvalidOperationException($"Unhandled event {message.GetType().Name}")
+    };
+
+    [Fact]
+    public void Documents_consumer_depends_only_on_ingestor_and_logger_without_publish_surface()
+    {
+        var ingestor = Substitute.For<IAuditIngestor>();
+        var consumer = new DocumentsAuditConsumer(ingestor, NullLogger<DocumentsAuditConsumer>.Instance);
+
+        consumer.Should().BeAssignableTo<IConsumer<DocumentClassified>>();
+        consumer.Should().BeAssignableTo<IConsumer<DocumentDeactivated>>();
+        consumer.Should().BeAssignableTo<IConsumer<DocumentRestored>>();
+        consumer.Should().BeAssignableTo<IConsumer<DocumentContentDownloaded>>();
+        consumer.Should().BeAssignableTo<IConsumer<DocumentScanCompleted>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<DocumentArchived>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<DocumentCreated>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<DocumentMetadataUpdated>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<DocumentVersionAdded>>();
+    }
 
     private static ConsumeContext<T> Context<T>(T message) where T : class
     {

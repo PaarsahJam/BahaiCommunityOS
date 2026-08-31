@@ -1612,6 +1612,17 @@ replacement source of truth** for any domain fact.
       decisions 5/6/10 with `role_code`/`scope_type` as the only newly
       allowlisted metadata keys. Break-glass rows are journaled Sensitive.
       No Authorization contract or producer change accompanies this gate.
+    - **Resolution note (Documents → Audit consumer configuration gate):**
+      the five ratified Documents compliance consumers (`DocumentClassified`,
+      `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`,
+      `DocumentScanCompleted`) are registered through Audit's inbox-only
+      configuration (`AddConsumer<DocumentsAuditConsumer>` inside
+      `AddCommunityOSEventBusWithInbox<AuditDbContext>`), mapped exactly per
+      decisions 5/6/10 with `Outcome` carrying `ScanStatus` and `classification_code`/
+      `status` as the only metadata keys. `DocumentContentDownloaded` is journaled
+      Sensitive; `DocumentClassified` is Sensitive iff its payload `IsSensitive`
+      is true. No new metadata key is allowlisted. No Documents contract or
+      producer change accompanies this gate.
 
 5. **First-gate event catalog.** Every event in every existing contract
    (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
@@ -1638,7 +1649,7 @@ replacement source of truth** for any domain fact.
 
    | Producer | Gate | Events |
    |----------|------|--------|
-   | Documents (5) | Documents outbox gate — **completed at the Documents outbox gate** (compliance events are now guaranteed-delivery; no consumers are registered by that gate) | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
+   | Documents (5) | Documents outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the five consumers are registered. **Active** | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
    | Authorization (7) | Authorization outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the seven consumers are registered. **Active** | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as

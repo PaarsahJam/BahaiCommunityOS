@@ -2,6 +2,7 @@ using System.Globalization;
 using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Contracts.Authorization;
+using CommunityOS.Contracts.Documents;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Records;
 using CommunityOS.Contracts.Workflow;
@@ -326,6 +327,64 @@ public static class AuditEventMapper
         AuthorizationHash(nameof(BreakGlassRevoked), AuditSources.ResourceTypes.BreakGlassRequest, e.RequestId, null, e.OccurredOn,
             $"{e.RequesterId:D}|{e.RevokedBy:D}"));
 
+    // ---- Documents ---------------------------------------------------------
+
+    public static IngestCandidate Map(DocumentClassified e) => new(
+        AuditSources.Documents, nameof(DocumentClassified), "document-classified",
+        AuditSources.ResourceTypes.Document, e.DocumentId,
+        null, null, null, null,
+        SensitiveAuditEventTypes.Resolve(nameof(DocumentClassified), e.IsSensitive), null,
+        e.ClassificationCode is null ? null : Build(("classification_code", e.ClassificationCode)),
+        e.OccurredOn,
+        DocumentsHash(nameof(DocumentClassified), e.DocumentId, null, e.OccurredOn,
+            $"{e.ClassificationCode ?? "-"}|{e.IsSensitive}"));
+
+    public static IngestCandidate Map(DocumentDeactivated e) => new(
+        AuditSources.Documents, nameof(DocumentDeactivated), "document-deactivated",
+        AuditSources.ResourceTypes.Document, e.DocumentId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn,
+        DocumentsHash(nameof(DocumentDeactivated), e.DocumentId, null, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(DocumentRestored e) => new(
+        AuditSources.Documents, nameof(DocumentRestored), "document-restored",
+        AuditSources.ResourceTypes.Document, e.DocumentId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        Build(("status", e.Status)),
+        e.OccurredOn,
+        DocumentsHash(nameof(DocumentRestored), e.DocumentId, null, e.OccurredOn, e.Status));
+
+    public static IngestCandidate Map(DocumentContentDownloaded e) => new(
+        AuditSources.Documents, nameof(DocumentContentDownloaded), "document-content-downloaded",
+        AuditSources.ResourceTypes.Document, e.DocumentId,
+        SecondaryResourceId: e.VersionId,
+        SubjectId: null,
+        ActorId: e.ActorId,
+        OrganizationUnitId: null,
+        Sensitivity: AuditSensitivity.Sensitive,
+        Outcome: null,
+        Metadata: null,
+        OccurredOn: e.OccurredOn,
+        SourceEventHash: DocumentsHash(nameof(DocumentContentDownloaded), e.DocumentId, e.VersionId, e.OccurredOn,
+            $"{e.ActorId:D}"));
+
+    public static IngestCandidate Map(DocumentScanCompleted e) => new(
+        AuditSources.Documents, nameof(DocumentScanCompleted), "document-scan-completed",
+        AuditSources.ResourceTypes.Document, e.DocumentId,
+        SecondaryResourceId: e.VersionId,
+        SubjectId: null,
+        ActorId: null,
+        OrganizationUnitId: null,
+        Sensitivity: AuditSensitivity.Normal,
+        Outcome: e.ScanStatus,
+        Metadata: null,
+        OccurredOn: e.OccurredOn,
+        SourceEventHash: DocumentsHash(nameof(DocumentScanCompleted), e.DocumentId, e.VersionId, e.OccurredOn,
+            e.ScanStatus));
+
     // ---- Helpers -------------------------------------------------------------
 
     /// <summary>Canonical identity hash for a Records-sourced fact.</summary>
@@ -347,6 +406,11 @@ public static class AuditEventMapper
     private static string AuthorizationHash(string eventType, string resourceType, Guid resourceId, Guid? secondary, DateTime occurredOn, string discriminator) =>
         SourceEventHash.Compute(AuditSources.Authorization, eventType, resourceType,
             resourceId, secondary, occurredOn, discriminator);
+
+    /// <summary>Canonical identity hash for a Documents-sourced fact.</summary>
+    private static string DocumentsHash(string eventType, Guid documentId, Guid? secondary, DateTime occurredOn, string discriminator) =>
+        SourceEventHash.Compute(AuditSources.Documents, eventType, AuditSources.ResourceTypes.Document,
+            documentId, secondary, occurredOn, discriminator);
 
     /// <summary>Organization-unit tier scopes select the hierarchy scope id as the
     /// entry's organization scope; global and resource scopes do not.</summary>
