@@ -1631,19 +1631,22 @@ replacement source of truth** for any domain fact.
       consumer is registered by this amendment, no Identity producer change is
       made, no contract or schema change is made, and no migration exists.
 
-      **Producer reliability (mandatory prerequisite).** The Identity producer
-      currently uses **best-effort event publication** (plain
-      `AddCommunityOSEventBus`, no transactional outbox, no outbox entities;
-      verified at Prompt 16AT) and therefore does **not** satisfy ADR-027
-      decision 4 / ADR-015 guaranteed-delivery. Before any Identity → Audit
-      consumer is implemented or registered, a **separate, commit-gated
-      Identity producer outbox gate under ADR-015 must be completed**. That
-      prior producer gate must upgrade the Identity integration-event
-      publication to the established transactional-outbox pattern using
-      `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, with outbox
-      entities in the `identity` schema and publication verification. Until
-      that gate completes, Audit must not register any Identity-event consumer
-      (`PRODUCER-GATED`).
+      **Producer reliability (mandatory prerequisite — completed).** The Identity
+      producer was upgraded to the established transactional-outbox pattern per
+      ADR-015 decision 4 / ADR-027 decision 4 under the separate **Identity
+      producer outbox gate**: Identity publication now uses
+      `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, with outbox entities
+      in the `identity` schema (verified — no longer best-effort, no longer
+      PRODUCER-GATED). The residues below therefore apply to the previous
+      best-effort state (plain `AddCommunityOSEventBus`, no transactional outbox,
+      no outbox entities; verified at Prompt 16AT). Before any Identity → Audit
+      consumer is implemented or registered, the **Identity → Audit consumer
+      configuration gate must complete**, register the consumers (e.g.
+      `AddConsumer<IdentityAuditConsumer>` inside
+      `AddCommunityOSEventBusWithInbox<AuditDbContext>`), and satisfy ADR-027
+      decision 4 / ADR-015 guaranteed-delivery end to end. Until that consumer
+      configuration gate completes, Audit must not register any Identity-event
+      consumer (`CONSUMER-GATED`).
 
       **Ratified mappings (all seven; decision 6 compliant):**
 
@@ -1708,7 +1711,7 @@ replacement source of truth** for any domain fact.
    |----------|------|--------|
    | Documents (5) | Documents outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the five consumers are registered. **Active** | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
    | Authorization (7) | Authorization outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the seven consumers are registered. **Active** | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
-   | Identity (7) | **RATIFIED / AUTHORIZED — NOT IMPLEMENTED.** Identity outbox gate **pending** (ADR-015 prerequisite) **+ consumer configuration gate pending**. No Identity consumer is registered. **PRODUCER-GATED** | `UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked` |
+    | Identity (7) | **RATIFIED / AUTHORIZED — NOT IMPLEMENTED.** Identity outbox gate **completed** (ADR-015 prerequisite): Identity now publishes through the transactional outbox (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`), so no longer **PRODUCER-GATED**. **Consumer configuration gate pending** — no Identity consumer is registered yet. **CONSUMER-GATED** | `UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as
    guaranteed-delivery-required, plus the entire authorization-security set

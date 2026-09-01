@@ -2,6 +2,7 @@ using Asp.Versioning;
 using CommunityOS.EventBus;
 using CommunityOS.Identity.Application;
 using CommunityOS.Identity.Infrastructure;
+using CommunityOS.Identity.Infrastructure.Persistence;
 using CommunityOS.Identity.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
@@ -17,7 +18,7 @@ internal static class ServiceCollectionExtensions
         services
             .AddIdentityApplication()
             .AddIdentityInfrastructure(config)
-            .AddCommunityOSEventBus(config);
+            .AddCommunityOSEventBusWithOutbox<IdentityDbContext>(config);
 
         services
             .AddControllers()

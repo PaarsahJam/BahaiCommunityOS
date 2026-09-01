@@ -136,9 +136,12 @@ Rationale highlights:
 - **Identity — account-security subset, ratified, not yet implemented.** Lock/
   unlock, credential change, MFA and external-identity linkage are classic
   security/compliance facts. The seven are **RATIFIED / AUTHORIZED** with the
-  exact mappings/privacy/hash rules below, but **NOT IMPLEMENTED**: the Identity
-  producer is still best-effort, so the subset is **PRODUCER-GATED** pending the
-  separate ADR-015 Identity outbox gate. No Identity consumer is registered.
+  exact mappings/privacy/hash rules below, but **NOT IMPLEMENTED**. The Identity
+  producer outbox gate (ADR-015) is **complete** — Identity now publishes through
+  the transactional outbox (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`),
+  so the subset is no longer **PRODUCER-GATED**. The consumers remain
+  **CONSUMER-GATED**: no Identity consumer is registered until the separate
+  Identity → Audit consumer configuration gate completes.
 
 ### Producer delivery gates
 
@@ -149,7 +152,7 @@ Rationale highlights:
 | Notifications | Outbox-protected | none — clear |
 | Documents | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, Documents outbox gate) | **Complete** — the five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Authorization | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, authorization outbox gate) | **Complete** — the seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
-| Identity | **Best-effort** (plain `AddCommunityOSEventBus`, no outbox) | **Pending** — Identity producer outbox gate (ADR-015): upgrade to `AddCommunityOSEventBusWithOutbox<IdentityDbContext>` before any Identity consumer may be registered (**CONSUMER-GATED**) |
+| Identity | Outbox-protected (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, Identity producer outbox gate) | **Complete (producer gate)** — Identity now publishes through the transactional outbox, so the subset is no longer PRODUCER-GATED. Consumers remain **CONSUMER-GATED** pending the Identity → Audit consumer configuration gate |
 | Organization | n/a (projection feed) | none — projection consumers may register immediately |
 
 Until a producer's gate completes, the Audit implementation must not register
@@ -201,13 +204,14 @@ carries none, and `CorrelationId`/`CausationId` remain null.
 
 ### Consumer configuration gate — Identity account-security subset ×7
 
-**RATIFIED / AUTHORIZED — NOT IMPLEMENTED / PRODUCER-GATED / CONSUMER-GATED.**
+**RATIFIED / AUTHORIZED — NOT IMPLEMENTED / CONSUMER-GATED.**
 The seven mappings below are ratified policy, but **no Identity consumer is
 implemented or registered** in this amendment. Audit is guaranteed-delivery
-inbox-only; before any Identity consumer is registered, the separate ADR-015
-Identity producer outbox gate must complete (upgrade Identity publication to
-`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`), and then the consumer
-configuration gate registers it (e.g. `AddConsumer<IdentityAuditConsumer>`
+inbox-only. The separate ADR-015 Identity producer outbox gate is **complete**
+(Identity publication upgraded to
+`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, verified — no longer
+PRODUCER-GATED). The Identity → Audit consumer
+configuration gate registers the consumers (e.g. `AddConsumer<IdentityAuditConsumer>`
 inside `AddCommunityOSEventBusWithInbox<AuditDbContext>`).
 
 The mappings use only payload fields the contracts carry. All seven set
@@ -476,7 +480,7 @@ Notifications ┘        │
                        ▼
 Documents ──── (gated: Documents outbox gate) ──►  AUDIT  ──►  (query/export API)
 Authorization (gated: Authorization outbox gate)┘    │
-Identity ───── (RATIFIED — PRODUCER-GATED: Identity outbox gate pending)│
+Identity ───── (RATIFIED — CONSUMER-GATED: producer outbox gate complete)│
 Organization ──► unit reference projection           ▼
                                         Authorization check API (guard)
 ```
