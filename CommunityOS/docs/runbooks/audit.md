@@ -26,6 +26,7 @@
   | Organization | None — projection feed only |
   | Documents | **Documents outbox gate — complete** (Documents now publishes through the transactional outbox; compliance events are guaranteed-delivery and eligible for Audit subscription). The five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
   | Authorization | **Authorization outbox gate — complete** (Authorization now publishes through the transactional outbox; the security subset — roles, delegations, break-glass — is guaranteed-delivery and eligible for Audit subscription). The seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
+  | Identity | **Identity account-security subset RATIFIED / AUTHORIZED — NOT IMPLEMENTED / PRODUCER-GATED.** The seven mappings are ratified, but the Identity producer is still **best-effort** (plain `AddCommunityOSEventBus`, no outbox). Before any Identity consumer is registered, the **Identity producer outbox gate (ADR-015)** must upgrade Identity publication to `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`; only then may the Identity → Audit consumer configuration gate register the seven consumers |
 
 ## Ratified implementation steps (Prompt 12C)
 
@@ -57,6 +58,16 @@
      `DocumentClassified` Sensitive iff its payload `IsSensitive` is true;
      `ScanStatus` carried by `Outcome`; only the existing `classification_code`/
      `status` metadata keys — no new allowlisted key).
+   - Identity ×7 (**RATIFIED / AUTHORIZED — NOT IMPLEMENTED**: `UserAccountLocked`,
+     `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`,
+     `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`; all
+     Normal; `ResourceType "user-account"`/`ResourceId UserAccountId`; Provider/
+     Subject/MethodType omitted; empty-hash discriminator; no new metadata key).
+     These are **NOT registered by this gate** — they are **PRODUCER-GATED** (and
+     thus **CONSUMER-GATED**) pending the separate ADR-015 Identity outbox gate
+     that upgrades Identity publication to
+     `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`. No Identity consumer
+     may be registered until that producer gate completes.
    Do **not** register any deferred or not-classified event (ADR-027 decision 5).
 5. Register the ratified `audit.*` permissions in `PermissionCatalog.cs`
    (`audit.entry.read`, `audit.entry.read.sensitive`, `audit.entry.export`,
@@ -156,6 +167,11 @@ architecture; the default class retains indefinitely until configured
   registered; if Documents or Authorization events appear missing, the producer
   outbox gates are complete, so investigate the producer logs/outbox and the
   consumer queue rather than treating the absence as pre-gate behavior.
+- Identity account-security subset: **RATIFIED / AUTHORIZED but NOT IMPLEMENTED —
+  PRODUCER-GATED / CONSUMER-GATED.** No Identity audit consumer is (or should be)
+  registered until the separate ADR-015 Identity producer outbox gate completes
+  (upgrade to `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`). Missing
+  Identity audit entries are expected at this state and do not indicate a fault.
 
 ## Security / authorization
 

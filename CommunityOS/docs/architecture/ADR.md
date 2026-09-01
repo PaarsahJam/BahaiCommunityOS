@@ -1623,6 +1623,63 @@ replacement source of truth** for any domain fact.
       Sensitive; `DocumentClassified` is Sensitive iff its payload `IsSensitive`
       is true. No new metadata key is allowlisted. No Documents contract or
       producer change accompanies this gate.
+    - **Resolution note (Identity account-security subset — ratified amendment):**
+      the seven Identity account-security events below are promoted from
+      DEFERRED to **CONSUMED AND PERSISTED**, ratifying their exact Audit
+      mappings, sensitivity, privacy and hash rules (per decisions 5/6/10).
+      **Status: RATIFIED / AUTHORIZED only — NOT IMPLEMENTED.** No Identity
+      consumer is registered by this amendment, no Identity producer change is
+      made, no contract or schema change is made, and no migration exists.
+
+      **Producer reliability (mandatory prerequisite).** The Identity producer
+      currently uses **best-effort event publication** (plain
+      `AddCommunityOSEventBus`, no transactional outbox, no outbox entities;
+      verified at Prompt 16AT) and therefore does **not** satisfy ADR-027
+      decision 4 / ADR-015 guaranteed-delivery. Before any Identity → Audit
+      consumer is implemented or registered, a **separate, commit-gated
+      Identity producer outbox gate under ADR-015 must be completed**. That
+      prior producer gate must upgrade the Identity integration-event
+      publication to the established transactional-outbox pattern using
+      `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, with outbox
+      entities in the `identity` schema and publication verification. Until
+      that gate completes, Audit must not register any Identity-event consumer
+      (`PRODUCER-GATED`).
+
+      **Ratified mappings (all seven; decision 6 compliant):**
+
+      | Event | Action | ResourceType / ResourceId | SecondaryResourceId | SubjectId | ActorId | OrganizationUnitId | Outcome | Sensitivity | Metadata |
+      |-------|--------|---------------------------|----------------------|-----------|---------|--------------------|---------|-------------|----------|
+      | `UserAccountLocked` | `user-account-locked` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `UserAccountUnlocked` | `user-account-unlocked` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `CredentialChanged` | `credential-changed` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `MfaMethodEnrolled` | `mfa-method-enrolled` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `MfaMethodRemoved` | `mfa-method-removed` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `ExternalIdentityLinked` | `external-identity-linked` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+      | `ExternalIdentityUnlinked` | `external-identity-unlinked` | `user-account` / `UserAccountId` | null | null | null | null | null | Normal | none |
+
+      **Sensitivity:** all seven are **Normal** (none is on the ratified
+      sensitive-event list `SensitiveAuditEventTypes`; none carries an
+      `IsSensitive` flag). Classification is payload/policy-driven per decision
+      6 — never inferred from event names.
+
+      **Privacy / PII (decision 6 — never persisted):** `ExternalIdentityLinked/
+      Unlinked` `Provider` and `Subject` are **omitted** at ingest (never
+      entered into audit fields or metadata). `MfaMethodEnrolled/Removed`
+      `MethodType` is **omitted**. `CredentialChanged` persists **no** credential
+      or secret material. **No new Audit metadata allowlist key is added.**
+
+      **Hash / idempotency (decision 10):** `SourceEventHash` =
+      `Compute("identity", <event type>, "user-account", UserAccountId, null,
+      OccurredOn, "")` — empty discriminator for all seven. Distinct event types
+      and distinct `UserAccountId`s remain distinct; an identical restated fact
+      replays to the identical hash; a changed `OccurredOn` yields a distinct
+      occurrence. Raw `Provider`, `Subject` or `MethodType` values never enter
+      the hash. No no-metadata collision exists among the seven.
+
+      **SourceService / ResourceType:** `SourceService = "identity"`,
+      `ResourceType = "user-account"` — both fit existing string(50) columns;
+      the code constants are added at the consumer-gate implementation (see
+      decision 8). No schema or contract change accompanies this amendment.
 
 5. **First-gate event catalog.** Every event in every existing contract
    (`CommunityOS.Contracts.*`) is classified below. The catalog is exhaustive:
@@ -1645,28 +1702,28 @@ replacement source of truth** for any domain fact.
    accountability (ADR-024); task *start* adds review-latency detail only.
    Dispatch completion is the sole exportable notification fact (ADR-025).
 
-   **CONSUMED AND PERSISTED — producer-gated (12):**
+   **CONSUMED AND PERSISTED — producer-gated (19):**
 
    | Producer | Gate | Events |
    |----------|------|--------|
    | Documents (5) | Documents outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the five consumers are registered. **Active** | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
    | Authorization (7) | Authorization outbox gate (completed) **+ consumer configuration gate**: no consumers were registered by the outbox gate; the seven consumers are registered. **Active** | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
+   | Identity (7) | **RATIFIED / AUTHORIZED — NOT IMPLEMENTED.** Identity outbox gate **pending** (ADR-015 prerequisite) **+ consumer configuration gate pending**. No Identity consumer is registered. **PRODUCER-GATED** | `UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked` |
 
    Rationale: exactly the subset `docs/documents.md` has always listed as
    guaranteed-delivery-required, plus the entire authorization-security set
    (role/delegation changes are privilege facts; break-glass is mandated by
-   ADR-014).
+   ADR-014). The Identity account-security subset (lock/unlock, credential
+   change, MFA and external-identity linkage) is ratified for consumption
+   subject to its producer-reliability (outbox) prerequisite.
 
    **CONSUMED BUT NOT PERSISTED AS AUDIT ENTRIES — projection only (3):**
    Organization `OrganizationUnitCreated/Updated/ParentChanged` →
    `organization_unit_references` (ADR-016 scoping infrastructure; never
    journaled as entries).
 
-   **DEFERRED (17)** — candidate second-gate material; none subscribed now:
-   `WorkflowTaskStarted`; Identity account-security subset (`UserAccountLocked`,
-   `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`,
-   `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`);
-   Organization governance facts (`DelegationFactGranted`,
+   **DEFERRED (10)** — candidate second-gate material; none subscribed now:
+   `WorkflowTaskStarted`; Organization governance facts (`DelegationFactGranted`,
    `DelegationFactRevoked`); Knowledge moderation/AI-governance subset
    (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`,
    `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`);
@@ -1734,7 +1791,7 @@ replacement source of truth** for any domain fact.
    | `SourceEventHash` (string 64) | yes | Deterministic SHA-256 over canonical (source service, event type, resource ids, occurred-on, discriminating scalar fields); the idempotency identity — unique | non-PII | no | UNIQUE |
    | `Action` (string 100) | yes | Normalized action code (e.g. `record-verified`, `hold-placed`, `task-completed`, `break-glass-approved`) | non-PII | no | yes (with date filters) |
    | `Outcome` (string 100) | no | Normalized outcome/status code carried by the payload (workflow outcome, scan status) | non-PII | no | no |
-   | `ResourceType` (string 50) | yes | What the fact is about (`record`, `document`, `workflow-task`, `notification`, `authz-role`, `authz-delegation`, `break-glass-request`) | non-PII | no | yes (composite) |
+   | `ResourceType` (string 50) | yes | What the fact is about (`record`, `document`, `workflow-task`, `notification`, `authz-role`, `authz-delegation`, `break-glass-request`, `user-account`) | non-PII | no | yes (composite) |
    | `ResourceId` (Guid) | yes | Primary aggregate id from the payload | non-PII | no | composite with type |
    | `SecondaryResourceId` (Guid?) | no | Sub-object id where applicable (hold id, version id, assignment/request id) | non-PII | no | no |
    | `SubjectId` (Guid?) | no | Person/household the fact concerns, when the payload carries one (e.g. `RecordCreated.SubjectId`); null otherwise — never resolved or enriched | person-id reference | no | yes |

@@ -110,8 +110,9 @@ never subscribed without an ADR amendment.
 | CONSUMED AND PERSISTED — first gate | 22 | Records: all 16 lifecycle/compliance events. Workflow: `WorkflowTaskCreated`, `WorkflowTaskAssigned`, `WorkflowTaskCompleted`, `WorkflowTaskCancelled`, `WorkflowTaskEscalated`. Notifications: `NotificationDispatched` |
 | CONSUMED AND PERSISTED — Authorization security subset | 7 | `RoleAssigned`, `RoleRevoked`, `DelegationGranted`, `DelegationRevoked`, `BreakGlassRequested`, `BreakGlassApproved`, `BreakGlassRevoked` |
 | CONSUMED AND PERSISTED — Documents compliance subset | 5 | `DocumentClassified`, `DocumentDeactivated`, `DocumentRestored`, `DocumentContentDownloaded`, `DocumentScanCompleted` |
+| CONSUMED AND PERSISTED — Identity account-security subset (RATIFIED / AUTHORIZED — NOT IMPLEMENTED, PRODUCER-GATED) | 7 | `UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked` |
 | CONSUMED BUT NOT PERSISTED — projection only | 3 | Organization: `OrganizationUnitCreated`, `OrganizationUnitUpdated`, `OrganizationUnitParentChanged` |
-| DEFERRED | 17 | `WorkflowTaskStarted`; Identity account-security subset (`UserAccountLocked`, `UserAccountUnlocked`, `CredentialChanged`, `MfaMethodEnrolled`, `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`); Organization governance facts (`DelegationFactGranted`, `DelegationFactRevoked`); Knowledge moderation/AI subset (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`, `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`); `DocumentArchived` |
+| DEFERRED | 10 | `WorkflowTaskStarted`; Organization governance facts (`DelegationFactGranted`, `DelegationFactRevoked`); Knowledge moderation/AI subset (`QuestionFlagged`, `QuestionUnderReview`, `QuestionMerged`, `QuestionArchived`, `AiSuggestionRequested`, `AiSuggestionReviewed`); `DocumentArchived` |
 | NOT AN AUDIT EVENT | 41 | Documents: `DocumentCreated`, `DocumentMetadataUpdated`, `DocumentVersionAdded`. Identity: `UserAccountRegistered` (carries email), `UserAccountVerified`, `UserAccountDeactivated`, `DeviceRegistered` (carries device name), `RefreshTokenIssued` (session telemetry). Organization: `OrganizationCreated/Updated`, `Committee*`, `AppointmentAssigned/Ended`. Community: all 14 person/household/membership/activity/event/meeting/participation events (official membership/appointment facts belong to Records). Knowledge: Library pipeline and answer/category events (`WorkImported`, `EditionImported`, `EditionVerified`, `PassageImported`, `PassageCorrected`, `QuestionSubmitted`, `QuestionPublished`, `AnswerAdded`, `AnswerUpdated`, `AnswerAccepted`, `CategoryCreated`, `CategoryUpdated`) |
 
 Rationale highlights:
@@ -132,6 +133,12 @@ Rationale highlights:
   privilege facts; break-glass auditing is mandated by ADR-014 ("high-priority
   audit events"). The producer gate completed and the seven consumers are
   registered (below).
+- **Identity — account-security subset, ratified, not yet implemented.** Lock/
+  unlock, credential change, MFA and external-identity linkage are classic
+  security/compliance facts. The seven are **RATIFIED / AUTHORIZED** with the
+  exact mappings/privacy/hash rules below, but **NOT IMPLEMENTED**: the Identity
+  producer is still best-effort, so the subset is **PRODUCER-GATED** pending the
+  separate ADR-015 Identity outbox gate. No Identity consumer is registered.
 
 ### Producer delivery gates
 
@@ -142,6 +149,7 @@ Rationale highlights:
 | Notifications | Outbox-protected | none — clear |
 | Documents | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, Documents outbox gate) | **Complete** — the five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Authorization | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, authorization outbox gate) | **Complete** — the seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
+| Identity | **Best-effort** (plain `AddCommunityOSEventBus`, no outbox) | **Pending** — Identity producer outbox gate (ADR-015): upgrade to `AddCommunityOSEventBusWithOutbox<IdentityDbContext>` before any Identity consumer may be registered (**CONSUMER-GATED**) |
 | Organization | n/a (projection feed) | none — projection consumers may register immediately |
 
 Until a producer's gate completes, the Audit implementation must not register
@@ -190,6 +198,48 @@ No `scan_status` metadata key is added: `ScanStatus` is represented through the
 existing `Outcome` field (ADR-027 decision 8 — the outcome column is defined for
 scan status). No `ActorId`/`SubjectId`/scope is invented where the contract
 carries none, and `CorrelationId`/`CausationId` remain null.
+
+### Consumer configuration gate — Identity account-security subset ×7
+
+**RATIFIED / AUTHORIZED — NOT IMPLEMENTED / PRODUCER-GATED / CONSUMER-GATED.**
+The seven mappings below are ratified policy, but **no Identity consumer is
+implemented or registered** in this amendment. Audit is guaranteed-delivery
+inbox-only; before any Identity consumer is registered, the separate ADR-015
+Identity producer outbox gate must complete (upgrade Identity publication to
+`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`), and then the consumer
+configuration gate registers it (e.g. `AddConsumer<IdentityAuditConsumer>`
+inside `AddCommunityOSEventBusWithInbox<AuditDbContext>`).
+
+The mappings use only payload fields the contracts carry. All seven set
+`ResourceType = "user-account"`, `ResourceId = UserAccountId`,
+`SecondaryResourceId = null`, `SubjectId = null`, `ActorId = null`,
+`OrganizationUnitId = null`, `Outcome = null` — no actor/subject/scope is
+invented where the contract carries none, and `CorrelationId`/`CausationId`
+remain null.
+
+| Event | Action | ResourceId | Metadata | Sensitivity |
+|-------|--------|-----------|----------|-------------|
+| `UserAccountLocked` | `user-account-locked` | `UserAccountId` | none | Normal |
+| `UserAccountUnlocked` | `user-account-unlocked` | `UserAccountId` | none | Normal |
+| `CredentialChanged` | `credential-changed` | `UserAccountId` | none | Normal |
+| `MfaMethodEnrolled` | `mfa-method-enrolled` | `UserAccountId` | none | Normal |
+| `MfaMethodRemoved` | `mfa-method-removed` | `UserAccountId` | none | Normal |
+| `ExternalIdentityLinked` | `external-identity-linked` | `UserAccountId` | none | Normal |
+| `ExternalIdentityUnlinked` | `external-identity-unlinked` | `UserAccountId` | none | Normal |
+
+Privacy (ADR-027 decision 6): `ExternalIdentityLinked/Unlinked` `Provider` and
+`Subject` are **not persisted** in any audit field or metadata; `MfaMethodEnrolled/
+Removed` `MethodType` is **not persisted**; `CredentialChanged` persists **no**
+credential/secret material. **No new metadata allowlist key is added.** All seven
+are **Normal** (none is on the ratified sensitive-event list; none carries an
+`IsSensitive` flag) — sensitivity is policy/payload-driven, never name-based.
+
+Idempotency hash (ADR-027 decision 10): `SourceEventHash` =
+`Compute("identity", <event type>, "user-account", UserAccountId, null,
+OccurredOn, "")` — empty discriminator for all seven. Distinct event types and
+`UserAccountId`s remain distinct; a restated identical fact replays to the same
+hash; a changed `OccurredOn` is a distinct occurrence; raw `Provider`/`Subject`/
+`MethodType` never enter the hash.
 
 ## Ingest Pipeline
 
@@ -404,8 +454,9 @@ consumer feedback loop can form.
 
 - **Consumes** — exactly the ratified first-gate catalog above via MassTransit
   under `CommunityOS.Contracts.{Records,Workflow,Notifications,Documents,
-  Authorization,Organization}`. Consumer registration per producer is gated on
-  that producer's delivery gate.
+  Authorization,Organization}` (plus the ratified-but-not-yet-implemented
+  Identity account-security subset, **PRODUCER-GATED**). Consumer registration
+  per producer is gated on that producer's delivery gate.
 - **Produces** — nothing. No integration events at the first gate; outbox
   activation requires an ADR amendment.
 - **Authorization** — guard over the check API as a service principal; no
@@ -425,6 +476,7 @@ Notifications ┘        │
                        ▼
 Documents ──── (gated: Documents outbox gate) ──►  AUDIT  ──►  (query/export API)
 Authorization (gated: Authorization outbox gate)┘    │
+Identity ───── (RATIFIED — PRODUCER-GATED: Identity outbox gate pending)│
 Organization ──► unit reference projection           ▼
                                         Authorization check API (guard)
 ```
