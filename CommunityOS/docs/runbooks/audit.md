@@ -26,7 +26,7 @@
   | Organization | None — projection feed only |
   | Documents | **Documents outbox gate — complete** (Documents now publishes through the transactional outbox; compliance events are guaranteed-delivery and eligible for Audit subscription). The five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
   | Authorization | **Authorization outbox gate — complete** (Authorization now publishes through the transactional outbox; the security subset — roles, delegations, break-glass — is guaranteed-delivery and eligible for Audit subscription). The seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
-  | Identity | **Identity account-security subset RATIFIED / AUTHORIZED — NOT IMPLEMENTED / CONSUMER-GATED.** The seven mappings are ratified, and the **Identity producer outbox gate (ADR-015) is complete** — Identity now publishes through the transactional outbox (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`), so it is no longer PRODUCER-GATED. Before any Identity consumer is registered, the separate **Identity → Audit consumer configuration gate** must register the seven consumers |
+  | Identity | **Identity account-security subset — active.** The seven mappings are ratified, the **Identity producer outbox gate (ADR-015) is complete**, and the seven account-security consumers are registered through Audit's inbox (consumer configuration gate). Identity publishes through the transactional outbox (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`); the seven consumers are active and journaling |
 
 ## Ratified implementation steps (Prompt 12C)
 
@@ -63,12 +63,11 @@
      `MfaMethodRemoved`, `ExternalIdentityLinked`, `ExternalIdentityUnlinked`; all
      Normal; `ResourceType "user-account"`/`ResourceId UserAccountId`; Provider/
      Subject/MethodType omitted; empty-hash discriminator; no new metadata key).
-     These are **NOT registered by this gate** — the separate ADR-015 Identity
-     producer outbox gate (upgrade Identity publication to
-     `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`) is **complete**, but
-     the seven consumers remain **CONSUMER-GATED** until the Identity → Audit
-     consumer configuration gate registers them. No Identity consumer
-     may be registered until that consumer configuration gate completes.
+     These seven consumers are **registered** inside Audit's inbox callback via
+     `AddConsumer<IdentityAuditConsumer>` inside
+     `AddCommunityOSEventBusWithInbox<AuditDbContext>`. The Identity producer
+     outbox gate (ADR-015) is **complete** (Identity publishes through the
+     transactional outbox). All seven are active and journaling.
    Do **not** register any deferred or not-classified event (ADR-027 decision 5).
 5. Register the ratified `audit.*` permissions in `PermissionCatalog.cs`
    (`audit.entry.read`, `audit.entry.read.sensitive`, `audit.entry.export`,
@@ -168,13 +167,12 @@ architecture; the default class retains indefinitely until configured
   registered; if Documents or Authorization events appear missing, the producer
   outbox gates are complete, so investigate the producer logs/outbox and the
   consumer queue rather than treating the absence as pre-gate behavior.
-- Identity account-security subset: **RATIFIED / AUTHORIZED but NOT IMPLEMENTED —
-  CONSUMER-GATED.** The Identity producer outbox gate (ADR-015) is **complete**
-  (Identity publishes through the transactional outbox). No Identity audit
-  consumer is (or should be) registered until the separate Identity → Audit
-  consumer configuration gate registers it
-  (e.g. `AddConsumer<IdentityAuditConsumer>`). Missing
-  Identity audit entries are expected at this state and do not indicate a fault.
+- Identity account-security subset: **RATIFIED / AUTHORIZED — ACTIVE.**
+  The Identity producer outbox gate (ADR-015) is **complete** (Identity
+  publishes through the transactional outbox) and the seven consumers are
+  registered and active. If Identity audit entries are missing, investigate the
+  producer logs/outbox and the consumer queue rather than treating the absence
+  as pre-gate behavior.
 
 ## Security / authorization
 

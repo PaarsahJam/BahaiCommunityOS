@@ -133,15 +133,15 @@ Rationale highlights:
   privilege facts; break-glass auditing is mandated by ADR-014 ("high-priority
   audit events"). The producer gate completed and the seven consumers are
   registered (below).
-- **Identity — account-security subset, ratified, not yet implemented.** Lock/
+- **Identity — account-security subset, active.** Lock/
   unlock, credential change, MFA and external-identity linkage are classic
   security/compliance facts. The seven are **RATIFIED / AUTHORIZED** with the
-  exact mappings/privacy/hash rules below, but **NOT IMPLEMENTED**. The Identity
-  producer outbox gate (ADR-015) is **complete** — Identity now publishes through
-  the transactional outbox (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`),
-  so the subset is no longer **PRODUCER-GATED**. The consumers remain
-  **CONSUMER-GATED**: no Identity consumer is registered until the separate
-  Identity → Audit consumer configuration gate completes.
+  exact mappings/privacy/hash rules below. The Identity
+  producer outbox gate (ADR-015) and consumer configuration gate are both
+  **complete** — Identity publishes through the transactional outbox
+  (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`) and the seven
+  `IdentityAuditConsumer` registrations are active inside Audit's inbox
+  (`AddCommunityOSEventBusWithInbox<AuditDbContext>`).
 
 ### Producer delivery gates
 
@@ -152,7 +152,7 @@ Rationale highlights:
 | Notifications | Outbox-protected | none — clear |
 | Documents | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, Documents outbox gate) | **Complete** — the five compliance-subset consumers are registered through Audit's inbox (consumer configuration gate) |
 | Authorization | Outbox-protected (`AddCommunityOSEventBusWithOutbox`, authorization outbox gate) | **Complete** — the seven security-subset consumers are registered through Audit's inbox (consumer configuration gate) |
-| Identity | Outbox-protected (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, Identity producer outbox gate) | **Complete (producer gate)** — Identity now publishes through the transactional outbox, so the subset is no longer PRODUCER-GATED. Consumers remain **CONSUMER-GATED** pending the Identity → Audit consumer configuration gate |
+| Identity | Outbox-protected (`AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, Identity producer outbox gate) | **Complete** — Identity publishes through the transactional outbox; the seven account-security consumers are registered through Audit's inbox (consumer configuration gate) |
 | Organization | n/a (projection feed) | none — projection consumers may register immediately |
 
 Until a producer's gate completes, the Audit implementation must not register
@@ -204,15 +204,14 @@ carries none, and `CorrelationId`/`CausationId` remain null.
 
 ### Consumer configuration gate — Identity account-security subset ×7
 
-**RATIFIED / AUTHORIZED — NOT IMPLEMENTED / CONSUMER-GATED.**
-The seven mappings below are ratified policy, but **no Identity consumer is
-implemented or registered** in this amendment. Audit is guaranteed-delivery
-inbox-only. The separate ADR-015 Identity producer outbox gate is **complete**
+**RATIFIED / AUTHORIZED — ACTIVE.**
+The seven mappings below are ratified policy and **registered** in Audit's
+inbox callback via `AddConsumer<IdentityAuditConsumer>` inside
+`AddCommunityOSEventBusWithInbox<AuditDbContext>`. Audit is guaranteed-delivery
+inbox-only. The Identity producer outbox gate (ADR-015) is **complete**
 (Identity publication upgraded to
 `AddCommunityOSEventBusWithOutbox<IdentityDbContext>`, verified — no longer
-PRODUCER-GATED). The Identity → Audit consumer
-configuration gate registers the consumers (e.g. `AddConsumer<IdentityAuditConsumer>`
-inside `AddCommunityOSEventBusWithInbox<AuditDbContext>`).
+PRODUCER-GATED). The seven consumers are active and journaling.
 
 The mappings use only payload fields the contracts carry. All seven set
 `ResourceType = "user-account"`, `ResourceId = UserAccountId`,
@@ -480,7 +479,7 @@ Notifications ┘        │
                        ▼
 Documents ──── (gated: Documents outbox gate) ──►  AUDIT  ──►  (query/export API)
 Authorization (gated: Authorization outbox gate)┘    │
-Identity ───── (RATIFIED — CONSUMER-GATED: producer outbox gate complete)│
+Identity ───── (Active: outbox + consumer configuration gate complete)   │
 Organization ──► unit reference projection           ▼
                                         Authorization check API (guard)
 ```

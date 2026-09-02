@@ -23,6 +23,7 @@ internal static class ServiceCollectionExtensions
             bus.AddConsumer<OrganizationUnitProjectionConsumer>();
             bus.AddConsumer<AuthorizationAuditConsumer>();
             bus.AddConsumer<DocumentsAuditConsumer>();
+            bus.AddConsumer<IdentityAuditConsumer>();
         });
         services.AddControllers()
             .AddJsonOptions(x => x.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);

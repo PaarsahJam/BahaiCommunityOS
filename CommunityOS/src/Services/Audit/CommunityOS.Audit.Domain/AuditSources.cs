@@ -11,6 +11,7 @@ public static class AuditSources
     public const string Notifications = "notifications";
     public const string Documents = "documents";
     public const string Authorization = "authorization";
+    public const string Identity = "identity";
     public const string Audit = "audit";
 
     /// <summary>Producers whose compliance events persist at the first gate.</summary>
@@ -26,6 +27,7 @@ public static class AuditSources
         public const string AuthzRole = "authz-role";
         public const string AuthzDelegation = "authz-delegation";
         public const string BreakGlassRequest = "break-glass-request";
+        public const string UserAccount = "user-account";
         public const string AuditEntry = "audit-entry";
         public const string AuditHold = "audit-entry-hold";
         public const string AuditExport = "audit-export";
@@ -35,7 +37,7 @@ public static class AuditSources
             new HashSet<string>(StringComparer.Ordinal)
             {
                 Record, WorkflowTask, Notification, Document, AuthzRole, AuthzDelegation,
-                BreakGlassRequest, AuditEntry, AuditHold, AuditExport
+                BreakGlassRequest, UserAccount, AuditEntry, AuditHold, AuditExport
             };
     }
 }

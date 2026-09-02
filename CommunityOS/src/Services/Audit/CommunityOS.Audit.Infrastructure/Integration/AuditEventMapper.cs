@@ -3,6 +3,7 @@ using CommunityOS.Audit.Application;
 using CommunityOS.Audit.Domain;
 using CommunityOS.Contracts.Authorization;
 using CommunityOS.Contracts.Documents;
+using CommunityOS.Contracts.Identity;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Records;
 using CommunityOS.Contracts.Workflow;
@@ -385,6 +386,64 @@ public static class AuditEventMapper
         SourceEventHash: DocumentsHash(nameof(DocumentScanCompleted), e.DocumentId, e.VersionId, e.OccurredOn,
             e.ScanStatus));
 
+    // ---- Identity -----------------------------------------------------
+
+    public static IngestCandidate Map(UserAccountLocked e) => new(
+        AuditSources.Identity, nameof(UserAccountLocked), "user-account-locked",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(UserAccountLocked), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(UserAccountUnlocked e) => new(
+        AuditSources.Identity, nameof(UserAccountUnlocked), "user-account-unlocked",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(UserAccountUnlocked), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(CredentialChanged e) => new(
+        AuditSources.Identity, nameof(CredentialChanged), "credential-changed",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(CredentialChanged), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(MfaMethodEnrolled e) => new(
+        AuditSources.Identity, nameof(MfaMethodEnrolled), "mfa-method-enrolled",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(MfaMethodEnrolled), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(MfaMethodRemoved e) => new(
+        AuditSources.Identity, nameof(MfaMethodRemoved), "mfa-method-removed",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(MfaMethodRemoved), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(ExternalIdentityLinked e) => new(
+        AuditSources.Identity, nameof(ExternalIdentityLinked), "external-identity-linked",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(ExternalIdentityLinked), e.UserAccountId, e.OccurredOn, string.Empty));
+
+    public static IngestCandidate Map(ExternalIdentityUnlinked e) => new(
+        AuditSources.Identity, nameof(ExternalIdentityUnlinked), "external-identity-unlinked",
+        AuditSources.ResourceTypes.UserAccount, e.UserAccountId,
+        null, null, null, null,
+        AuditSensitivity.Normal, null,
+        null,
+        e.OccurredOn, IdentityHash(nameof(ExternalIdentityUnlinked), e.UserAccountId, e.OccurredOn, string.Empty));
+
     // ---- Helpers -------------------------------------------------------------
 
     /// <summary>Canonical identity hash for a Records-sourced fact.</summary>
@@ -411,6 +470,13 @@ public static class AuditEventMapper
     private static string DocumentsHash(string eventType, Guid documentId, Guid? secondary, DateTime occurredOn, string discriminator) =>
         SourceEventHash.Compute(AuditSources.Documents, eventType, AuditSources.ResourceTypes.Document,
             documentId, secondary, occurredOn, discriminator);
+
+    /// <summary>Canonical identity hash for an Identity-sourced account-security fact.
+    /// Provider/Subject (external identity) and MethodType (MFA) never enter the hash
+    /// (ADR-027 decision 10 / privacy).</summary>
+    private static string IdentityHash(string eventType, Guid userAccountId, DateTime occurredOn, string discriminator) =>
+        SourceEventHash.Compute(AuditSources.Identity, eventType, AuditSources.ResourceTypes.UserAccount,
+            userAccountId, null, occurredOn, discriminator);
 
     /// <summary>Organization-unit tier scopes select the hierarchy scope id as the
     /// entry's organization scope; global and resource scopes do not.</summary>

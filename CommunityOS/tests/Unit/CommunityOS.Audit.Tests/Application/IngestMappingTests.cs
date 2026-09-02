@@ -3,6 +3,7 @@ using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure.Integration;
 using CommunityOS.Contracts.Authorization;
 using CommunityOS.Contracts.Documents;
+using CommunityOS.Contracts.Identity;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Organization;
 using CommunityOS.Contracts.Records;
@@ -456,6 +457,117 @@ public sealed class IngestMappingTests
         candidate.Metadata.Should().BeNull();
     }
 
+    // ---- Identity -------------------------------------------------------
+
+    [Fact]
+    public void UserAccountLocked_maps_account_identity_without_fabricating_scope()
+    {
+        var accountId = Guid.NewGuid();
+
+        var candidate = AuditEventMapper.Map(new UserAccountLocked(accountId, Now));
+
+        candidate.SourceService.Should().Be("identity");
+        candidate.Action.Should().Be("user-account-locked");
+        candidate.ResourceType.Should().Be("user-account");
+        candidate.ResourceId.Should().Be(accountId);
+        candidate.SecondaryResourceId.Should().BeNull();
+        candidate.SubjectId.Should().BeNull();
+        candidate.ActorId.Should().BeNull();
+        candidate.OrganizationUnitId.Should().BeNull();
+        candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+        candidate.Outcome.Should().BeNull();
+        candidate.Metadata.Should().BeNull();
+    }
+
+    [Fact]
+    public void All_seven_identity_events_map_identity_provenance_user_account_resource_and_normal_sensitivity()
+    {
+        var accountId = Guid.NewGuid();
+
+        var events = new object[]
+        {
+            new UserAccountLocked(accountId, Now),
+            new UserAccountUnlocked(accountId, Now),
+            new CredentialChanged(accountId, Now),
+            new MfaMethodEnrolled(accountId, "totp", Now),
+            new MfaMethodRemoved(accountId, "totp", Now),
+            new ExternalIdentityLinked(accountId, "google", "sub-123", Now),
+            new ExternalIdentityUnlinked(accountId, "apple", "sub-456", Now)
+        };
+
+        foreach (var e in events)
+        {
+            var candidate = Map(e);
+            candidate.SourceService.Should().Be("identity");
+            candidate.ResourceType.Should().Be("user-account");
+            candidate.ResourceId.Should().Be(accountId);
+            candidate.SecondaryResourceId.Should().BeNull();
+            candidate.SubjectId.Should().BeNull();
+            candidate.ActorId.Should().BeNull();
+            candidate.OrganizationUnitId.Should().BeNull();
+            candidate.Sensitivity.Should().Be(AuditSensitivity.Normal);
+            candidate.Metadata.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public void External_identity_events_never_persist_provider_or_subject()
+    {
+        var candidate = AuditEventMapper.Map(new ExternalIdentityLinked(Guid.NewGuid(), "google", "sub-123", Now));
+
+        candidate.Metadata.Should().BeNull();
+        candidate.SourceEventHash.Should().NotContain("google");
+        candidate.SourceEventHash.Should().NotContain("sub-123");
+
+        var unlinked = AuditEventMapper.Map(new ExternalIdentityUnlinked(Guid.NewGuid(), "apple", "sub-456", Now));
+        unlinked.Metadata.Should().BeNull();
+        unlinked.SourceEventHash.Should().NotContain("apple");
+        unlinked.SourceEventHash.Should().NotContain("sub-456");
+    }
+
+    [Fact]
+    public void Mfa_events_never_persist_method_type_or_metadata_key()
+    {
+        var enrolled = AuditEventMapper.Map(new MfaMethodEnrolled(Guid.NewGuid(), "totp", Now));
+        enrolled.Metadata.Should().BeNull();
+        enrolled.SourceEventHash.Should().NotContain("totp");
+        enrolled.SourceEventHash.Should().NotContain("method_type");
+
+        var removed = AuditEventMapper.Map(new MfaMethodRemoved(Guid.NewGuid(), "sms", Now));
+        removed.Metadata.Should().BeNull();
+        removed.SourceEventHash.Should().NotContain("sms");
+        removed.SourceEventHash.Should().NotContain("method_type");
+    }
+
+    [Fact]
+    public void Credential_changed_never_persists_credential_material()
+    {
+        var candidate = AuditEventMapper.Map(new CredentialChanged(Guid.NewGuid(), Now));
+
+        candidate.Metadata.Should().BeNull();
+        candidate.SourceEventHash.Should().NotContain("cred");
+        candidate.SourceEventHash.Should().NotContain("secret");
+        candidate.SourceEventHash.Should().NotContain("password");
+    }
+
+    [Fact]
+    public void Same_identity_fact_hashes_identically_regardless_of_provider_subject_or_method_type()
+    {
+        var accountId = Guid.NewGuid();
+
+        var linkedA = AuditEventMapper.Map(new ExternalIdentityLinked(accountId, "google", "sub-1", Now));
+        var linkedB = AuditEventMapper.Map(new ExternalIdentityLinked(accountId, "apple", "sub-2", Now));
+
+        linkedA.SourceEventHash.Should().Be(linkedB.SourceEventHash,
+            "distinct provider/subject values do not change the ratified identity hash");
+
+        var enrolledA = AuditEventMapper.Map(new MfaMethodEnrolled(accountId, "totp", Now));
+        var enrolledB = AuditEventMapper.Map(new MfaMethodEnrolled(accountId, "sms", Now));
+
+        enrolledA.SourceEventHash.Should().Be(enrolledB.SourceEventHash,
+            "distinct method types do not change the ratified identity hash");
+    }
+
     // ---- Hash semantics --------------------------------------------------------
 
     [Fact]
@@ -505,4 +617,55 @@ public sealed class IngestMappingTests
         var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
         AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);
     }
+
+    [Fact]
+    public void Identity_distinct_event_types_hash_distinctly()
+    {
+        var accountId = Guid.NewGuid();
+
+        AuditEventMapper.Map(new UserAccountLocked(accountId, Now)).SourceEventHash
+            .Should().NotBe(AuditEventMapper.Map(new UserAccountUnlocked(accountId, Now)).SourceEventHash);
+
+        AuditEventMapper.Map(new MfaMethodEnrolled(accountId, "totp", Now)).SourceEventHash
+            .Should().NotBe(AuditEventMapper.Map(new MfaMethodRemoved(accountId, "totp", Now)).SourceEventHash);
+
+        AuditEventMapper.Map(new ExternalIdentityLinked(accountId, "google", "sub-1", Now)).SourceEventHash
+            .Should().NotBe(AuditEventMapper.Map(new ExternalIdentityUnlinked(accountId, "google", "sub-1", Now)).SourceEventHash);
+
+        AuditEventMapper.Map(new CredentialChanged(accountId, Now)).SourceEventHash
+            .Should().NotBe(AuditEventMapper.Map(new ExternalIdentityLinked(accountId, "google", "sub-1", Now)).SourceEventHash);
+    }
+
+    [Fact]
+    public void Identity_distinct_user_accounts_hash_distinctly()
+    {
+        var e1 = new UserAccountLocked(Guid.NewGuid(), Now);
+        var e2 = new UserAccountLocked(Guid.NewGuid(), Now);
+
+        AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(e2).SourceEventHash);
+    }
+
+    [Fact]
+    public void Identity_identical_fact_hashes_identically_and_new_occurred_on_is_distinct()
+    {
+        var e1 = new CredentialChanged(Guid.NewGuid(), Now);
+        var e2 = e1 with { };
+
+        AuditEventMapper.Map(e1).SourceEventHash.Should().Be(AuditEventMapper.Map(e2).SourceEventHash);
+
+        var restated = e1 with { OccurredOn = Now.AddSeconds(1) };
+        AuditEventMapper.Map(e1).SourceEventHash.Should().NotBe(AuditEventMapper.Map(restated).SourceEventHash);
+    }
+
+    private static IngestCandidate Map(object message) => message switch
+    {
+        UserAccountLocked e => AuditEventMapper.Map(e),
+        UserAccountUnlocked e => AuditEventMapper.Map(e),
+        CredentialChanged e => AuditEventMapper.Map(e),
+        MfaMethodEnrolled e => AuditEventMapper.Map(e),
+        MfaMethodRemoved e => AuditEventMapper.Map(e),
+        ExternalIdentityLinked e => AuditEventMapper.Map(e),
+        ExternalIdentityUnlinked e => AuditEventMapper.Map(e),
+        _ => throw new InvalidOperationException($"Unhandled event {message.GetType().Name}")
+    };
 }

@@ -3,6 +3,7 @@ using CommunityOS.Audit.Domain;
 using CommunityOS.Audit.Infrastructure.Integration;
 using CommunityOS.Contracts.Authorization;
 using CommunityOS.Contracts.Documents;
+using CommunityOS.Contracts.Identity;
 using CommunityOS.Contracts.Notifications;
 using CommunityOS.Contracts.Records;
 using FluentAssertions;
@@ -169,6 +170,85 @@ public sealed class AuditConsumerTests
         consumer.Should().NotBeAssignableTo<IConsumer<DocumentCreated>>();
         consumer.Should().NotBeAssignableTo<IConsumer<DocumentMetadataUpdated>>();
         consumer.Should().NotBeAssignableTo<IConsumer<DocumentVersionAdded>>();
+    }
+
+    [Fact]
+    public async Task Identity_consumer_ingests_exactly_the_seven_ratified_events_mapped_and_tolerates_duplicates()
+    {
+        var ingestor = Substitute.For<IAuditIngestor>();
+        ingestor.IngestAsync(Arg.Any<IngestCandidate>(), Arg.Any<CancellationToken>())
+            .Returns(IngestOutcome.Duplicate);
+        var consumer = new IdentityAuditConsumer(ingestor, NullLogger<IdentityAuditConsumer>.Instance);
+
+        var accountId = Guid.NewGuid();
+        object[] events =
+        [
+            new UserAccountLocked(accountId, DateTime.UtcNow),
+            new UserAccountUnlocked(accountId, DateTime.UtcNow),
+            new CredentialChanged(accountId, DateTime.UtcNow),
+            new MfaMethodEnrolled(accountId, "totp", DateTime.UtcNow),
+            new MfaMethodRemoved(accountId, "totp", DateTime.UtcNow),
+            new ExternalIdentityLinked(accountId, "google", "sub-1", DateTime.UtcNow),
+            new ExternalIdentityUnlinked(accountId, "google", "sub-1", DateTime.UtcNow)
+        ];
+
+        var expectedActions = new[]
+        {
+            "user-account-locked",
+            "user-account-unlocked",
+            "credential-changed",
+            "mfa-method-enrolled",
+            "mfa-method-removed",
+            "external-identity-linked",
+            "external-identity-unlinked"
+        };
+
+        for (var i = 0; i < events.Length; i++)
+        {
+            await Dispatch(consumer, events[i]);
+            await ingestor.Received(1).IngestAsync(
+                Arg.Is<IngestCandidate>(c =>
+                    c.SourceService == "identity" && c.ResourceType == "user-account"
+                    && c.Action == expectedActions[i]
+                    && c.SecondaryResourceId == null
+                    && c.SubjectId == null
+                    && c.ActorId == null
+                    && c.OrganizationUnitId == null
+                    && c.Sensitivity == AuditSensitivity.Normal),
+                Arg.Any<CancellationToken>());
+        }
+    }
+
+    private static Task Dispatch(IdentityAuditConsumer consumer, object message) => message switch
+    {
+        UserAccountLocked e => consumer.Consume(Context(e)),
+        UserAccountUnlocked e => consumer.Consume(Context(e)),
+        CredentialChanged e => consumer.Consume(Context(e)),
+        MfaMethodEnrolled e => consumer.Consume(Context(e)),
+        MfaMethodRemoved e => consumer.Consume(Context(e)),
+        ExternalIdentityLinked e => consumer.Consume(Context(e)),
+        ExternalIdentityUnlinked e => consumer.Consume(Context(e)),
+        _ => throw new InvalidOperationException($"Unhandled event {message.GetType().Name}")
+    };
+
+    [Fact]
+    public void Identity_consumer_consumes_only_the_seven_ratified_events_without_publish_surface()
+    {
+        var ingestor = Substitute.For<IAuditIngestor>();
+        var consumer = new IdentityAuditConsumer(ingestor, NullLogger<IdentityAuditConsumer>.Instance);
+
+        consumer.Should().BeAssignableTo<IConsumer<UserAccountLocked>>();
+        consumer.Should().BeAssignableTo<IConsumer<UserAccountUnlocked>>();
+        consumer.Should().BeAssignableTo<IConsumer<CredentialChanged>>();
+        consumer.Should().BeAssignableTo<IConsumer<MfaMethodEnrolled>>();
+        consumer.Should().BeAssignableTo<IConsumer<MfaMethodRemoved>>();
+        consumer.Should().BeAssignableTo<IConsumer<ExternalIdentityLinked>>();
+        consumer.Should().BeAssignableTo<IConsumer<ExternalIdentityUnlinked>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<UserAccountRegistered>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<UserAccountVerified>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<UserAccountDeactivated>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<DeviceRegistered>>();
+        consumer.Should().NotBeAssignableTo<IConsumer<RefreshTokenIssued>>();
     }
 
     private static ConsumeContext<T> Context<T>(T message) where T : class
