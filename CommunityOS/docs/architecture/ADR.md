@@ -40,6 +40,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-032 | Finance bounded context and financial-truth boundary | Accepted (16T) |
 | ADR-033 | Communications / VoIP slot disposition: no dedicated bounded context | Accepted |
 | ADR-034 | Analytics / cross-domain reporting slot disposition: no dedicated bounded context | Accepted |
+| ADR-035 | API Gateway as the client-facing boundary                          | Accepted |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -4221,3 +4222,257 @@ event-catalog subscriptions, the API contract and the documentation updates.
   "Analytics" to "Deferred — no dedicated bounded context" and resolves the
   deferral clause of ADR-032 OQ-6. No existing bounded context ownership is
   changed.
+
+
+## ADR-035 — API Gateway as the client-facing boundary
+
+**Status:** Accepted (ratified at the PROMPT 20 Gateway architectural-decision
+gate, following the READ-ONLY PROMPT 19 Gateway/BFF assessment).
+
+**Decision:** CommunityOS exposes a single client-facing HTTP origin through
+a **thin API Gateway** hosted on `src/Host/CommunityOS.Host.ApiGateway`. The
+Gateway is a **transparent forwarding boundary** that preserves the public
+API path/version contract and forwards the caller's access-token
+`Authorization` header, method, query string and body to the owning service.
+The Gateway does **not** become an authentication or authorization authority,
+and is **not** a BFF (no aggregation, no UI-specific DTO composition, no
+token exchange) for the initial Member Portal slice.
+
+### Authentication boundary
+
+The Gateway is a **transport forwarding layer for a bearer token, not an
+authentication or authorization authority**. Receiving or forwarding an
+`Authorization` header is transport mechanics; it is not authenticating the
+caller.
+
+The Gateway **does NOT**:
+
+- validate JWT signatures or JWT claims;
+- authenticate callers;
+- mint access tokens;
+- exchange tokens (no authorization-code-to-token exchange, no token
+  exchange for a client token);
+- refresh tokens;
+- call Identity to introspect or validate tokens;
+- call `/authz/check`;
+- cache authorization decisions;
+- make allow/deny authorization decisions;
+- apply domain authorization rules (permissions, roles, scopes, tuples,
+  delegations);
+- access Identity, Authorization, Organization or Community databases
+  directly.
+
+The Gateway **DOES**:
+
+- receive HTTP requests;
+- preserve the public API path/version contract;
+- forward the caller's access-token `Authorization` header unchanged when
+  present;
+- forward the HTTP method, query string and request body;
+- forward relevant request/correlation headers;
+- return the downstream status code, content type and body appropriately;
+- route anonymous Identity endpoints (`/auth`, `/connect`, `/.well-known`)
+  without requiring authentication;
+- provide the single client-facing HTTP origin.
+
+Authentication remains the Identity bounded context's authority (ADR-018).
+Authorization decisions remain the Authorization bounded context's authority
+(ADR-009, ADR-010, ADR-018). Organization and Community continue enforcing
+operation-level authorization through their own guards (ADR-016, ADR-019).
+Refresh tokens and JWT signing keys remain entirely outside the Gateway.
+
+### ServiceHttpClient conclusion
+
+`CommunityOS.ServiceClients` (`ServiceHttpClient`,
+`ServiceClientOptions`, `AddServiceHttpClient`) is a **service-to-service**
+transport mechanism (ADR-031). Its `CreateRequest` unconditionally sets
+`Authorization: Bearer <AccessToken>` and `X-Client-Id: <ClientId>` from the
+caller's own service-identity options and does not read or preserve any
+incoming client `Authorization` header. Using it as-is would present the
+**Gateway's own service identity** as the caller — the wrong security model
+for transparent client-token forwarding.
+
+**Consequently the Gateway does NOT "reuse ServiceHttpClient" for forwarding.**
+The Gateway requires a **dedicated forwarding abstraction** that copies the
+incoming `Authorization` header verbatim (plus correlation headers) onto the
+outbound request to the target service, never substituting its own identity.
+The Gateway may follow the repository's HTTP/resilience conventions
+(`Microsoft.Extensions.Http.Resilience`, config-bound `BaseUrl`), but the
+forwarding path must be its own. `ServiceHttpClient` is not modified by this
+ADR.
+
+### Gateway vs BFF
+
+CommunityOS will initially use a **thin API Gateway, not a BFF**. For the
+first Member Portal slice:
+
+- no `/api/portal/*` aggregation endpoints;
+- no UI-specific response DTO composition;
+- no cross-service aggregation;
+- no token exchange;
+- no Gateway-side business logic.
+
+Every public Gateway route maps **1:1** to an existing downstream API route.
+BFF composition may be introduced later through a **separate architectural
+decision** if a real aggregation or scoping requirement appears.
+
+### Routing model
+
+The initial public routing boundary:
+
+```text
+/api/v{version}/auth/*              → Identity
+/api/v{version}/connect/*           → Identity
+/api/v{version}/.well-known/*       → Identity
+/api/v{version}/me/*                → Identity
+/api/v{version}/account/*           → Identity
+/api/v{version}/mfa/*               → Identity
+
+/api/v{version}/authz/*             → Authorization
+
+/api/v{version}/organizations/*     → Organization
+/api/v{version}/orgunits/*          → Organization
+/api/v{version}/committees/*        → Organization
+/api/v{version}/appointments/*      → Organization
+/api/v{version}/institutions/*      → Organization
+/api/v{version}/delegations/*       → Organization
+
+/api/v{version}/persons/*           → Community
+/api/v{version}/households/*        → Community
+/api/v{version}/memberships/*       → Community
+/api/v{version}/meetings/*          → Community
+/api/v{version}/activities/*        → Community
+/api/v{version}/community-events/*  → Community
+/api/v{version}/calendar/*          → Community
+/api/v{version}/communities/*       → Community
+/api/v{version}/family-relationships/* → Community
+/api/v{version}/participations/*    → Community
+```
+
+These prefixes are grounded in the actual service controller routes
+(`src/Services/{Identity,Authorization,Organization,Community}/.../Controllers`).
+No routes are invented.
+
+**Service-internal endpoints are not automatically public Gateway routes.**
+Internal-only controller actions and service-to-service seams must not become
+public client routes. Verified example: Organization
+`GET /api/v1/orgunits/{id}/covers`
+(`OrganizationUnitsController.Covers`) is guarded by the `X-Client-Id` header
+matched against `Organization:InternalClientId` and is an internal fact
+endpoint for the Authorization service only; it is **not** a public Gateway
+route. The `X-Client-Id` header is a service-to-service identity convention
+and must not be exposed to or required from public clients.
+
+### Technology
+
+The first Gateway is implemented using **ASP.NET Core controller/endpoint
+transparent forwarding** on `src/Host/CommunityOS.Host.ApiGateway`, which
+already declares `Microsoft.AspNetCore.Authentication.JwtBearer`,
+`Serilog.AspNetCore`, `OpenTelemetry.Extensions.Hosting` and
+`Microsoft.Extensions.Http.Resilience`.
+
+Do **not** introduce:
+
+- YARP;
+- Ocelot;
+- another third-party reverse-proxy engine;
+- service discovery;
+- Kubernetes-specific routing requirements.
+
+The controller-based approach is currently the **smallest correct
+implementation**: the existing `Program.cs` already wires
+`AddControllers()`/`MapControllers()`, the route set is small and 1:1, it is
+directly testable with the repository's unit-test conventions, and it avoids
+a new runtime dependency. A generic reverse-proxy engine would be justified
+only when scale, dynamic routing or many services demand it — a decision for a
+later gate, not this one.
+
+### Configuration
+
+Downstream base URLs are recorded using the repository's existing
+configuration and environment-override conventions (static `appsettings.json`
+`BaseUrl` sections — the same mechanism ADR-031 services use):
+
+```text
+Services:
+  Identity:
+  Authorization:
+  Organization:
+  Community:
+```
+
+No service discovery is introduced. No deployment-specific production
+addresses are hard-coded into this ADR; real addresses come from configuration
+at deployment time.
+
+### CORS, rate limiting, observability
+
+Recorded as implementation boundaries, not reasons to expand the architecture:
+
+- **CORS:** native Flutter clients do not require CORS; a future Flutter Web
+  client may. CORS belongs at the Gateway boundary. No permissive CORS policy
+  is enabled now.
+- **Rate limiting:** deferred hardening. No bespoke rate limiter and no
+  implementation in this ADR gate.
+- **Observability:** follow the existing Serilog/OpenTelemetry conventions.
+  Gateway request/correlation propagation is addressed during implementation.
+  No new observability product is introduced.
+
+### Error handling
+
+The Gateway **must not redefine the downstream API error contract**. For
+downstream responses, preserve the HTTP status, content type, problem-details
+body, and validation/error payload where applicable. The Gateway must not turn
+every downstream failure into a generic Gateway error. Infrastructure failures
+(Gateway cannot reach a service) may naturally produce Gateway-level failures;
+these are distinguished from downstream application errors, which pass through
+unchanged.
+
+### Security invariants
+
+1. Identity remains the authentication authority (ADR-018).
+2. Authorization remains the authorization decision authority (ADR-009,
+   ADR-010, ADR-018).
+3. Organization and Community continue enforcing operation-level
+   authorization (ADR-016, ADR-019).
+4. The Gateway does not become an authorization bypass.
+5. No cross-context database access is introduced (ADR-018).
+6. Refresh tokens remain owned by Identity.
+7. JWT signing keys remain outside the Gateway.
+8. No Gateway-side token minting or exchange is introduced.
+9. Service-internal endpoints are not exposed accidentally.
+10. Anonymous Identity endpoints remain accessible anonymously.
+
+### Scope
+
+This ADR establishes only:
+
+- thin Gateway architecture;
+- no BFF for the initial slice;
+- transparent access-token forwarding;
+- downstream authentication/authorization ownership;
+- 1:1 routing;
+- service BaseUrl configuration;
+- controller-based forwarding technology;
+- public/internal route boundary;
+- error passthrough principle;
+- basic observability/CORS/rate-limit boundaries.
+
+This ADR does **not** redesign the existing services, does **not** amend
+ADR-027, does **not** reopen completed security ADRs (ADR-009 through ADR-019),
+and does **not** resolve unrelated OQs. This gate performs no Gateway
+implementation: no controllers, forwarding clients, middleware, tests,
+configuration, or runtime behavior are created here.
+
+### Ratification record (Prompt 20)
+
+- **Verdict:** READY WITH ONE ARCHITECTURAL DECISION — resolved by recording
+  this ADR. The Gateway is a thin transparent forwarder (not a BFF) on
+  `CommunityOS.Host.ApiGateway` via ASP.NET Core controller forwarding.
+- Preserved decisions: ADR-009 through ADR-019 (auth/authorization/
+  security), ADR-015 (outbox/inbox), ADR-016 (Organization/Community), ADR-031
+  (ServiceClients / Integrations disposition) remain in force unchanged; no
+  OQ was reopened; ADR-027 is not amended.
+- Superseded decisions: none. The only prior "API gateway/BFF" reference was an
+  intent line in the placeholder `specifications/01-Architecture-Overview.md`;
+  this ADR is the authoritative client-facing-boundary decision.
