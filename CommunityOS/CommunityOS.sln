@@ -311,6 +311,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.ServiceClients"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.ServiceClients.Tests", "tests\Unit\CommunityOS.ServiceClients.Tests\CommunityOS.ServiceClients.Tests.csproj", "{C260E59B-E64A-4097-B1FC-E3E4E715ADB7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommunityOS.Host.ApiGateway.Tests", "tests\Unit\CommunityOS.Host.ApiGateway.Tests\CommunityOS.Host.ApiGateway.Tests.csproj", "{F4280805-C17C-4E4E-84B0-A7A9D0639514}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1797,6 +1799,18 @@ Global
 		{C260E59B-E64A-4097-B1FC-E3E4E715ADB7}.Release|x64.Build.0 = Release|Any CPU
 		{C260E59B-E64A-4097-B1FC-E3E4E715ADB7}.Release|x86.ActiveCfg = Release|Any CPU
 		{C260E59B-E64A-4097-B1FC-E3E4E715ADB7}.Release|x86.Build.0 = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|x64.Build.0 = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Debug|x86.Build.0 = Debug|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|x64.ActiveCfg = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|x64.Build.0 = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|x86.ActiveCfg = Release|Any CPU
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1949,5 +1963,6 @@ Global
 		{536AE53E-65BF-442B-A828-CB029C5E6EB9} = {28A6993C-471E-82FE-7D9E-AD3B1EC22BD9}
 		{2E7FAE79-B0B8-4564-A7B0-4BDE54CE5D08} = {90298CBA-BD6F-3A0A-69D5-97CAD7B05E7E}
 		{C260E59B-E64A-4097-B1FC-E3E4E715ADB7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{F4280805-C17C-4E4E-84B0-A7A9D0639514} = {9D556B49-86D1-93A7-9596-FFAAB74EC556}
 	EndGlobalSection
 EndGlobal

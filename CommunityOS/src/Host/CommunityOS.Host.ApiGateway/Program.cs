@@ -1,14 +1,31 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using CommunityOS.Host.ApiGateway.Extensions;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console(formatProvider: System.Globalization.CultureInfo.InvariantCulture)
+    .CreateBootstrapLogger();
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+    builder.Host.UseSerilog((ctx, lc) =>
+        lc.ReadFrom.Configuration(ctx.Configuration));
 
-app.MapControllers();
+    builder.Services.AddGatewayServices(builder.Configuration);
 
-await app.RunAsync();
+    var app = builder.Build();
+
+    app.MapGatewayPipeline();
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "CommunityOS API Gateway terminated unexpectedly.");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
+
+public partial class Program;
