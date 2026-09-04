@@ -53,6 +53,17 @@ with contact methods empty; without `community.person.sensitive.read` the date
 of birth and the identity link are masked (`null` / empty). Privacy preferences
 may further restrict exposure.
 
+## My person — `/my-person`
+
+| Method | Path | Capability | Description |
+|--------|------|------------|-------------|
+| GET | `/my-person` | none (self-scoped) | Resolve the authenticated account's own Person |
+
+Returns the `PersonDto` of the Community Person linked to the authenticated
+Identity account (JWT `sub`). The endpoint is self-scoped: it accepts no
+caller-supplied identifier and can only ever resolve the caller's own Person.
+Returns `404` when the authenticated account has no linked Person.
+
 ## Households — `/households`
 
 | Method | Path | Capability | Description |

@@ -113,6 +113,22 @@ public class GatewayForwardingTests
     }
 
     [Fact]
+    public async Task MyPerson_ForwardsToCommunity_PreservingVersion()
+    {
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => Json("application/json", "{\"id\":\"person-id\"}");
+
+        var response = await client.GetAsync("/api/v1/my-person");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var downstream = fixture.Handler.CapturedRequests.Should().ContainSingle().Subject;
+        downstream.Method.Should().Be(HttpMethod.Get);
+        downstream.RequestUri!.AbsolutePath.Should().Be("/api/v1/my-person");
+        downstream.RequestUri.GetLeftPart(UriPartial.Authority).Should().Be("http://localhost:5004");
+    }
+
+    [Fact]
     public async Task DownstreamStatusAndProblemDetails_PassThroughUnchanged()
     {
         using var fixture = new GatewayTestFixture();

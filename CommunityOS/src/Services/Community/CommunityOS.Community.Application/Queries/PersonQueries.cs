@@ -46,3 +46,23 @@ internal sealed class GetPersonsQueryHandler(
         return all.Select(p => p.ToDto()).ToList();
     }
 }
+
+/// <summary>
+/// Resolves the authenticated user's Community Person from the JWT subject.
+/// The endpoint is self-scoped: only the authenticated account's own Person
+/// can be resolved. No caller-controlled identifier is accepted.
+/// </summary>
+public sealed record GetMyPersonQuery(
+    Guid IdentityAccountId) : IRequest<PersonDto>;
+
+internal sealed class GetMyPersonQueryHandler(
+    IPersonRepository persons) : IRequestHandler<GetMyPersonQuery, PersonDto>
+{
+    public async Task<PersonDto> Handle(GetMyPersonQuery request, CancellationToken ct)
+    {
+        var person = await persons.GetByIdentityAccountIdAsync(request.IdentityAccountId, ct)
+            ?? throw new PersonNotLinkedToAccountException(request.IdentityAccountId);
+
+        return person.ToDto();
+    }
+}

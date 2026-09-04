@@ -11,6 +11,9 @@ public sealed class PersonAlreadyLinkedException(Guid personId, Guid accountId)
 public sealed class PersonNotLinkedException(Guid personId)
     : Exception($"Person '{personId}' is not linked to an Identity account.");
 
+public sealed class PersonNotLinkedToAccountException(Guid identityAccountId)
+    : Exception($"No person is linked to Identity account '{identityAccountId}'.");
+
 public sealed class PersonAlreadyDeactivatedException(Guid personId)
     : Exception($"Person '{personId}' is already deactivated.");
 

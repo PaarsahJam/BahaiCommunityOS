@@ -32,6 +32,7 @@ public static class GatewayRouteTable
             ["delegations"] = DownstreamService.Organization,
 
             // Community
+            ["my-person"] = DownstreamService.Community,
             ["persons"] = DownstreamService.Community,
             ["households"] = DownstreamService.Community,
             ["memberships"] = DownstreamService.Community,

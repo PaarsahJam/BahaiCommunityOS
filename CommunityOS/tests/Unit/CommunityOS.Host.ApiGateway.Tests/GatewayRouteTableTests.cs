@@ -21,6 +21,7 @@ public class GatewayRouteTableTests
     [InlineData("/api/v1/institutions", DownstreamService.Organization)]
     [InlineData("/api/v1/delegations", DownstreamService.Organization)]
     [InlineData("/api/v1/persons/1", DownstreamService.Community)]
+    [InlineData("/api/v1/my-person", DownstreamService.Community)]
     [InlineData("/api/v1/households", DownstreamService.Community)]
     [InlineData("/api/v1/memberships", DownstreamService.Community)]
     [InlineData("/api/v1/meetings", DownstreamService.Community)]
@@ -91,6 +92,7 @@ public class GatewayRouteTableTests
     [InlineData("me")]
     [InlineData("account")]
     [InlineData("mfa")]
+    [InlineData("my-person")]
     [InlineData("persons")]
     public void IsAnonymousIdentitySegment_False_ForAuthenticatedSegments(string segment)
     {

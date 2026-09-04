@@ -325,4 +325,57 @@ public class CommunitySecurityRegressionTests
 
         await act.Should().ThrowAsync<AuthorizationForbiddenException>();
     }
+
+    // --- Self-scoped person resolution (GET /my-person) ---
+
+    [Fact]
+    public async Task GetMyPerson_returns_linked_person_without_authorization_guard()
+    {
+        var h = CreateHarness();
+        var person = StubPerson();
+        var accountId = person.IdentityAccountId!.Value;
+        h.Repos.Persons.GetByIdentityAccountIdAsync(accountId, Arg.Any<CancellationToken>()).Returns(person);
+
+        var result = await h.Sender.Send(new GetMyPersonQuery(accountId));
+
+        result.Id.Should().Be(person.Id);
+        result.PreferredName.Should().Be("Mona");
+        // No authorization guard call — self-scoped resolution
+        await h.Repos.Evaluator.DidNotReceive()
+            .EvaluateAsync(Arg.Any<AuthorizationRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetMyPerson_throws_when_account_not_linked()
+    {
+        var h = CreateHarness();
+        var accountId = Guid.NewGuid();
+        h.Repos.Persons.GetByIdentityAccountIdAsync(accountId, Arg.Any<CancellationToken>())
+            .Returns((Person?)null);
+
+        var act = () => h.Sender.Send(new GetMyPersonQuery(accountId));
+
+        await act.Should().ThrowAsync<PersonNotLinkedToAccountException>();
+    }
+
+    [Fact]
+    public async Task GetMyPerson_does_not_accept_caller_supplied_person_id()
+    {
+        var h = CreateHarness();
+        var person = StubPerson();
+        var accountId = person.IdentityAccountId!.Value;
+        h.Repos.Persons.GetByIdentityAccountIdAsync(accountId, Arg.Any<CancellationToken>()).Returns(person);
+
+        // The query record only accepts IdentityAccountId — there is no PersonId parameter.
+        // This test verifies the contract enforces self-scoping.
+        var query = new GetMyPersonQuery(accountId);
+        var result = await h.Sender.Send(query);
+
+        result.Id.Should().Be(person.Id);
+        // Only the identity-account lookup was used, never the direct person lookup
+        await h.Repos.Persons.Received(1)
+            .GetByIdentityAccountIdAsync(accountId, Arg.Any<CancellationToken>());
+        await h.Repos.Persons.DidNotReceive()
+            .GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
 }
