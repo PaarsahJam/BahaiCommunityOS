@@ -62,7 +62,42 @@ may further restrict exposure.
 Returns the `PersonDto` of the Community Person linked to the authenticated
 Identity account (JWT `sub`). The endpoint is self-scoped: it accepts no
 caller-supplied identifier and can only ever resolve the caller's own Person.
-Returns `404` when the authenticated account has no linked Person.
+Returns `404` (`application/problem+json`) when the authenticated account has
+no linked Person — an unlinked account is a "not found" state, never a server
+error.
+
+### Member Portal v1 access
+
+Member Portal v1 lets an authenticated account read their own Community
+profile and their own membership through the standard endpoints:
+
+- `GET /my-person` — resolve the caller's own `personId`.
+- `GET /persons/{id}` — profile of the caller's own person.
+- `GET /memberships/by-person/{personId}` — membership of the caller's own
+  person (a missing membership returns `200` with `null`).
+
+The required capabilities are granted as resource-scoped `has_permission`
+relations on the member's own Person resource (subject = Identity account;
+object = `person`, the member's own `personId`):
+
+| Capability | Scope |
+|------------|-------|
+| `community.person.read` | `person:{ownPersonId}` |
+| `community.person.contact.read` | `person:{ownPersonId}` |
+| `community.membership.read` | `person:{ownPersonId}` |
+
+No new endpoint (`/my-membership`), no JWT context claims, and no organization
+context are introduced in v1. Authorization is exclusively relationship-based
+and evaluated by the Authorization service (fail-closed): the grants only ever
+apply to the member's own person resource and grant nothing globally.
+
+Grants are provisioned automatically by the Authorization service: the
+Community service publishes `PersonIdentityLinked` / `PersonIdentityUnlinked`
+integration events when a Person is linked to or unlinked from an Identity
+account. The `PersonIdentityIntegrationEventConsumer` creates or revokes the
+member portal relationship tuple for that person. Provisioning is idempotent,
+consolidates stale partial tuples, and never removes relationship tuples that
+carry other (non-member) permissions.
 
 ## Households — `/households`
 

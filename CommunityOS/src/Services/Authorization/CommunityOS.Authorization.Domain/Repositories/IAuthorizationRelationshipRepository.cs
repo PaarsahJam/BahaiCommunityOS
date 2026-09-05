@@ -13,4 +13,5 @@ public interface IAuthorizationRelationshipRepository
         Guid? objectId = null,
         CancellationToken ct = default);
     Task AddAsync(AuthorizationRelationship relationship, CancellationToken ct = default);
+    Task RemoveAsync(Guid id, CancellationToken ct = default);
 }

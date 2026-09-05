@@ -46,4 +46,14 @@ public sealed class AuthorizationRelationshipRepository(AuthorizationDbContext d
         await db.Relationships.AddAsync(relationship, ct);
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task RemoveAsync(Guid id, CancellationToken ct = default)
+    {
+        var relationship = await db.Relationships.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (relationship is null)
+            return;
+
+        db.Relationships.Remove(relationship);
+        await db.SaveChangesAsync(ct);
+    }
 }

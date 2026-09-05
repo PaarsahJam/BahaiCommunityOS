@@ -30,6 +30,7 @@ internal sealed class ExceptionHandlingMiddleware(
             CommunityNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
             LocalUnitNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
             PersonNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
+            PersonNotLinkedToAccountException => (StatusCodes.Status404NotFound, ex.Message),
             HouseholdNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
             FamilyRelationshipNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
             MembershipNotFoundException => (StatusCodes.Status404NotFound, ex.Message),
