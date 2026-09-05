@@ -29,13 +29,11 @@ class _MfaPageState extends State<MfaPage> {
   void _submit() {
     setState(() => _attempted = true);
     if (!_formKey.currentState!.validate()) return;
-    final email = context.select<AuthBloc, String>((bloc) {
-      final state = bloc.state;
-      return state is AuthMfaRequired ? state.email : '';
-    });
+    final state = context.read<AuthBloc>().state;
+    if (state is! AuthMfaRequired) return;
     context.read<AuthBloc>().add(
           AuthEvent.mfaCodeSubmitted(
-            email: email,
+            email: state.email,
             mfaCode: _codeController.text.trim(),
           ),
         );

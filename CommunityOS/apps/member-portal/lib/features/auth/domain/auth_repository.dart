@@ -56,6 +56,7 @@ class AuthRepository {
     required String password,
     String? mfaCode,
   }) async {
+    final generation = await _storage.generation();
     final LoginResponseDto response;
     try {
       response = await _authApi.login(
@@ -87,14 +88,22 @@ class AuthRepository {
       throw const AppException('Sign-in response did not include tokens.');
     }
 
-    await _storage.write(
+    final persisted = await _storage.write(
       TokenPair(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
       ),
+      expectedGeneration: generation,
     );
     _pendingMfaPassword = null;
+    if (!persisted) {
+      // The credentials exchange outlived a logout/session-expiry clear;
+      // persisting now would resurrect a session that was explicitly ended.
+      throw const AppException(
+        'Sign-in was interrupted. Please try again.',
+      );
+    }
     return AuthLoginResult.authenticated(
       user: AuthUser(
         userAccountId: response.userAccountId,

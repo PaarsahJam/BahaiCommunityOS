@@ -13,18 +13,27 @@ class _MockAuthApi extends Mock implements AuthApi {}
 class _MemoryStorage implements TokenStorage {
   TokenPair? value;
   int writes = 0;
+  int _generation = 0;
+
+  @override
+  Future<int> generation() async => _generation;
 
   @override
   Future<TokenPair?> read() async => value;
 
   @override
-  Future<void> write(TokenPair tokens) async {
+  Future<bool> write(TokenPair tokens, {int? expectedGeneration}) async {
+    if (expectedGeneration != null && expectedGeneration != _generation) {
+      return false;
+    }
     value = tokens;
     writes++;
+    return true;
   }
 
   @override
   Future<void> clear() async {
+    _generation++;
     value = null;
   }
 }
@@ -128,6 +137,30 @@ void main() {
       storage.value = _pair();
       final result = await coordinator.refreshTokens();
       expect(result!.accessToken, 'rotated-access');
+    });
+
+    test('does not resurrect credentials cleared while refresh is in flight',
+        () async {
+      storage.value = _pair();
+      final gate = Completer<TokenDto>();
+      var apiCalled = false;
+      when(() => api.refresh(any())).thenAnswer((_) {
+        apiCalled = true;
+        return gate.future;
+      });
+
+      final pending = coordinator.refreshTokens();
+      await pumpEventQueue();
+      expect(apiCalled, isTrue);
+
+      await storage.clear();
+      gate.complete(_tokenDto());
+
+      final result = await pending;
+
+      expect(result, isNull);
+      expect(storage.value, isNull);
+      expect(storage.writes, 0);
     });
   });
 }

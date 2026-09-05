@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:member_portal/core/network/error_mapper.dart';
@@ -14,17 +16,26 @@ class _MockAccountApi extends Mock implements AccountApi {}
 
 class _MemoryStorage implements TokenStorage {
   TokenPair? value;
+  int _generation = 0;
+
+  @override
+  Future<int> generation() async => _generation;
 
   @override
   Future<TokenPair?> read() async => value;
 
   @override
-  Future<void> write(TokenPair tokens) async {
+  Future<bool> write(TokenPair tokens, {int? expectedGeneration}) async {
+    if (expectedGeneration != null && expectedGeneration != _generation) {
+      return false;
+    }
     value = tokens;
+    return true;
   }
 
   @override
   Future<void> clear() async {
+    _generation++;
     value = null;
   }
 }
@@ -245,6 +256,29 @@ void main() {
         throwsA(isA<AppException>()),
         reason: 'MFA password must not survive a logout',
       );
+    });
+
+    test('does not persist a login that outlived a session clear', () async {
+      final gate = Completer<LoginResponseDto>();
+      when(() => authApi.login(any())).thenAnswer((_) => gate.future);
+      final pending =
+          repository.login(email: 'ada@example.org', password: 'hunter2');
+
+      await storage.clear();
+      gate.complete(LoginResponseDto(
+        userAccountId: 'u1',
+        email: 'ada@example.org',
+        requiresMfa: false,
+        tokens: TokenDto(
+          accessToken: 'access-1',
+          refreshToken: 'refresh-1',
+          expiresAt: DateTime(2030),
+        ),
+      ));
+
+      await expectLater(pending, throwsA(isA<AppException>()));
+      expect(storage.value, isNull,
+          reason: 'credentials must not resurrect after a logout');
     });
   });
 }

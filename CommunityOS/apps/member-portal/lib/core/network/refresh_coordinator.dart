@@ -46,6 +46,11 @@ class RefreshCoordinator {
     final tokens = await _tokenStorage.read();
     if (tokens == null) return null;
 
+    // Snapshot the storage generation before the network round trip so a
+    // logout/session-expiry clear that lands in the meantime can be detected
+    // and the rotated pair discarded instead of resurrecting the session.
+    final generation = await _tokenStorage.generation();
+
     final TokenDto response;
     try {
       response = await _authApi.refresh(
@@ -66,7 +71,11 @@ class RefreshCoordinator {
       refreshToken: response.refreshToken,
       expiresAt: response.expiresAt,
     );
-    await _tokenStorage.write(rotated);
+    final persisted = await _tokenStorage.write(
+      rotated,
+      expectedGeneration: generation,
+    );
+    if (!persisted) return null;
     return rotated;
   }
 

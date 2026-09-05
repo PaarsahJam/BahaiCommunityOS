@@ -82,6 +82,56 @@ void main() {
 
       expect(values.values.where((v) => v != null), isEmpty);
     });
+
+    test('generation starts at zero and grows with every clear', () async {
+      expect(await storage.generation(), 0);
+      await storage.clear();
+      expect(await storage.generation(), 1);
+      await storage.clear();
+      expect(await storage.generation(), 2);
+    });
+
+    test('a write guarded by a stale generation is ignored', () async {
+      expect(
+        await storage.write(
+          TokenPair(
+            accessToken: 'access-1',
+            refreshToken: 'refresh-1',
+            expiresAt: tokenExpiry,
+          ),
+          expectedGeneration: 0,
+        ),
+        isTrue,
+      );
+
+      await storage.clear();
+
+      expect(
+        await storage.write(
+          TokenPair(
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            expiresAt: tokenExpiry,
+          ),
+          expectedGeneration: 0,
+        ),
+        isFalse,
+      );
+      expect(values['auth.access_token'], isNull);
+      expect(values['auth.refresh_token'], isNull);
+    });
+
+    test('a write without a guard always persists', () async {
+      await storage.clear();
+
+      await storage.write(TokenPair(
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        expiresAt: tokenExpiry,
+      ));
+
+      expect(values['auth.access_token'], 'access-2');
+    });
   });
 }
 

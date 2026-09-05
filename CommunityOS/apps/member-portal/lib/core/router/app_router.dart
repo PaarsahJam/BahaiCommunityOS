@@ -53,15 +53,23 @@ class AppRouter {
         ],
       );
 
-  static String? _redirect(String path, AuthState state) {
-    return switch (state) {
-      AuthInitializing() => path == '/' ? null : '/',
-      AuthMfaRequired() => (path == '/login' || path == '/mfa') ? null : '/mfa',
-      AuthAuthenticated() =>
-        (path == '/login' || path == '/mfa') ? '/home' : null,
-      _ => path == '/login' ? null : '/login',
-    };
-  }
+  static String? _redirect(String path, AuthState state) =>
+      authRedirect(path, state);
+}
+
+/// Pure redirect decision for the member-portal route table.
+///
+/// Separated from [AppRouter] so the rules can be unit-tested without a live
+/// router: splash while initializing, sign-in gates on unauthenticated /
+/// MFA, and member pages only ever render for an authenticated session.
+String? authRedirect(String path, AuthState state) {
+  return switch (state) {
+    AuthInitializing() => path == '/' ? null : '/',
+    AuthMfaRequired() => (path == '/login' || path == '/mfa') ? null : '/mfa',
+    AuthAuthenticated() =>
+      (path == '/' || path == '/login' || path == '/mfa') ? '/home' : null,
+    _ => path == '/login' ? null : '/login',
+  };
 }
 
 /// Bridges an [AuthBloc] state [Stream] to the [Listenable] contract that

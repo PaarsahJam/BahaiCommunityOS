@@ -20,19 +20,36 @@ class TokenPair {
 /// token values to logs or non-secure storage.
 abstract interface class TokenStorage {
   Future<TokenPair?> read();
-  Future<void> write(TokenPair tokens);
+
+  /// Persists [tokens] unless [expectedGeneration] no longer matches the
+  /// storage's current generation — i.e. a logout or session-expiry clear
+  /// landed while the credential exchange was in flight. Returns whether the
+  /// write was applied. A disregarded (stale) write must never resurrect a
+  /// discarded session.
+  Future<bool> write(TokenPair tokens, {int? expectedGeneration});
+
   Future<void> clear();
+
+  /// Monotonic counter that every [clear] increments. Snapshot it immediately
+  /// before an asynchronous credential exchange and hand it back to [write]
+  /// so a late completion cannot repopulate cleared credentials.
+  Future<int> generation();
 }
 
 @LazySingleton(as: TokenStorage)
 class SecureTokenStorage implements TokenStorage {
-  const SecureTokenStorage(this._storage);
+  SecureTokenStorage(this._storage);
 
   final FlutterSecureStorage _storage;
+
+  int _generation = 0;
 
   static const _accessTokenKey = 'auth.access_token';
   static const _refreshTokenKey = 'auth.refresh_token';
   static const _expiresAtKey = 'auth.token_expires_at';
+
+  @override
+  Future<int> generation() async => _generation;
 
   @override
   Future<TokenPair?> read() async {
@@ -52,15 +69,20 @@ class SecureTokenStorage implements TokenStorage {
   }
 
   @override
-  Future<void> write(TokenPair tokens) async {
+  Future<bool> write(TokenPair tokens, {int? expectedGeneration}) async {
+    if (expectedGeneration != null && expectedGeneration != _generation) {
+      return false;
+    }
     await _storage.write(key: _accessTokenKey, value: tokens.accessToken);
     await _storage.write(key: _refreshTokenKey, value: tokens.refreshToken);
     await _storage.write(
         key: _expiresAtKey, value: tokens.expiresAt.toIso8601String());
+    return true;
   }
 
   @override
   Future<void> clear() async {
+    _generation++;
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _expiresAtKey);

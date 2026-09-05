@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:member_portal/l10n/generated/app_localizations.dart';
 
 import '../../../core/error/app_exception.dart';
@@ -21,9 +24,27 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _attempted = false;
+  StreamSubscription<AuthState>? _stateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateSubscription =
+        context.read<AuthBloc>().stream.listen(_routeOnState);
+  }
+
+  /// Escorts the sign-in flow to the MFA page the moment the backend reports
+  /// that MFA is required. Redirect rules alone cannot reach `/mfa` from the
+  /// login route, so this page performs the navigation.
+  void _routeOnState(AuthState state) {
+    if (state is AuthMfaRequired && mounted) {
+      context.go('/mfa');
+    }
+  }
 
   @override
   void dispose() {
+    _stateSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
