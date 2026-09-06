@@ -5,7 +5,6 @@ import 'package:member_portal/l10n/generated/app_localizations.dart';
 import '../core/router/app_router.dart';
 import '../di/injection.dart';
 import '../features/auth/application/auth_bloc.dart';
-import '../features/member/application/member_bloc.dart';
 
 class MemberPortalApp extends StatelessWidget {
   const MemberPortalApp({super.key});
@@ -14,11 +13,8 @@ class MemberPortalApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final authBloc = getIt<AuthBloc>();
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<AuthBloc>(create: (_) => authBloc),
-        BlocProvider<MemberBloc>(create: (_) => getIt<MemberBloc>()),
-      ],
+    return BlocProvider<AuthBloc>(
+      create: (_) => authBloc,
       child: MaterialApp.router(
         title: 'CommunityOS Member Portal',
         theme: ThemeData(

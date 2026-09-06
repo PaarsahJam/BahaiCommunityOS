@@ -4,43 +4,32 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:member_portal/l10n/generated/app_localizations.dart';
 
-import '../../../core/error/app_exception.dart';
-import '../../../core/ui/exception_message.dart';
 import '../../auth/application/auth_bloc.dart';
 import '../../auth/application/auth_event.dart';
-import '../application/member_bloc.dart';
-import '../application/member_event.dart';
-import '../application/member_state.dart';
+import '../application/member_session_bloc.dart';
+import '../application/member_session_state.dart';
 import '../data/member_dtos.dart';
 import '../domain/member_models.dart';
 import 'widgets/status_labels.dart';
-import 'widgets/unlinked_account_view.dart';
 
-class HomePage extends StatefulWidget {
+/// Member home screen, rendered inside the authenticated member shell.
+///
+/// The shell gates rendering on a ready [MemberSessionState], so this page
+/// only ever presents the bootstrap context; bootstrap/unlinked/forbidden/
+/// failed states are the shell's responsibility.
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<MemberBloc>().add(const MemberEvent.homeRequested());
-      }
-    });
-  }
-
-  void _retry() {
-    context.read<MemberBloc>().add(const MemberEvent.homeRequested());
-  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final memberContext = context.select<MemberSessionBloc, MemberContext?>(
+      (bloc) => switch (bloc.state) {
+        MemberSessionReady(:final context) => context,
+        _ => null,
+      },
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.homeTitle),
@@ -53,83 +42,24 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: BlocBuilder<MemberBloc, MemberState>(
-        builder: (context, state) {
-          return switch (state) {
-            MemberLoaded(:final data) => _MemberHomeContent(data: data),
-            MemberUnlinked() => UnlinkedAccountView(onRetry: _retry),
-            MemberSessionExpired() => const _CenteredProgress(),
-            MemberForbidden(:final error) =>
-              _ErrorView(error: error, onRetry: _retry),
-            MemberFailed(:final error) =>
-              _ErrorView(error: error, onRetry: _retry),
-            MemberProfileFailed(:final error) =>
-              _ErrorView(error: error, onRetry: _retry),
-            _ => const _CenteredProgress(),
-          };
-        },
-      ),
-    );
-  }
-}
-
-class _CenteredProgress extends StatelessWidget {
-  const _CenteredProgress();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error, this.onRetry});
-
-  final AppException error;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-            const SizedBox(height: 12),
-            Text(
-              exceptionMessage(context, error),
-              textAlign: TextAlign.center,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n.homeRetry),
-              ),
-            ],
-          ],
-        ),
-      ),
+      body: memberContext == null
+          ? const Center(child: CircularProgressIndicator())
+          : _MemberHomeContent(memberContext: memberContext),
     );
   }
 }
 
 class _MemberHomeContent extends StatelessWidget {
-  const _MemberHomeContent({required this.data});
+  const _MemberHomeContent({required this.memberContext});
 
-  final MemberHomeData data;
+  final MemberContext memberContext;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final person = data.person;
-    final membership = data.membership;
+    final person = memberContext.person;
+    final membership = memberContext.membership;
 
     return ListView(
       padding: const EdgeInsets.all(16),

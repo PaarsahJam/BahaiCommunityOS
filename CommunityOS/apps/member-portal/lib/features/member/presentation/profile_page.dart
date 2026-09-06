@@ -5,57 +5,76 @@ import 'package:member_portal/l10n/generated/app_localizations.dart';
 
 import '../../../core/error/app_exception.dart';
 import '../../../core/ui/exception_message.dart';
-import '../application/member_bloc.dart';
-import '../application/member_event.dart';
-import '../application/member_state.dart';
+import '../../../di/injection.dart';
+import '../application/profile_bloc.dart';
+import '../application/profile_event.dart';
+import '../application/profile_state.dart';
 import '../data/member_dtos.dart';
+import '../domain/member_repository.dart';
 import 'widgets/status_labels.dart';
 
+/// Member profile feature, rendered inside the authenticated shell.
+///
+/// [personId] is the Community PersonId obtained from `/my-person`; it is never
+/// derived from the JWT and never assumed equal to the UserAccountId. The
+/// backend authorizes the access; privacy-masked fields stay absent.
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key, required this.personId});
+  const ProfilePage(
+      {super.key, required this.personId, this.createProfileBloc});
 
   final String personId;
+
+  /// Injectable factory for tests; defaults to a bloc backed by the DI
+  /// [MemberRepository].
+  final ProfileBloc Function()? createProfileBloc;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  late final ProfileBloc _bloc = (widget.createProfileBloc ??
+      () => ProfileBloc(getIt<MemberRepository>()))();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<MemberBloc>().add(
-              MemberEvent.profileRequested(personId: widget.personId),
-            );
+        _bloc.add(ProfileEvent.requested(personId: widget.personId));
       }
     });
   }
 
+  @override
+  void dispose() {
+    _bloc.close();
+    super.dispose();
+  }
+
   void _retry() {
-    context.read<MemberBloc>().add(
-          MemberEvent.profileRequested(personId: widget.personId),
-        );
+    _bloc.add(ProfileEvent.requested(personId: widget.personId));
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.profileTitle)),
-      body: BlocBuilder<MemberBloc, MemberState>(
-        builder: (context, state) {
-          return switch (state) {
-            MemberProfileLoaded(:final detail) =>
-              _ProfileContent(detail: detail),
-            MemberProfileFailed(:final error) => _ProfileErrorView(
-                error: error,
-                onRetry: _retry,
-              ),
-            _ => const Center(child: CircularProgressIndicator()),
-          };
-        },
+    return BlocProvider<ProfileBloc>.value(
+      value: _bloc,
+      child: Scaffold(
+        appBar: AppBar(title: Text(l10n.profileTitle)),
+        body: BlocBuilder<ProfileBloc, ProfileState>(
+          builder: (context, state) {
+            return switch (state) {
+              ProfileLoaded(:final detail) => _ProfileContent(detail: detail),
+              ProfileFailed(:final error) => _ProfileErrorView(
+                  error: error,
+                  onRetry: _retry,
+                ),
+              _ => const Center(child: CircularProgressIndicator()),
+            };
+          },
+        ),
       ),
     );
   }

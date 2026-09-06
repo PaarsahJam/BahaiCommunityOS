@@ -25,8 +25,6 @@ import 'package:member_portal/features/auth/application/auth_bloc.dart'
 import 'package:member_portal/features/auth/data/auth_api.dart' as _i922;
 import 'package:member_portal/features/auth/domain/auth_repository.dart'
     as _i552;
-import 'package:member_portal/features/member/application/member_bloc.dart'
-    as _i637;
 import 'package:member_portal/features/member/data/member_api.dart' as _i214;
 import 'package:member_portal/features/member/domain/member_repository.dart'
     as _i278;
@@ -74,10 +72,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => apiModule.provideAccountApi(gh<_i361.Dio>()));
     gh.lazySingleton<_i214.MemberApi>(
         () => apiModule.provideMemberApi(gh<_i361.Dio>()));
-    gh.lazySingleton<_i278.MemberRepository>(() => _i278.MemberRepository(
-          gh<_i214.MemberApi>(),
-          gh<_i678.ErrorMapper>(),
-        ));
     gh.lazySingleton<_i552.AuthRepository>(() => _i552.AuthRepository(
           gh<_i922.AuthApi>(),
           gh<_i922.AccountApi>(),
@@ -88,8 +82,11 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i552.AuthRepository>(),
           gh<_i245.RefreshCoordinator>(),
         ));
-    gh.lazySingleton<_i637.MemberBloc>(
-        () => _i637.MemberBloc(gh<_i278.MemberRepository>()));
+    gh.lazySingleton<_i278.MemberRepository>(() => _i278.MemberRepository(
+          gh<_i922.AccountApi>(),
+          gh<_i214.MemberApi>(),
+          gh<_i678.ErrorMapper>(),
+        ));
     return this;
   }
 }
