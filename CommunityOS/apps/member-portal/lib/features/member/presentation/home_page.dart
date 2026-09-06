@@ -174,11 +174,18 @@ class _NoMembershipCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
-            const SizedBox(width: 12),
-            Expanded(child: Text(l10n.homeNoMembership)),
+            Text(l10n.homeMembershipStatus, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
+                const SizedBox(width: 12),
+                Expanded(child: Text(l10n.homeNoMembership)),
+              ],
+            ),
           ],
         ),
       ),
