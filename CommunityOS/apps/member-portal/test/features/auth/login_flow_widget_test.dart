@@ -263,4 +263,159 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  testWidgets(
+      'logout followed by a protected deep link restores the destination for '
+      'the next session only', (tester) async {
+    when(() => authRepo.restoreSession()).thenAnswer((_) async => null);
+    when(
+      () => authRepo.login(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer((invocation) async {
+      final email = invocation.namedArguments[#email] as String;
+      if (email == 'grace@example.org') {
+        return const AuthLoginResult.requiresMfa(
+          accountId: 'u2',
+          email: 'grace@example.org',
+        );
+      }
+      return AuthLoginResult.requiresMfa(accountId: 'u1', email: email);
+    });
+    when(
+      () => authRepo.resolveMfa(
+        email: any(named: 'email'),
+        mfaCode: any(named: 'mfaCode'),
+      ),
+    ).thenAnswer((invocation) async {
+      final email = invocation.namedArguments[#email] as String;
+      if (email == 'grace@example.org') {
+        return const AuthLoginResult.authenticated(
+          user: AuthUser(userAccountId: 'u2', email: 'grace@example.org'),
+        );
+      }
+      return const AuthLoginResult.authenticated(
+        user: AuthUser(userAccountId: 'u1', email: 'ada@example.org'),
+      );
+    });
+    when(() => authRepo.logout()).thenAnswer((_) async {});
+
+    // The second session belongs to a different account and must never see
+    // the first account's context. mocktail replays the latest stub for every
+    // call, so the stub branches on the session ordinal: first (account A) vs
+    // later (account B).
+    var sessionLoads = 0;
+    when(() => memberRepo.loadMemberSession()).thenAnswer(
+      (_) async {
+        sessionLoads += 1;
+        if (sessionLoads == 1) {
+          return MemberSessionResult.resolved(
+            account: const AuthUser(
+              userAccountId: 'u1',
+              email: 'ada@example.org',
+            ),
+            person: PersonDto(
+              id: 'p1',
+              preferredName: 'Ada Lovelace',
+              status: 'Active',
+              hasLinkedIdentityAccount: true,
+              createdOn: DateTime(2020, 1, 1),
+            ),
+            membership: null,
+          );
+        }
+        return MemberSessionResult.resolved(
+          account: const AuthUser(
+            userAccountId: 'u2',
+            email: 'grace@example.org',
+          ),
+          person: PersonDto(
+            id: 'p2',
+            preferredName: 'Grace Hopper',
+            status: 'Active',
+            hasLinkedIdentityAccount: true,
+            createdOn: DateTime(2020, 1, 1),
+          ),
+          membership: null,
+        );
+      },
+    );
+    when(() => memberRepo.personDetail('p2')).thenAnswer(
+      (_) async => PersonDetailDto(
+        id: 'p2',
+        preferredName: 'Grace Hopper',
+        status: 'Active',
+        profileVisibility: 'Self',
+        contactVisibility: 'Self',
+        dateOfBirthVisibility: 'Self',
+        createdOn: DateTime(2020, 1, 1),
+      ),
+    );
+
+    final authBloc = AuthBloc(authRepo, coordinator);
+    addTearDown(authBloc.close);
+    // Each authenticated session owns a fresh MemberSessionBloc (as in
+    // production); the first shell unmounts and closes its own.
+    final router = AppRouter.build(
+      authBloc,
+      createMemberSession: () => MemberSessionBloc(memberRepo),
+      createProfile: () => ProfileBloc(memberRepo),
+    );
+
+    authBloc.add(const AuthEvent.appStarted());
+    await tester.pumpWidget(harness(authBloc, router));
+    await pumpFrames(tester);
+    expect(find.byType(LoginPage), findsOneWidget);
+
+    // First session: account A signs in through MFA and lands on home.
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'ada@example.org');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'hunter2');
+    await tester.tap(find.byType(FilledButton));
+    await pumpFrames(tester);
+    expect(find.byType(MfaPage), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField), '123456');
+    await tester.tap(find.byType(FilledButton));
+    await pumpFrames(tester);
+    expect(find.byType(HomePage), findsOneWidget);
+    expect(find.text('Ada Lovelace'), findsOneWidget);
+
+    // Logout clears the pending route for account A.
+    await tester.tap(find.byIcon(Icons.logout));
+    await pumpFrames(tester);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(HomePage), findsNothing);
+
+    // A protected destination attempted now belongs to the *next* session.
+    router.push('/profile/p2');
+    await pumpFrames(tester);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(ProfilePage), findsNothing);
+
+    // Second session: account B signs in through MFA and the pending
+    // destination is restored against B's context — never account A's.
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email'), 'grace@example.org');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'hunter2');
+    await tester.tap(find.byType(FilledButton));
+    await pumpFrames(tester);
+    expect(find.byType(MfaPage), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField), '123456');
+    await tester.tap(find.byType(FilledButton));
+    await pumpFrames(tester);
+
+    expect(find.byType(ProfilePage), findsOneWidget);
+    verify(() => memberRepo.personDetail('p2')).called(1);
+    verifyNever(() => memberRepo.personDetail('p1'));
+    expect(find.text('Grace Hopper'), findsOneWidget);
+    expect(find.text('Ada Lovelace'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
 }

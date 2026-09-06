@@ -11,6 +11,8 @@ import 'package:member_portal/features/auth/application/auth_event.dart';
 import 'package:member_portal/features/auth/domain/auth_models.dart';
 import 'package:member_portal/features/auth/domain/auth_repository.dart';
 import 'package:member_portal/features/member/application/member_session_bloc.dart';
+import 'package:member_portal/features/member/application/member_session_event.dart';
+import 'package:member_portal/features/member/application/member_session_state.dart';
 import 'package:member_portal/features/member/application/profile_bloc.dart';
 import 'package:member_portal/features/member/data/member_dtos.dart';
 import 'package:member_portal/features/member/domain/member_models.dart';
@@ -214,6 +216,49 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 1));
     });
+
+    testWidgets(
+        'a shell disposed while the bootstrap is in flight never emits or '
+        'hangs', (tester) async {
+      final gate = Completer<MemberSessionResult>();
+      when(() => memberRepo.loadMemberSession()).thenAnswer((_) => gate.future);
+
+      final authBloc = AuthBloc(authRepo, coordinator);
+      final sessionBloc = MemberSessionBloc(memberRepo);
+      addTearDown(authBloc.close);
+
+      await tester.pumpWidget(shellHarness(authBloc, sessionBloc));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
+      expect(sessionBloc.isClosed, isFalse);
+
+      // Dispose the whole shell (sign-out / session expiry) with the
+      // bootstrap request still unresolved.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+
+      // The bloc is closed: it rejects any further event.
+      expect(
+        () => sessionBloc.add(const MemberSessionEvent.bootstrapRequested()),
+        throwsStateError,
+      );
+
+      // The late result, whatever it is, must never surface: the shell (and
+      // its published context) is already gone. The bloc stays in its last
+      // published state (bootstrap loading) and never transitions.
+      gate.complete(
+        MemberSessionResult.resolved(
+          account: _accountA,
+          person: _person('p1', 'Ada'),
+          membership: _membership(),
+        ),
+      );
+      await pumpFrames(tester, 4);
+
+      expect(sessionBloc.state, const MemberSessionState.loading());
+      expect(find.text('SHELL_CHILD'), findsNothing);
+    });
   });
 
   group('MemberShell routing', () {
@@ -308,6 +353,84 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 1));
     });
+
+    testWidgets(
+        'repeated Profile navigation uses an independent profile lifecycle '
+        'per visit', (tester) async {
+      when(() => authRepo.restoreSession()).thenAnswer(
+        (_) async => TokenPair(
+          accessToken: 'access-1',
+          refreshToken: 'refresh-1',
+          expiresAt: DateTime(2030),
+        ),
+      );
+      when(() => authRepo.currentUser()).thenAnswer(
+        (_) async => const AuthUser(
+          userAccountId: 'u1',
+          email: 'ada@example.org',
+          status: 'Active',
+        ),
+      );
+      when(() => memberRepo.loadMemberSession()).thenAnswer(
+        (_) async => MemberSessionResult.resolved(
+          account: _accountA,
+          person: _person('p1', 'Ada'),
+          membership: _membership(status: 'Active'),
+        ),
+      );
+      var personCalls = 0;
+      when(() => memberRepo.personDetail('p1')).thenAnswer((_) async {
+        personCalls += 1;
+        return _fullDetail();
+      });
+
+      final authBloc = AuthBloc(authRepo, coordinator);
+      final sessionBloc = MemberSessionBloc(memberRepo);
+      addTearDown(authBloc.close);
+      final router = AppRouter.build(
+        authBloc,
+        createMemberSession: () => sessionBloc,
+        createProfile: () => ProfileBloc(memberRepo),
+      );
+
+      authBloc.add(const AuthEvent.appStarted());
+      await tester.pumpWidget(
+        BlocProvider<AuthBloc>.value(
+          value: authBloc,
+          child: MaterialApp.router(
+            theme: ThemeData(useMaterial3: true),
+            routerConfig: router,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+          ),
+        ),
+      );
+      await pumpFrames(tester);
+
+      expect(find.byType(HomePage), findsOneWidget);
+      expect(personCalls, 0);
+
+      await tester.tap(find.text('Member Profile'));
+      await pumpFrames(tester);
+      expect(find.byType(ProfilePage), findsOneWidget);
+      expect(personCalls, 1);
+
+      await tester.pageBack();
+      await pumpFrames(tester);
+      expect(find.byType(ProfilePage), findsNothing);
+      expect(find.byType(HomePage), findsOneWidget);
+
+      // The second visit constructs a fresh ProfileBloc; exactly one request
+      // per visit, no reuse of the previous bloc's state.
+      await tester.tap(find.text('Member Profile'));
+      await pumpFrames(tester);
+      expect(find.byType(ProfilePage), findsOneWidget);
+      expect(personCalls, 2);
+      expect(find.text('Contact methods'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
   });
 }
 
@@ -324,4 +447,24 @@ MembershipDto _membership({String status = 'Pending'}) => MembershipDto(
       personId: 'p1',
       status: status,
       effectiveFrom: DateTime(2021, 3, 1),
+    );
+
+PersonDetailDto _fullDetail() => PersonDetailDto(
+      id: 'p1',
+      preferredName: 'Ada',
+      formalName: 'Ada Lovelace',
+      status: 'Active',
+      profileVisibility: 'Self',
+      contactVisibility: 'Self',
+      dateOfBirthVisibility: 'Self',
+      contactMethods: [
+        const ContactMethodDto(
+          id: 'c1',
+          type: 'email',
+          value: 'ada@example.org',
+          isPreferred: true,
+          visibility: 'Self',
+        ),
+      ],
+      createdOn: DateTime(2020, 1, 1),
     );
