@@ -19,6 +19,10 @@ String exceptionMessage(BuildContext context, AppException? error) {
       return l10n?.profileNotFound ?? error.message;
     case 'profile_forbidden':
       return l10n?.profileForbidden ?? error.message;
+    case 'membership_notFound':
+      return l10n?.membershipNotFound ?? error.message;
+    case 'membership_forbidden':
+      return l10n?.membershipForbidden ?? error.message;
   }
 
   if (error.message.trim().isEmpty) {

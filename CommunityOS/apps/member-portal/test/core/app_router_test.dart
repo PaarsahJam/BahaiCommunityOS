@@ -44,6 +44,7 @@ void main() {
       expect(authRedirect('/login', state), '/');
       expect(authRedirect('/home', state), '/');
       expect(authRedirect('/profile/p1', state), '/');
+      expect(authRedirect('/membership', state), '/');
     });
 
     test('never yanks the user off the sign-in surface while authenticating',
@@ -62,6 +63,7 @@ void main() {
       expect(authRedirect('/mfa', state), '/login');
       expect(authRedirect('/home', state), '/login');
       expect(authRedirect('/profile/p1', state), '/login');
+      expect(authRedirect('/membership', state), '/login');
     });
 
     test(
@@ -72,6 +74,16 @@ void main() {
 
       expect(authRedirect('/profile/p1', state, pending: store), '/login');
       expect(store.pending, '/profile/p1');
+    });
+
+    test(
+        'records a membership destination when unauthenticated so sign-in can '
+        'restore it', () {
+      final store = PendingRouteStore();
+      const state = AuthState.unauthenticated();
+
+      expect(authRedirect('/membership', state, pending: store), '/login');
+      expect(store.pending, '/membership');
     });
 
     test('does not record unprotected destinations', () {
@@ -88,6 +100,7 @@ void main() {
       expect(authRedirect('/mfa', state), isNull);
       expect(authRedirect('/', state), '/mfa');
       expect(authRedirect('/home', state), '/mfa');
+      expect(authRedirect('/membership', state), '/mfa');
     });
 
     test(
@@ -96,6 +109,7 @@ void main() {
       const state = AuthState.authenticated(user: user);
       expect(authRedirect('/home', state), isNull);
       expect(authRedirect('/profile/p1', state), isNull);
+      expect(authRedirect('/membership', state), isNull);
       expect(authRedirect('/login', state), '/home');
       expect(authRedirect('/mfa', state), '/home');
       // Regression: a restored session must leave the splash, not idle on it.

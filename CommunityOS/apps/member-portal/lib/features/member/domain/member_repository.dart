@@ -85,6 +85,16 @@ class MemberRepository {
   Future<PersonDetailDto> personDetail(String personId) =>
       _guard(() => _api.getPerson(personId));
 
+  /// Loads the authoritative membership record for [personId] — the member's
+  /// own Community PersonId from the authenticated `MemberContext`.
+  ///
+  /// Error semantics mirror the backend exactly: the record on `200 + DTO`,
+  /// `null` on `200 + null` (the legitimate no-membership state), and
+  /// 401/403/404/timeout/network/500 all propagate as typed application
+  /// exceptions — never as null.
+  Future<MembershipDto?> getMembership(String personId) =>
+      _guard(() => _api.getMembershipByPerson(personId));
+
   ForbiddenException _keyed(ForbiddenException error) => ForbiddenException(
         error.message,
         messageKey: 'profile_forbidden',

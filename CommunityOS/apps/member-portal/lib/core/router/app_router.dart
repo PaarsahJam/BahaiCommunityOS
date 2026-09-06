@@ -8,9 +8,11 @@ import '../../features/auth/application/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/mfa_page.dart';
 import '../../features/member/application/member_session_bloc.dart';
+import '../../features/member/application/membership_bloc.dart';
 import '../../features/member/application/profile_bloc.dart';
 import '../../features/member/presentation/home_page.dart';
 import '../../features/member/presentation/member_shell.dart';
+import '../../features/member/presentation/membership_page.dart';
 import '../../features/member/presentation/profile_page.dart';
 import '../ui/splash_page.dart';
 
@@ -55,6 +57,7 @@ class AppRouter {
     AuthBloc authBloc, {
     MemberSessionBloc Function()? createMemberSession,
     ProfileBloc Function()? createProfile,
+    MembershipBloc Function()? createMembership,
   }) {
     final pending = PendingRouteStore();
 
@@ -99,6 +102,12 @@ class AppRouter {
                 createProfileBloc: createProfile,
               ),
             ),
+            GoRoute(
+              path: '/membership',
+              name: 'membership',
+              builder: (context, state) =>
+                  MembershipPage(createMembershipBloc: createMembership),
+            ),
           ],
         ),
       ],
@@ -141,7 +150,7 @@ String? authRedirect(
 }
 
 bool _isProtectedPath(String path) =>
-    path == '/home' || path.startsWith('/profile');
+    path == '/home' || path == '/membership' || path.startsWith('/profile');
 
 /// Bridges an [AuthBloc] state [Stream] to the [Listenable] contract that
 /// [GoRouter.refreshListenable] expects so redirects re-evaluate on change.

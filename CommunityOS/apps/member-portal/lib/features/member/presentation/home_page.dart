@@ -135,31 +135,37 @@ class _MembershipCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(l10n.homeMembershipStatus,
-                    style: theme.textTheme.titleMedium),
-                const Spacer(),
-                Chip(
-                  label: Text(
-                    membershipStatusLabel(context, membership.status),
-                    style: theme.textTheme.labelMedium,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/membership'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(l10n.homeMembershipStatus,
+                      style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Chip(
+                    label: Text(
+                      membershipStatusLabel(context, membership.status),
+                      style: theme.textTheme.labelMedium,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${l10n.homeMemberSince}: '
-              '${DateFormat.yMMMd(l10n.localeName).format(membership.effectiveFrom)}',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ],
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${l10n.homeMemberSince}: '
+                '${DateFormat.yMMMd(l10n.localeName).format(membership.effectiveFrom)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -172,21 +178,32 @@ class _NoMembershipCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.homeMembershipStatus, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
-                const SizedBox(width: 12),
-                Expanded(child: Text(l10n.homeNoMembership)),
-              ],
-            ),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/membership'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(l10n.homeMembershipStatus,
+                      style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                  Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.hourglass_empty, color: theme.colorScheme.outline),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l10n.homeNoMembership)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
