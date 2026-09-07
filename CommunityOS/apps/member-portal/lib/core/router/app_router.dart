@@ -8,6 +8,7 @@ import '../../features/auth/application/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/mfa_page.dart';
 import '../../features/account/application/account_bloc.dart';
+import '../../features/account/application/security_bloc.dart';
 import '../../features/account/presentation/account_page.dart';
 import '../../features/member/application/member_session_bloc.dart';
 import '../../features/member/application/membership_bloc.dart';
@@ -61,6 +62,7 @@ class AppRouter {
     ProfileBloc Function()? createProfile,
     MembershipBloc Function()? createMembership,
     AccountBloc Function()? createAccount,
+    SecurityBloc Function()? createSecurity,
   }) {
     final pending = PendingRouteStore();
 
@@ -108,8 +110,10 @@ class AppRouter {
             GoRoute(
               path: '/account',
               name: 'account',
-              builder: (context, state) =>
-                  AccountPage(createAccountBloc: createAccount),
+              builder: (context, state) => AccountPage(
+                createAccountBloc: createAccount,
+                createSecurityBloc: createSecurity,
+              ),
             ),
             GoRoute(
               path: '/membership',

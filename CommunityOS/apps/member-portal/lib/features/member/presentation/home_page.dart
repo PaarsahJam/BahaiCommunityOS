@@ -125,7 +125,50 @@ class _MemberHomeContent extends StatelessWidget {
           _MembershipCard(membership: membership)
         else
           _NoMembershipCard(),
+        const SizedBox(height: 12),
+        _AccountCard(),
       ],
+    );
+  }
+}
+
+/// Textual entry point to the account & security page. Kept alongside the
+/// icon-only toolbar action so the destination is discoverable with large text
+/// and to assistive technology.
+class _AccountCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push('/account'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.verified_user_outlined,
+                  color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.homeAccountTitle,
+                        style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(l10n.homeAccountSubtitle,
+                        style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:member_portal/core/network/refresh_coordinator.dart';
 import 'package:member_portal/core/router/app_router.dart';
 import 'package:member_portal/features/account/application/account_bloc.dart';
+import 'package:member_portal/features/account/application/security_bloc.dart';
 import 'package:member_portal/features/account/presentation/account_page.dart';
 import 'package:member_portal/features/auth/application/auth_bloc.dart';
 import 'package:member_portal/features/auth/application/auth_event.dart';
@@ -76,6 +77,7 @@ void main() {
         authBloc,
         createMemberSession: () => MemberSessionBloc(memberRepo),
         createAccount: () => AccountBloc(memberRepo),
+        createSecurity: () => SecurityBloc(memberRepo),
       );
 
   void stubAccount() {
@@ -94,6 +96,9 @@ void main() {
             occurredOn: DateTime(2026, 9, 7, 12),
           ),
         ]);
+    // The Identity & Security section loads the read-only session list when
+    // the account page mounts.
+    when(() => memberRepo.sessions()).thenAnswer((_) async => <SessionDto>[]);
   }
 
   void stubSignIn({required String email}) {

@@ -147,3 +147,53 @@ abstract class SecurityEventDto with _$SecurityEventDto {
   factory SecurityEventDto.fromJson(Map<String, dynamic> json) =>
       _$SecurityEventDtoFromJson(json);
 }
+
+/// Enrollment material returned by `POST /mfa/enroll` for a single method.
+///
+/// `secret` and `provisioningUri` are one-time sensitive enrollment values that
+/// must never be logged, persisted, or placed anywhere but transient page
+/// state. Only the enrollment [mfaMethodId] may be handed back to the
+/// `POST /mfa/enroll/complete` completion call.
+@freezed
+abstract class MfaEnrollmentDto with _$MfaEnrollmentDto {
+  const factory MfaEnrollmentDto({
+    required String mfaMethodId,
+    required String secret,
+    required String provisioningUri,
+  }) = _MfaEnrollmentDto;
+
+  factory MfaEnrollmentDto.fromJson(Map<String, dynamic> json) =>
+      _$MfaEnrollmentDtoFromJson(json);
+}
+
+@freezed
+abstract class CompleteMfaEnrollmentRequestDto
+    with _$CompleteMfaEnrollmentRequestDto {
+  const factory CompleteMfaEnrollmentRequestDto({
+    required String mfaMethodId,
+    required String code,
+  }) = _CompleteMfaEnrollmentRequestDto;
+
+  factory CompleteMfaEnrollmentRequestDto.fromJson(Map<String, dynamic> json) =>
+      _$CompleteMfaEnrollmentRequestDtoFromJson(json);
+}
+
+/// A read-only session record from `GET /me/sessions`.
+///
+/// The backend contract carries no device-name, IP/user-agent, geographic or
+/// current-session fields; the UI therefore renders only the fields below and
+/// never fabricates "this device" or device names.
+@freezed
+abstract class SessionDto with _$SessionDto {
+  const factory SessionDto({
+    required String id,
+    required String deviceId,
+    required DateTime createdOn,
+    required DateTime expiresOn,
+    required DateTime lastUsedOn,
+    required bool isActive,
+  }) = _SessionDto;
+
+  factory SessionDto.fromJson(Map<String, dynamic> json) =>
+      _$SessionDtoFromJson(json);
+}

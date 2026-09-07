@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:member_portal/core/error/app_exception.dart';
 import 'package:member_portal/core/network/refresh_coordinator.dart';
 import 'package:member_portal/features/account/application/account_bloc.dart';
+import 'package:member_portal/features/account/application/security_bloc.dart';
 import 'package:member_portal/features/account/domain/account_exceptions.dart';
 import 'package:member_portal/features/account/presentation/account_page.dart';
 import 'package:member_portal/features/auth/application/auth_bloc.dart';
@@ -87,6 +88,9 @@ void main() {
     addTearDown(tester.view.reset);
     authBloc = AuthBloc(authRepo, coordinator);
     addTearDown(authBloc.close);
+    // The Identity & Security section loads the read-only session list when the
+    // page mounts, so every harness run needs a default stub.
+    when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(useMaterial3: true),
@@ -96,6 +100,7 @@ void main() {
           value: authBloc,
           child: AccountPage(
             createAccountBloc: () => AccountBloc(repository),
+            createSecurityBloc: () => SecurityBloc(repository),
           ),
         ),
       ),

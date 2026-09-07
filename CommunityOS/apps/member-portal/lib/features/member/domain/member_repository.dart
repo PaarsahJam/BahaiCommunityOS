@@ -115,6 +115,42 @@ class MemberRepository {
   Future<List<SecurityEventDto>> securityEvents({int take = 100}) =>
       _guard(() => _accountApi.securityEvents(take: take));
 
+  /// Loads the read-only session list for the authenticated account
+  /// (`/me/sessions`).
+  ///
+  /// Read-only and self-scoped. Failures are retryable and are never conflated
+  /// with a successful empty list; a 401 follows the existing session-expiry
+  /// machinery.
+  Future<List<SessionDto>> sessions() => _guard(() => _accountApi.sessions());
+
+  /// Begins TOTP enrollment for the authenticated account (`POST /mfa/enroll`).
+  ///
+  /// The returned [MfaEnrollmentDto.secret] and `.provisioningUri` are one-time
+  /// sensitive enrollment values. They are delivered to the page-scoped caller,
+  /// which owns their transient lifecycle; they are never retained, logged, or
+  /// persisted here.
+  Future<MfaEnrollmentDto> beginMfaEnrollment() =>
+      _guard(() => _accountApi.beginMfaEnrollment());
+
+  /// Completes TOTP enrollment for the method opened by the caller's own
+  /// `POST /mfa/enroll` operation (`POST /mfa/enroll/complete`).
+  ///
+  /// The method id is always the enrollment value returned to the same account
+  /// session; it is never taken from a route or another user. The backend is
+  /// authoritative for code validation. Ordinary 401 semantics (refresh once
+  /// then retry, or centralized session-expiry) are preserved: a failed
+  /// enrollment never becomes "MFA disabled".
+  Future<void> completeMfaEnrollment({
+    required String mfaMethodId,
+    required String code,
+  }) =>
+      _guard(() => _accountApi.completeMfaEnrollment(
+            CompleteMfaEnrollmentRequestDto(
+              mfaMethodId: mfaMethodId,
+              code: code,
+            ),
+          ));
+
   /// Changes the authenticated account's password and deliberately invalidates
   /// the whole token family (the backend revokes *all* sessions).
   ///

@@ -99,8 +99,8 @@ class _MfaPageState extends State<MfaPage> {
                       validator: (value) {
                         final code = value?.trim() ?? '';
                         if (code.isEmpty) return l10n.loginRequiredField;
-                        if (!RegExp(r'^\d{4,8}$').hasMatch(code)) {
-                          return l10n.mfaInvalidCode;
+                        if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+                          return l10n.mfaCodeLength;
                         }
                         return null;
                       },
@@ -108,10 +108,14 @@ class _MfaPageState extends State<MfaPage> {
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 16),
-                      Text(
-                        exceptionMessage(context, error),
-                        style: TextStyle(color: theme.colorScheme.error),
-                        textAlign: TextAlign.center,
+                      Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: Text(
+                          exceptionMessage(context, error),
+                          style: TextStyle(color: theme.colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -120,11 +124,14 @@ class _MfaPageState extends State<MfaPage> {
                       child: FilledButton(
                         onPressed: submitting ? null : _submit,
                         child: submitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.5),
+                            ? Semantics(
+                                label: l10n.mfaVerifying,
+                                child: const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5),
+                                ),
                               )
                             : Text(l10n.mfaSubmit),
                       ),

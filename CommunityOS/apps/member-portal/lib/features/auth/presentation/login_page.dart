@@ -29,8 +29,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _stateSubscription =
-        context.read<AuthBloc>().stream.listen(_routeOnState);
+    _stateSubscription = context.read<AuthBloc>().stream.listen(_routeOnState);
   }
 
   /// Escorts the sign-in flow to the MFA page the moment the backend reports
@@ -136,6 +135,9 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
+                          tooltip: _obscurePassword
+                              ? l10n.loginPasswordShow
+                              : l10n.loginPasswordHide,
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_outlined
@@ -163,11 +165,14 @@ class _LoginPageState extends State<LoginPage> {
                       child: FilledButton(
                         onPressed: submitting ? null : _submit,
                         child: submitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.5),
+                            ? Semantics(
+                                label: l10n.loginSigningIn,
+                                child: const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5),
+                                ),
                               )
                             : Text(l10n.loginSubmit),
                       ),
@@ -195,23 +200,28 @@ class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: theme.colorScheme.onErrorContainer),
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline,
+                color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: theme.colorScheme.onErrorContainer),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

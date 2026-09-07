@@ -31,6 +31,22 @@ abstract class AccountApi {
   Future<List<SecurityEventDto>> securityEvents(
       {@Query('take') int take = 100});
 
+  @GET('me/sessions')
+  Future<List<SessionDto>> sessions();
+
+  /// Begins TOTP enrollment for the caller and returns the one-time
+  /// enrollment material ([MfaEnrollmentDto.secret] and `.provisioningUri`)
+  /// that must never leave transient page state.
+  @POST('mfa/enroll')
+  Future<MfaEnrollmentDto> beginMfaEnrollment();
+
+  /// Completes TOTP enrollment for the enrollment returned by the caller's own
+  /// `POST /mfa/enroll` operation. The backend is authoritative; the
+  /// completion resolves the method by id and is consumed as-is by Phase 1.
+  @POST('mfa/enroll/complete')
+  Future<void> completeMfaEnrollment(
+      @Body() CompleteMfaEnrollmentRequestDto request);
+
   /// Changes the caller's password.
   ///
   /// The backend responds with `204` and revokes the *entire* token family
