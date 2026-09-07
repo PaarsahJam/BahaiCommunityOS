@@ -96,6 +96,7 @@ public sealed class GatewayForwarder(
             DownstreamService.Authorization => gatewayOptions.Value.Authorization.BaseUrl,
             DownstreamService.Organization => gatewayOptions.Value.Organization.BaseUrl,
             DownstreamService.Community => gatewayOptions.Value.Community.BaseUrl,
+            DownstreamService.Notifications => gatewayOptions.Value.Notifications.BaseUrl,
             _ => string.Empty
         };
 

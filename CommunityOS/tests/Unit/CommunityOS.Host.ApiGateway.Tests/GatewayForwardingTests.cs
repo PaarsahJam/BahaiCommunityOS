@@ -129,6 +129,57 @@ public class GatewayForwardingTests
     }
 
     [Fact]
+    public async Task MyNotifications_ForwardsToNotifications_PreservingVersion()
+    {
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => Json("application/json", "[]");
+
+        var response = await client.GetAsync("/api/v1/my-notifications?limit=10&offset=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var downstream = fixture.Handler.CapturedRequests.Should().ContainSingle().Subject;
+        downstream.Method.Should().Be(HttpMethod.Get);
+        downstream.RequestUri!.AbsolutePath.Should().Be("/api/v1/my-notifications");
+        downstream.RequestUri.GetLeftPart(UriPartial.Authority).Should().Be("http://localhost:5008");
+        downstream.RequestUri.Query.Should().Contain("limit=10").And.Contain("offset=0");
+    }
+
+    [Fact]
+    public async Task MyNotificationsUnreadCount_ForwardsToNotifications()
+    {
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => Json("application/json", "{\"count\":2}");
+
+        var response = await client.GetAsync("/api/v1/my-notifications/unread-count");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var downstream = fixture.Handler.CapturedRequests.Should().ContainSingle().Subject;
+        downstream.RequestUri!.AbsolutePath.Should().Be("/api/v1/my-notifications/unread-count");
+        downstream.RequestUri.GetLeftPart(UriPartial.Authority).Should().Be("http://localhost:5008");
+    }
+
+    [Fact]
+    public async Task AdminNotificationsSurface_IsNotExposed()
+    {
+        // Only the member-safe my-notifications surface is routed; the
+        // administrative /api/v1/notifications/** endpoints (create, dispatch,
+        // sensitive) must never be reachable through the Gateway.
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => Json("application/json", "{}");
+
+        var response = await client.GetAsync("/api/v1/notifications");
+        var sensitive = await client.GetAsync(
+            "/api/v1/notifications/00000000-0000-0000-0000-000000000000/sensitive");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        sensitive.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        fixture.Handler.CapturedRequests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task DownstreamStatusAndProblemDetails_PassThroughUnchanged()
     {
         using var fixture = new GatewayTestFixture();

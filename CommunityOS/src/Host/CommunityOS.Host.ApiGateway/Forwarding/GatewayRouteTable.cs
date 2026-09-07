@@ -43,6 +43,12 @@ public static class GatewayRouteTable
             ["communities"] = DownstreamService.Community,
             ["family-relationships"] = DownstreamService.Community,
             ["participations"] = DownstreamService.Community,
+
+            // Notifications (member-safe read contract only — ADR-027). The
+            // administrative /api/v1/notifications/** surface is deliberately
+            // absent from the route table and is never exposed through the
+            // Gateway.
+            ["my-notifications"] = DownstreamService.Notifications,
         };
 
     /// <summary>

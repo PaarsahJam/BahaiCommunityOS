@@ -31,6 +31,9 @@ public class GatewayRouteTableTests
     [InlineData("/api/v1/communities", DownstreamService.Community)]
     [InlineData("/api/v1/family-relationships", DownstreamService.Community)]
     [InlineData("/api/v1/participations", DownstreamService.Community)]
+    [InlineData("/api/v1/my-notifications", DownstreamService.Notifications)]
+    [InlineData("/api/v1/my-notifications/unread-count", DownstreamService.Notifications)]
+    [InlineData("/api/v1/my-notifications/00000000-0000-0000-0000-000000000000/read", DownstreamService.Notifications)]
     public void TryResolve_PublicRoutes_ResolvesToService(string path, DownstreamService expected)
     {
         GatewayRouteTable.TryResolve(path, out var service).Should().BeTrue();
@@ -55,6 +58,9 @@ public class GatewayRouteTableTests
     [InlineData("/api/v1")]
     [InlineData("/api/v1/unknown")]
     [InlineData("/api/v1/gateway")]
+    [InlineData("/api/v1/notifications")]
+    [InlineData("/api/v1/notifications/00000000-0000-0000-0000-000000000000")]
+    [InlineData("/api/v1/notifications/00000000-0000-0000-0000-000000000000/sensitive")]
     [InlineData("/swagger")]
     [InlineData("/not-an-api/persons")]
     public void TryResolve_UnknownOrNonApiPaths_ReturnsFalse(string path)

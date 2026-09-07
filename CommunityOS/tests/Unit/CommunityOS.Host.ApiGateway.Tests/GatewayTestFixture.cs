@@ -32,7 +32,8 @@ public sealed class GatewayTestFixture : IDisposable
             ["Services:Identity:BaseUrl"] = "http://localhost:5001",
             ["Services:Authorization:BaseUrl"] = "http://localhost:5007",
             ["Services:Organization:BaseUrl"] = "http://localhost:5003",
-            ["Services:Community:BaseUrl"] = "http://localhost:5004"
+            ["Services:Community:BaseUrl"] = "http://localhost:5004",
+            ["Services:Notifications:BaseUrl"] = "http://localhost:5008"
         });
 
         builder.Services.AddGatewayServices(builder.Configuration);

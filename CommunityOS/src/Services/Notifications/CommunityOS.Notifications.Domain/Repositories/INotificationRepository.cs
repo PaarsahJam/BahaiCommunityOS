@@ -18,6 +18,25 @@ public interface INotificationRepository
         Guid memberId, int limit, int offset, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Recipient-scoped member inbox for the authenticated actor (ADR-027):
+    /// notifications the member is a recipient of, newest-first, bounded by
+    /// skip/take at the query boundary. Sensitive notifications are excluded at
+    /// the query boundary — they are not part of the member read contract
+    /// (fail-closed). The recipient identity is never client-supplied.
+    /// </summary>
+    Task<List<Notification>> ListMemberInboxAsync(
+        Guid memberId, int limit, int offset, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Count of delivered-but-unread notifications for the member (recipient
+    /// status <c>Delivered</c>, not yet <c>Read</c>), excluding sensitive
+    /// notifications. Recipient-filtered before aggregation; never loads a
+    /// recipient distribution (ADR-027).
+    /// </summary>
+    Task<int> CountUnreadByMemberAsync(
+        Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Not-yet-dispatched notifications eligible for the dispatch worker
     /// (immediate <c>ScheduledFor</c> is null, or due at/before
     /// <paramref name="now"/>).

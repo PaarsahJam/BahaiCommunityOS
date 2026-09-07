@@ -56,6 +56,31 @@ public sealed record NotificationTypeDto(
     Guid UpdatedBy,
     DateTime UpdatedOn);
 
+/// <summary>
+/// Member-safe notification summary for the authenticated recipient
+/// (relationship-granted, fail-closed). Delivers notification identity, type,
+/// channel, lifecycle status, creation timestamp, member-visible content and
+/// recipient-specific read state. Exposes no recipient distribution, no
+/// source/scope metadata, and never a sensitive notification (ADR-027 member
+/// read contract).
+/// </summary>
+public sealed record MemberNotificationSummaryDto(
+    Guid Id,
+    string TypeCode,
+    string Channel,
+    string Status,
+    string Title,
+    string Body,
+    bool IsRead,
+    DateTime? ReadAt,
+    DateTime CreatedOn);
+
+/// <summary>
+/// Recipient-scoped unread count for the authenticated member (delivered, not
+/// read). Carries no notification details — count only.
+/// </summary>
+public sealed record MemberUnreadCountDto(int Count);
+
 public sealed record NotificationPreferenceRuleDto(
     string TypeCode,
     IReadOnlyList<string> Channels,

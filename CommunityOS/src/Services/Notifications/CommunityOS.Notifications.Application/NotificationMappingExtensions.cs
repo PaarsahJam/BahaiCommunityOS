@@ -1,11 +1,33 @@
 using CommunityOS.Notifications.Application.DTOs;
 using CommunityOS.Notifications.Domain.Aggregates;
 using CommunityOS.Notifications.Domain.Entities;
+using CommunityOS.Notifications.Domain.Enumerations;
 
 namespace CommunityOS.Notifications.Application;
 
 internal static class NotificationMappingExtensions
 {
+    /// <summary>
+    /// Member-safe summary for the authenticated recipient. Content is the
+    /// notification's own per-notification template (shared by design with its
+    /// recipients; never per-recipient and never PII). Read state is
+    /// recipient-specific; no distribution is serialized.
+    /// </summary>
+    internal static MemberNotificationSummaryDto ToMemberSummaryDto(
+        this Notification n, Guid memberId)
+    {
+        var recipient = n.RecipientFor(memberId);
+        return new(n.Id,
+            n.TypeCode,
+            n.Channel.Name,
+            n.Status.Name,
+            n.Template.Subject,
+            n.Template.Body,
+            recipient?.Status == NotificationRecipientStatus.Read,
+            recipient?.ReadAt,
+            n.CreatedOn);
+    }
+
     internal static NotificationSummaryDto ToSummaryDto(this Notification n) =>
         new(n.Id,
             n.TypeCode,

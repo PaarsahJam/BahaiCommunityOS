@@ -33,5 +33,6 @@ internal static class ServiceCollectionExtensions
         !string.IsNullOrWhiteSpace(options.Identity.BaseUrl) &&
         !string.IsNullOrWhiteSpace(options.Authorization.BaseUrl) &&
         !string.IsNullOrWhiteSpace(options.Organization.BaseUrl) &&
-        !string.IsNullOrWhiteSpace(options.Community.BaseUrl);
+        !string.IsNullOrWhiteSpace(options.Community.BaseUrl) &&
+        !string.IsNullOrWhiteSpace(options.Notifications.BaseUrl);
 }

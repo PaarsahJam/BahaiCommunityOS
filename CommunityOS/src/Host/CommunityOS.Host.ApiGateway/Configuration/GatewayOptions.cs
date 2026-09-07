@@ -16,6 +16,8 @@ public sealed class GatewayOptions
     public DownstreamServiceOptions Organization { get; set; } = new();
 
     public DownstreamServiceOptions Community { get; set; } = new();
+
+    public DownstreamServiceOptions Notifications { get; set; } = new();
 }
 
 /// <summary>

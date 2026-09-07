@@ -9,5 +9,6 @@ public enum DownstreamService
     Identity,
     Authorization,
     Organization,
-    Community
+    Community,
+    Notifications
 }

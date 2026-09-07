@@ -33,6 +33,23 @@ public sealed class NotificationRepository(NotificationsDbContext db) : INotific
             .Take(limit)
             .ToListAsync(cancellationToken);
 
+    public Task<List<Notification>> ListMemberInboxAsync(
+        Guid memberId, int limit, int offset, CancellationToken cancellationToken = default) =>
+        Query()
+            .Where(n => !n.IsSensitive && n.Recipients.Any(r => r.MemberId == memberId))
+            .OrderByDescending(n => n.CreatedOn)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountUnreadByMemberAsync(
+        Guid memberId, CancellationToken cancellationToken = default) =>
+        db.Notifications.CountAsync(n =>
+            !n.IsSensitive &&
+            n.Recipients.Any(r =>
+                r.MemberId == memberId && r.Status == NotificationRecipientStatus.Delivered),
+            cancellationToken);
+
     public Task<List<Notification>> ListQueuedForDispatchAsync(
         int limit, DateTime now, CancellationToken cancellationToken = default) =>
         Query()
