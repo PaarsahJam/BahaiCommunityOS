@@ -17,6 +17,8 @@ import '../../features/member/presentation/home_page.dart';
 import '../../features/member/presentation/member_shell.dart';
 import '../../features/member/presentation/membership_page.dart';
 import '../../features/member/presentation/profile_page.dart';
+import '../../features/notifications/application/notification_bloc.dart';
+import '../../features/notifications/presentation/notification_center_page.dart';
 import '../ui/splash_page.dart';
 
 /// In-memory store for a destination intended while unauthenticated, so the
@@ -63,6 +65,7 @@ class AppRouter {
     MembershipBloc Function()? createMembership,
     AccountBloc Function()? createAccount,
     SecurityBloc Function()? createSecurity,
+    NotificationBloc Function()? createNotifications,
   }) {
     final pending = PendingRouteStore();
 
@@ -121,6 +124,13 @@ class AppRouter {
               builder: (context, state) =>
                   MembershipPage(createMembershipBloc: createMembership),
             ),
+            GoRoute(
+              path: '/notifications',
+              name: 'notifications',
+              builder: (context, state) => NotificationCenterPage(
+                createBloc: createNotifications,
+              ),
+            ),
           ],
         ),
       ],
@@ -166,6 +176,7 @@ bool _isProtectedPath(String path) =>
     path == '/home' ||
     path == '/membership' ||
     path == '/account' ||
+    path == '/notifications' ||
     path.startsWith('/profile');
 
 /// Bridges an [AuthBloc] state [Stream] to the [Listenable] contract that

@@ -6,6 +6,7 @@ import 'package:member_portal/l10n/generated/app_localizations.dart';
 
 import '../../auth/application/auth_bloc.dart';
 import '../../auth/application/auth_event.dart';
+import '../../notifications/presentation/widgets/home_notifications_badge.dart';
 import '../application/member_session_bloc.dart';
 import '../application/member_session_state.dart';
 import '../data/member_dtos.dart';
@@ -34,6 +35,7 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: Text(l10n.homeTitle),
         actions: [
+          const HomeNotificationsBadge(),
           IconButton(
             tooltip: l10n.accountTitle,
             icon: const Icon(Icons.manage_accounts_outlined),

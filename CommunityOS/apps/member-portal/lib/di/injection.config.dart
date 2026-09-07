@@ -28,6 +28,10 @@ import 'package:member_portal/features/auth/domain/auth_repository.dart'
 import 'package:member_portal/features/member/data/member_api.dart' as _i214;
 import 'package:member_portal/features/member/domain/member_repository.dart'
     as _i278;
+import 'package:member_portal/features/notifications/data/notifications_api.dart'
+    as _i697;
+import 'package:member_portal/features/notifications/domain/notification_repository.dart'
+    as _i142;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -72,6 +76,13 @@ extension GetItInjectableX on _i174.GetIt {
         () => apiModule.provideAccountApi(gh<_i361.Dio>()));
     gh.lazySingleton<_i214.MemberApi>(
         () => apiModule.provideMemberApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i697.NotificationApi>(
+        () => apiModule.provideNotificationApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i142.NotificationRepository>(
+        () => _i142.NotificationRepository(
+              gh<_i697.NotificationApi>(),
+              gh<_i678.ErrorMapper>(),
+            ));
     gh.lazySingleton<_i278.MemberRepository>(() => _i278.MemberRepository(
           gh<_i922.AccountApi>(),
           gh<_i214.MemberApi>(),

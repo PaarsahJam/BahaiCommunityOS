@@ -121,5 +121,49 @@
   "accountEventRefreshTokenReuse": "Session suspicious activity detected",
   "accountEventAuthorizeCodeIssued": "Authorization code issued",
   "accountEventTokenIssued": "Access token issued",
-  "accountEventUnknown": "Security event"
+  "accountEventUnknown": "Security event",
+  "notificationsTitle": "Notifications",
+  "notificationsOpen": "Notifications",
+  "notificationsEmpty": "You have no notifications.",
+  "notificationsRefresh": "Refresh",
+  "notificationsUnread": "Unread",
+  "notificationsRead": "Read",
+  "notificationsMarkAsRead": "Mark as read",
+  "notificationsMarkingAsRead": "Marking as read…",
+  "notificationsMarkReadFailed": "Could not mark as read. Please try again.",
+  "notificationsReceived": "Received",
+  "notificationsLoadMore": "Load more",
+  "notificationsLoadMoreFailed": "Could not load more notifications.",
+  "notificationsUnreadHeader": "You have {count} unread notification(s).",
+  "@notificationsUnreadHeader": {
+    "description": "Header summarizing the server-provided unread count.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsUnreadCountUnavailable": "Unread count unavailable.",
+  "notificationsUnreadCountSemantic": "{count} unread notifications",
+  "@notificationsUnreadCountSemantic": {
+    "description": "Accessibility label for the unread-count badge.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationTypeFallback": "Notification",
+  "notificationTypeTaskAssigned": "Task assigned",
+  "notificationTypeTaskEscalated": "Task escalated",
+  "notificationTypeTaskCompleted": "Task completed",
+  "notificationTypeTaskCancelled": "Task cancelled",
+  "notificationTypeRecordVerified": "Record verified",
+  "notificationTypeRecordRejected": "Record rejected",
+  "notificationTypeRecordHold": "Record on hold",
+  "notificationTypeQuestionFlagged": "Question flagged",
+  "notificationTypeCommunityActivity": "Community activity",
+  "notificationTypeCommunityEvent": "Community event",
+  "notificationTypeCommunityMeeting": "Community meeting",
+  "notificationTypeGeneral": "General"
 }

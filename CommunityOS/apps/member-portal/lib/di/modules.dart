@@ -8,6 +8,7 @@ import '../core/network/refresh_coordinator.dart';
 import '../core/storage/token_storage.dart';
 import '../features/auth/data/auth_api.dart';
 import '../features/member/data/member_api.dart';
+import '../features/notifications/data/notifications_api.dart';
 
 @module
 abstract class AppModule {
@@ -52,4 +53,7 @@ abstract class ApiModule {
 
   @LazySingleton()
   MemberApi provideMemberApi(Dio dio) => MemberApi(dio);
+
+  @LazySingleton()
+  NotificationApi provideNotificationApi(Dio dio) => NotificationApi(dio);
 }

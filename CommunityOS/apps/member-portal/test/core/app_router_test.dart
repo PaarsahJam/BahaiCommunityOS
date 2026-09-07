@@ -45,6 +45,7 @@ void main() {
       expect(authRedirect('/home', state), '/');
       expect(authRedirect('/profile/p1', state), '/');
       expect(authRedirect('/membership', state), '/');
+      expect(authRedirect('/notifications', state), '/');
     });
 
     test('never yanks the user off the sign-in surface while authenticating',
@@ -86,6 +87,16 @@ void main() {
       expect(store.pending, '/membership');
     });
 
+    test(
+        'records the notification center destination when unauthenticated so '
+        'sign-in can restore it', () {
+      final store = PendingRouteStore();
+      const state = AuthState.unauthenticated();
+
+      expect(authRedirect('/notifications', state, pending: store), '/login');
+      expect(store.pending, '/notifications');
+    });
+
     test('does not record unprotected destinations', () {
       final store = PendingRouteStore();
       const state = AuthState.unauthenticated();
@@ -101,6 +112,7 @@ void main() {
       expect(authRedirect('/', state), '/mfa');
       expect(authRedirect('/home', state), '/mfa');
       expect(authRedirect('/membership', state), '/mfa');
+      expect(authRedirect('/notifications', state), '/mfa');
     });
 
     test(
@@ -110,6 +122,7 @@ void main() {
       expect(authRedirect('/home', state), isNull);
       expect(authRedirect('/profile/p1', state), isNull);
       expect(authRedirect('/membership', state), isNull);
+      expect(authRedirect('/notifications', state), isNull);
       expect(authRedirect('/login', state), '/home');
       expect(authRedirect('/mfa', state), '/home');
       // Regression: a restored session must leave the splash, not idle on it.
