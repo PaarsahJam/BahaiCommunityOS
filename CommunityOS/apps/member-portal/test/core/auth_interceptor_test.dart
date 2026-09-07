@@ -147,5 +147,33 @@ void main() {
 
       verifyNever(() => coordinator.refreshTokens());
     });
+
+    test(
+        'a request flagged with noAutoRetry is surfaced verbatim: no refresh '
+        'and no automatic retry', () async {
+      when(() => storage.read()).thenAnswer((_) async => TokenPair(
+            accessToken: 'stale-access',
+            refreshToken: 'stale-refresh',
+            expiresAt: DateTime(2040),
+          ));
+      when(() => coordinator.refreshTokens()).thenAnswer((_) async => null);
+      when(() => adapter.fetch(any(), any(), any()))
+          .thenAnswer((_) async => json(401));
+
+      await expectLater(
+        dio.post(
+          '/me/password',
+          data: {'currentPassword': 'x', 'newPassword': 'y'},
+          options: Options(extra: {AuthInterceptor.noAutoRetryKey: true}),
+        ),
+        throwsA(isA<DioException>()
+            .having((e) => e.response?.statusCode, 'status', 401)),
+      );
+
+      // Exactly one attempt: the mutation is never re-submitted, even though
+      // a fresh (valid) token is available.
+      verify(() => adapter.fetch(any(), any(), any())).called(1);
+      verifyNever(() => coordinator.refreshTokens());
+    });
   });
 }

@@ -35,6 +35,11 @@ class HomePage extends StatelessWidget {
         title: Text(l10n.homeTitle),
         actions: [
           IconButton(
+            tooltip: l10n.accountTitle,
+            icon: const Icon(Icons.manage_accounts_outlined),
+            onPressed: () => context.push('/account'),
+          ),
+          IconButton(
             tooltip: l10n.homeLogout,
             icon: const Icon(Icons.logout),
             onPressed: () =>

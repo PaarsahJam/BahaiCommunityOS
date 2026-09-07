@@ -72,6 +72,12 @@ extension GetItInjectableX on _i174.GetIt {
         () => apiModule.provideAccountApi(gh<_i361.Dio>()));
     gh.lazySingleton<_i214.MemberApi>(
         () => apiModule.provideMemberApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i278.MemberRepository>(() => _i278.MemberRepository(
+          gh<_i922.AccountApi>(),
+          gh<_i214.MemberApi>(),
+          gh<_i678.ErrorMapper>(),
+          gh<_i245.RefreshCoordinator>(),
+        ));
     gh.lazySingleton<_i552.AuthRepository>(() => _i552.AuthRepository(
           gh<_i922.AuthApi>(),
           gh<_i922.AccountApi>(),
@@ -81,11 +87,6 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i952.AuthBloc>(() => _i952.AuthBloc(
           gh<_i552.AuthRepository>(),
           gh<_i245.RefreshCoordinator>(),
-        ));
-    gh.lazySingleton<_i278.MemberRepository>(() => _i278.MemberRepository(
-          gh<_i922.AccountApi>(),
-          gh<_i214.MemberApi>(),
-          gh<_i678.ErrorMapper>(),
         ));
     return this;
   }

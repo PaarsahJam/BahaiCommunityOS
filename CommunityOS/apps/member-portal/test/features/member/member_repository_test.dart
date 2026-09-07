@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:member_portal/core/error/app_exception.dart';
+import 'package:member_portal/core/network/auth_interceptor.dart';
 import 'package:member_portal/core/network/error_mapper.dart';
+import 'package:member_portal/core/network/refresh_coordinator.dart';
+import 'package:member_portal/core/storage/token_storage.dart';
+import 'package:member_portal/features/account/domain/account_exceptions.dart';
 import 'package:member_portal/features/auth/data/auth_api.dart';
 import 'package:member_portal/features/auth/data/auth_dtos.dart';
 import 'package:member_portal/features/member/data/member_api.dart';
@@ -13,6 +17,8 @@ import 'package:mocktail/mocktail.dart';
 class _MockAccountApi extends Mock implements AccountApi {}
 
 class _MockMemberApi extends Mock implements MemberApi {}
+
+class _MockRefreshCoordinator extends Mock implements RefreshCoordinator {}
 
 UserAccountDto _account() => UserAccountDto(
       id: 'u1',
@@ -47,15 +53,67 @@ DioException _http(int status, {String path = '/api/v1/my-person'}) =>
       ),
     );
 
+/// A 401 carrying the JwtBearer challenge the gateway forwards verbatim.
+DioException _jwt401() => DioException(
+      requestOptions: RequestOptions(path: '/api/v1/me/password'),
+      type: DioExceptionType.badResponse,
+      response: Response<dynamic>(
+        requestOptions: RequestOptions(path: '/api/v1/me/password'),
+        statusCode: 401,
+        headers: Headers.fromMap({
+          'www-authenticate': [
+            'Bearer error="invalid_token", error_description="The token expired"'
+          ]
+        }),
+        data: {'detail': 'token expired'},
+      ),
+    );
+
+/// A 400 problem-details payload as produced by FluentValidation
+/// (`InvalidModelState`), carrying PascalCase `errors[]`.
+DioException _validation400() => DioException(
+      requestOptions: RequestOptions(path: '/api/v1/me/password'),
+      type: DioExceptionType.badResponse,
+      response: Response<dynamic>(
+        requestOptions: RequestOptions(path: '/api/v1/me/password'),
+        statusCode: 400,
+        data: {
+          'status': 400,
+          'title': 'One or more validation errors occurred.',
+          'errors': [
+            {
+              'propertyName': 'CurrentPassword',
+              'errorMessage': 'The current password is required.'
+            },
+            {
+              'propertyName': 'NewPassword',
+              'errorMessage':
+                  'The new password must be at least 12 characters long.'
+            },
+          ],
+        },
+      ),
+    );
+
 void main() {
   late _MockAccountApi accountApi;
   late _MockMemberApi api;
+  late _MockRefreshCoordinator coordinator;
   late MemberRepository repository;
+
+  setUpAll(() {
+    registerFallbackValue(const ChangePasswordRequestDto(
+      currentPassword: 'fallback',
+      newPassword: 'fallback',
+    ));
+  });
 
   setUp(() {
     accountApi = _MockAccountApi();
     api = _MockMemberApi();
-    repository = MemberRepository(accountApi, api, const ErrorMapper());
+    coordinator = _MockRefreshCoordinator();
+    repository =
+        MemberRepository(accountApi, api, const ErrorMapper(), coordinator);
   });
 
   group('loadMemberSession', () {
@@ -237,6 +295,189 @@ void main() {
         () => repository.personDetail('p1'),
         throwsA(isA<NotFoundException>()),
       );
+    });
+  });
+
+  group('loadAccount', () {
+    test('loads the authenticated account overview', () async {
+      when(() => accountApi.me()).thenAnswer((_) async => _account());
+
+      final result = await repository.loadAccount();
+
+      expect(result.id, 'u1');
+      expect(result.email, 'ada@example.org');
+    });
+
+    test('a 403 maps to a forbidden exception', () async {
+      when(() => accountApi.me()).thenThrow(_http(403, path: '/api/v1/me'));
+
+      expect(
+        () => repository.loadAccount(),
+        throwsA(isA<ForbiddenException>()),
+      );
+    });
+
+    test('a 404 maps to a not-found exception', () async {
+      when(() => accountApi.me()).thenThrow(_http(404, path: '/api/v1/me'));
+
+      expect(
+        () => repository.loadAccount(),
+        throwsA(isA<NotFoundException>()),
+      );
+    });
+  });
+
+  group('securityEvents', () {
+    test('loads the recent security-activity events', () async {
+      when(() => accountApi.securityEvents(take: any(named: 'take')))
+          .thenAnswer((_) async => [
+                SecurityEventDto(
+                  id: 'e1',
+                  eventType: 'Login.Succeeded',
+                  occurredOn: DateTime(2026, 9, 7, 12),
+                ),
+              ]);
+
+      final result = await repository.securityEvents();
+
+      expect(result, hasLength(1));
+      expect(result.single.eventType, 'Login.Succeeded');
+      verify(() => accountApi.securityEvents(take: 100)).called(1);
+    });
+
+    test('a network failure propagates and is never an empty history',
+        () async {
+      when(() => accountApi.securityEvents(take: any(named: 'take'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/me/security-events'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      expect(
+        () => repository.securityEvents(),
+        throwsA(isA<NetworkException>()),
+      );
+    });
+  });
+
+  group('changePassword', () {
+    test('sends the DTO and flags the request as never-auto-retry', () async {
+      when(() => accountApi.changePassword(any(), any()))
+          .thenAnswer((_) async {});
+
+      await repository.changePassword(
+        currentPassword: 'old-pass',
+        newPassword: 'new-pass',
+      );
+
+      final captured =
+          verify(() => accountApi.changePassword(captureAny(), captureAny()))
+              .captured;
+      final dto = captured[0] as ChangePasswordRequestDto;
+      final extra = captured[1] as Map<String, dynamic>;
+      expect(dto.currentPassword, 'old-pass');
+      expect(dto.newPassword, 'new-pass');
+      expect(extra[AuthInterceptor.noAutoRetryKey], isTrue);
+    });
+
+    test(
+        'an application 401 (no challenge header) is a wrong-current-password '
+        'error, never a refresh and never a session event', () async {
+      when(() => accountApi.changePassword(any(), any()))
+          .thenThrow(_http(401, path: '/api/v1/me/password'));
+
+      await expectLater(
+        repository.changePassword(
+          currentPassword: 'wrong',
+          newPassword: 'new-pass',
+        ),
+        throwsA(isA<UnauthorizedException>().having(
+          (e) => e.messageKey,
+          'messageKey',
+          'accountCurrentPasswordIncorrect',
+        )),
+      );
+      verifyNever(() => coordinator.refreshTokens());
+    });
+
+    test(
+        'a JwtBearer 401 with a recoverable token surfaces a retryable '
+        'credential error', () async {
+      when(() => accountApi.changePassword(any(), any())).thenThrow(_jwt401());
+      when(() => coordinator.refreshTokens()).thenAnswer((_) async => TokenPair(
+            accessToken: 'rotated',
+            refreshToken: 'rotated-r',
+            expiresAt: DateTime(2031),
+          ));
+
+      await expectLater(
+        repository.changePassword(
+          currentPassword: 'old-pass',
+          newPassword: 'new-pass',
+        ),
+        throwsA(
+          isA<UnauthorizedException>().having(
+              (e) => e.messageKey, 'messageKey', 'accountPasswordRetryable'),
+        ),
+      );
+      verify(() => coordinator.refreshTokens()).called(1);
+    });
+
+    test(
+        'a JwtBearer 401 with a dead token maps through the centralized '
+        'session-expiry path', () async {
+      when(() => accountApi.changePassword(any(), any())).thenThrow(_jwt401());
+      when(() => coordinator.refreshTokens()).thenAnswer((_) async => null);
+
+      await expectLater(
+        repository.changePassword(
+          currentPassword: 'old-pass',
+          newPassword: 'new-pass',
+        ),
+        throwsA(
+          isA<UnauthorizedException>()
+              .having((e) => e.messageKey, 'messageKey', isNull),
+        ),
+      );
+      verify(() => coordinator.refreshTokens()).called(1);
+    });
+
+    test('a validator 400 surfaces per-field server messages lowercased',
+        () async {
+      when(() => accountApi.changePassword(any(), any()))
+          .thenThrow(_validation400());
+
+      var caught = false;
+      try {
+        await repository.changePassword(
+          currentPassword: '',
+          newPassword: 'short',
+        );
+      } on PasswordValidationException catch (error) {
+        caught = true;
+        expect(error.fieldErrors['currentpassword'],
+            'The current password is required.');
+        expect(error.fieldErrors['newpassword'],
+            'The new password must be at least 12 characters long.');
+        expect(error.messageKey, 'accountPasswordValidationFailed');
+      }
+      expect(caught, isTrue);
+      verifyNever(() => coordinator.refreshTokens());
+    });
+
+    test('a 500 maps to a server failure', () async {
+      when(() => accountApi.changePassword(any(), any()))
+          .thenThrow(_http(500, path: '/api/v1/me/password'));
+
+      await expectLater(
+        repository.changePassword(
+          currentPassword: 'old-pass',
+          newPassword: 'new-pass',
+        ),
+        throwsA(isA<ServerException>()),
+      );
+      verifyNever(() => coordinator.refreshTokens());
     });
   });
 }

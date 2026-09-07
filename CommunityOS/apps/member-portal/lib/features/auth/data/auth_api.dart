@@ -27,6 +27,24 @@ abstract class AccountApi {
   @GET('me')
   Future<UserAccountDto> me();
 
+  @GET('me/security-events')
+  Future<List<SecurityEventDto>> securityEvents(
+      {@Query('take') int take = 100});
+
+  /// Changes the caller's password.
+  ///
+  /// The backend responds with `204` and revokes the *entire* token family
+  /// (`RevokeAllForUserAsync`), so every refresh token is invalidated from
+  /// here. This is a non-idempotent mutation: it is the one authenticated
+  /// endpoint that must *never* be transparently refresh+retried. The caller
+  /// passes `extra: {AuthInterceptor.noAutoRetryKey: true}` so a 401 is
+  /// surfaced verbatim for the repository to discriminate.
+  @POST('me/password')
+  Future<void> changePassword(
+    @Body() ChangePasswordRequestDto request,
+    @Extras() Map<String, dynamic>? extra,
+  );
+
   @POST('account/logout')
   Future<void> logout(@Body() LogoutRequestDto request);
 }

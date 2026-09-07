@@ -40,6 +40,17 @@ abstract class LogoutRequestDto with _$LogoutRequestDto {
 }
 
 @freezed
+abstract class ChangePasswordRequestDto with _$ChangePasswordRequestDto {
+  const factory ChangePasswordRequestDto({
+    required String currentPassword,
+    required String newPassword,
+  }) = _ChangePasswordRequestDto;
+
+  factory ChangePasswordRequestDto.fromJson(Map<String, dynamic> json) =>
+      _$ChangePasswordRequestDtoFromJson(json);
+}
+
+@freezed
 abstract class TokenDto with _$TokenDto {
   const factory TokenDto({
     required String accessToken,
@@ -122,4 +133,17 @@ abstract class DeviceDto with _$DeviceDto {
 
   factory DeviceDto.fromJson(Map<String, dynamic> json) =>
       _$DeviceDtoFromJson(json);
+}
+
+@freezed
+abstract class SecurityEventDto with _$SecurityEventDto {
+  const factory SecurityEventDto({
+    required String id,
+    required String eventType,
+    String? description,
+    required DateTime occurredOn,
+  }) = _SecurityEventDto;
+
+  factory SecurityEventDto.fromJson(Map<String, dynamic> json) =>
+      _$SecurityEventDtoFromJson(json);
 }

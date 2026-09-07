@@ -144,6 +144,7 @@ void main() {
       AccountApi(authorized),
       MemberApi(authorized),
       mapper,
+      coordinator,
     );
 
     // The refresh failed: the coordinator has already discarded the stored
@@ -189,6 +190,7 @@ void main() {
       AccountApi(authorized),
       MemberApi(authorized),
       mapper,
+      coordinator,
     );
 
     // /my-person is still scripted as 401 after rotation, so the bootstrap

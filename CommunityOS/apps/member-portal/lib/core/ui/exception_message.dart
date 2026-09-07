@@ -23,6 +23,16 @@ String exceptionMessage(BuildContext context, AppException? error) {
       return l10n?.membershipNotFound ?? error.message;
     case 'membership_forbidden':
       return l10n?.membershipForbidden ?? error.message;
+    case 'account_notFound':
+      return l10n?.accountNotFound ?? error.message;
+    case 'account_forbidden':
+      return l10n?.accountForbidden ?? error.message;
+    case 'accountCurrentPasswordIncorrect':
+      return l10n?.accountCurrentPasswordIncorrect ?? error.message;
+    case 'accountPasswordRetryable':
+      return l10n?.accountPasswordRetryable ?? error.message;
+    case 'accountPasswordValidationFailed':
+      return l10n?.accountPasswordValidationFailed ?? error.message;
   }
 
   if (error.message.trim().isEmpty) {

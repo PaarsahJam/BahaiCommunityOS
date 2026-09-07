@@ -10,6 +10,12 @@ import 'refresh_coordinator.dart';
 /// Refresh calls and retried requests are safe from recursion: the refresh
 /// request runs on a separate bare client (no interceptors) and each retried
 /// request is marked before re-sending.
+///
+/// A request can opt out of the transparent refresh+retry by carrying
+/// `extra[noAutoRetryKey] == true`. This is required for non-idempotent
+/// mutations (e.g. password change): such endpoints must never be re-submitted
+/// automatically after a 401, and their 401 responses are surfaced verbatim so
+/// the caller can decide semantics that an HTTP status code alone cannot.
 @LazySingleton()
 class AuthInterceptor extends Interceptor {
   AuthInterceptor(this._tokenStorage, this._refreshCoordinator);
@@ -22,6 +28,10 @@ class AuthInterceptor extends Interceptor {
   Dio? retryClient;
 
   static const _retriedKey = 'auth_already_retried';
+
+  /// Request-options extra flag that opts a request out of the automatic
+  /// refresh+retry path. Set by non-idempotent mutations only.
+  static const noAutoRetryKey = 'no_auto_retry';
 
   // Defense in depth: these endpoints are never used on the authenticated
   // client, but must never be intercepted if they ever were.
@@ -49,6 +59,7 @@ class AuthInterceptor extends Interceptor {
   ) async {
     if (err.response?.statusCode != 401 ||
         err.requestOptions.extra[_retriedKey] == true ||
+        err.requestOptions.extra[noAutoRetryKey] == true ||
         _isAnonymous(err.requestOptions.path)) {
       return handler.next(err);
     }
