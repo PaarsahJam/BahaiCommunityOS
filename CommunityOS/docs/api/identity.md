@@ -1,9 +1,11 @@
 # Identity Service API
 
-> **STATUS: RATIFIED IN PART — SELF-SERVICE SESSION MANAGEMENT (Prompt 46).**
+> **STATUS: RATIFIED IN PART — SELF-SERVICE SESSION MANAGEMENT (Prompt 46)
+> AND MFA ENROLLMENT-COMPLETION OWNERSHIP (Prompt 49).**
 > This document covers the authenticated **self-service session management**
-> surface of the Identity service (`/api/v1/me/sessions`). The broader
-> authentication contract (login, tokens, MFA) is owned by the ratified
+> surface (`/api/v1/me/sessions`) and the corrected **MFA enrollment
+> completion** ownership contract (`/api/v1/mfa/enroll/complete`). The broader
+> authentication contract (login, tokens, MFA setup) is owned by the ratified
 > Identity/Authorization arrangements and is not restated here.
 
 The session-management surface is versioned under `/api/v1/me/sessions`,
@@ -65,6 +67,44 @@ The endpoint is covered by the existing router-facing `/api/v1/me` surface
 segment was introduced). Session rows carry no claim/policy data — revocation
 is a row-level `RevokedOn` transition; downstream token validation
 (`IsActive = not revoked && not expired`) continues to reject revoked sessions.
-Future work (MFA enrollment ownership binding, rate limiting, current-session
+Future work (rate limiting, current-session
 guards) is deferred by ADR-035 and tracked separately; none is implemented by
 this contract.
+
+## MFA enrollment completion — `/api/v1/mfa/enroll/complete`
+
+`POST /mfa/enroll/complete` completes a pending TOTP enrollment. It requires a
+valid access token (`[Authorize]`) and is **self-scoped**: the acting user
+account is resolved exclusively from the JWT `sub` subject. The request body
+carries only the MFA-method identifier and the six-digit verification code.
+
+Request body:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mfaMethodId` | GUID | Identifier of an MFA method enrolled for the caller |
+| `code` | string | Six-digit verification code |
+
+Semantics:
+
+- **Authenticated-sub binding** — the account is derived solely from the `sub`
+  claim; the endpoint accepts **no** client-supplied `userAccountId`,
+  `personId`, `membershipId`, `organizationUnitId`, or any other account
+  identity.
+- **Ownership scope** — the `mfaMethodId` is a selector within the
+  authenticated account's own MFA methods only. A method belonging to another
+  account cannot be found or completed from this endpoint.
+- **Uniform non-existence (no oracle)** — an unknown method id and a method
+  belonging to another account return the same `404`, with identical semantics
+  and no information about the target account or method.
+- **Invalid code** — a well-formed but incorrect code for the caller's own
+  method returns `401` (unchanged).
+- **Success** — completing the caller's own pending method returns `204 No
+  Content` (unchanged).
+
+| HTTP status | Meaning |
+|-------------|---------|
+| 400 | Validation failure (missing/empty identifiers or malformed code) |
+| 401 | Missing / invalid access token, or invalid verification code |
+| 404 | MFA method not found **or** not owned by the caller (uniform, no existence oracle) |
+| 204 | (success) enrollment completed |

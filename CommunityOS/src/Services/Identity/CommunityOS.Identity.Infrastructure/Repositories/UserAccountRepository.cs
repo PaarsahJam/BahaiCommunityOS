@@ -14,10 +14,6 @@ public sealed class UserAccountRepository(IdentityDbContext db) : IUserAccountRe
     public async Task<UserAccount?> GetByEmailAsync(Email email, CancellationToken ct = default) =>
         await db.UserAccounts.FirstOrDefaultAsync(x => x.Email == email, ct);
 
-    public async Task<UserAccount?> GetByMfaMethodIdAsync(Guid mfaMethodId, CancellationToken ct = default) =>
-        await db.UserAccounts
-            .FirstOrDefaultAsync(x => x.MfaMethods.Any(m => m.Id == mfaMethodId), ct);
-
     public async Task<bool> ExistsByEmailAsync(Email email, CancellationToken ct = default) =>
         await db.UserAccounts.AnyAsync(x => x.Email == email, ct);
 

@@ -35,7 +35,8 @@ internal sealed class BeginMfaEnrollmentCommandHandler(
     }
 }
 
-public sealed record CompleteMfaEnrollmentCommand(Guid MfaMethodId, string Code) : IRequest;
+public sealed record CompleteMfaEnrollmentCommand(
+    Guid UserAccountId, Guid MfaMethodId, string Code) : IRequest;
 
 internal sealed class CompleteMfaEnrollmentCommandHandler(
     IUserAccountRepository userAccounts,
@@ -43,11 +44,16 @@ internal sealed class CompleteMfaEnrollmentCommandHandler(
 {
     public async Task Handle(CompleteMfaEnrollmentCommand cmd, CancellationToken ct)
     {
-        var account = await userAccounts.GetByMfaMethodIdAsync(cmd.MfaMethodId, ct)
-            ?? throw new UserAccountNotFoundException(Guid.Empty);
+        var account = await userAccounts.GetByIdAsync(cmd.UserAccountId, ct)
+            ?? throw new UserAccountNotFoundException(cmd.UserAccountId);
 
-        var method = account.MfaMethods.FirstOrDefault(m => m.Id == cmd.MfaMethodId)
-            ?? throw new InvalidMfaCodeException();
+        var method = account.MfaMethods.FirstOrDefault(m => m.Id == cmd.MfaMethodId);
+
+        // Unknown method ids and methods belonging to another account resolve to
+        // the same non-existence failure (their owning account is never loaded),
+        // so ownership is never disclosed and no existence oracle exists.
+        if (method is null)
+            throw new MfaMethodNotFoundException(cmd.MfaMethodId);
 
         if (!totpService.Verify(method.Secret, cmd.Code))
             throw new InvalidMfaCodeException();

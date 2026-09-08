@@ -44,6 +44,7 @@ public sealed class CompleteMfaEnrollmentCommandValidator : AbstractValidator<Co
 {
     public CompleteMfaEnrollmentCommandValidator()
     {
+        RuleFor(x => x.UserAccountId).NotEmpty();
         RuleFor(x => x.MfaMethodId).NotEmpty();
         RuleFor(x => x.Code).NotEmpty().Length(6);
     }

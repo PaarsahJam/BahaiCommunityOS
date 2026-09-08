@@ -23,10 +23,12 @@ public sealed class MfaController(IMediator mediator) : ControllerBase
     [HttpPost("enroll/complete")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CompleteEnrollment(
         CompleteMfaEnrollmentRequest request, CancellationToken ct)
     {
-        await mediator.Send(new CompleteMfaEnrollmentCommand(request.MfaMethodId, request.Code), ct);
+        await mediator.Send(new CompleteMfaEnrollmentCommand(
+            User.GetUserAccountId(), request.MfaMethodId, request.Code), ct);
         return NoContent();
     }
 }

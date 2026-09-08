@@ -42,6 +42,9 @@ public sealed class RefreshTokenReuseDetectedException()
 public sealed class SessionNotFoundException(Guid sessionId)
     : Exception($"Session '{sessionId}' was not found.");
 
+public sealed class MfaMethodNotFoundException(Guid mfaMethodId)
+    : Exception($"MFA method '{mfaMethodId}' was not found.");
+
 public sealed class UnauthorisedAccessException(string resource)
     : Exception($"Access to '{resource}' is not permitted.");
 
