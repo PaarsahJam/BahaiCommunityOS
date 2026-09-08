@@ -90,6 +90,40 @@ class _AccountPageState extends State<AccountPage> {
   void _retrySessions() =>
       _securityBloc.add(const SecurityEvent.sessionsRequested());
 
+  /// Retries a failed revocation directly. The session is explicit and was
+  /// already confirmed by the user before the first attempt; nothing was
+  /// revoked, so re-confirming would be pointless friction.
+  void _retryRevokeSession(String sessionId) =>
+      _securityBloc.add(SecurityEvent.sessionRevokeRequested(sessionId));
+
+  Future<void> _confirmRevokeSession(
+    BuildContext context,
+    String sessionId,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.accountSessionRevokeTitle),
+        content: Text(l10n.accountSessionRevokeBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.accountSessionRevokeCancel),
+          ),
+          FilledButton(
+            key: const Key('session-revoke-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.accountSessionRevokeConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      _securityBloc.add(SecurityEvent.sessionRevokeRequested(sessionId));
+    }
+  }
+
   void _setupMfa() =>
       _securityBloc.add(const SecurityEvent.mfaEnrollmentRequested());
 
@@ -177,6 +211,9 @@ class _AccountPageState extends State<AccountPage> {
                       onCancelMfa: _cancelMfa,
                       onSubmitMfaCode: _submitMfaCode,
                       onRetrySessions: _retrySessions,
+                      onRevokeSession: (sessionId) =>
+                          _confirmRevokeSession(context, sessionId),
+                      onRetryRevokeSession: _retryRevokeSession,
                     ),
                   AccountFailed(:final error) => _AccountErrorView(
                       error: error,
@@ -212,6 +249,8 @@ class _AccountContent extends StatelessWidget {
     required this.onCancelMfa,
     required this.onSubmitMfaCode,
     required this.onRetrySessions,
+    required this.onRevokeSession,
+    required this.onRetryRevokeSession,
   });
 
   final UserAccountDto account;
@@ -231,6 +270,8 @@ class _AccountContent extends StatelessWidget {
   final VoidCallback onCancelMfa;
   final VoidCallback onSubmitMfaCode;
   final VoidCallback onRetrySessions;
+  final ValueChanged<String> onRevokeSession;
+  final ValueChanged<String> onRetryRevokeSession;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +290,8 @@ class _AccountContent extends StatelessWidget {
           onCancelMfa: onCancelMfa,
           onSubmitMfaCode: onSubmitMfaCode,
           onRetrySessions: onRetrySessions,
+          onRevokeSession: onRevokeSession,
+          onRetryRevokeSession: onRetryRevokeSession,
         ),
         const SizedBox(height: 16),
         _PasswordCard(
@@ -670,6 +713,8 @@ class _IdentitySecurityCard extends StatelessWidget {
     required this.onCancelMfa,
     required this.onSubmitMfaCode,
     required this.onRetrySessions,
+    required this.onRevokeSession,
+    required this.onRetryRevokeSession,
   });
 
   final UserAccountDto account;
@@ -680,6 +725,8 @@ class _IdentitySecurityCard extends StatelessWidget {
   final VoidCallback onCancelMfa;
   final VoidCallback onSubmitMfaCode;
   final VoidCallback onRetrySessions;
+  final ValueChanged<String> onRevokeSession;
+  final ValueChanged<String> onRetryRevokeSession;
 
   @override
   Widget build(BuildContext context) {
@@ -732,6 +779,11 @@ class _IdentitySecurityCard extends StatelessWidget {
               sessions: security.sessions,
               loading: security.isSessionsLoading,
               error: security.sessionsError,
+              revokingSessionIds: security.revokingSessionIds,
+              sessionRevokeErrors: security.sessionRevokeErrors,
+              revokedSessionIds: security.revokedSessionIds,
+              onRevokeSession: onRevokeSession,
+              onRevokeRetry: onRetryRevokeSession,
               onRetry: onRetrySessions,
             ),
           ],
@@ -1137,12 +1189,22 @@ class _SessionsSection extends StatelessWidget {
     required this.sessions,
     required this.loading,
     required this.error,
+    required this.revokingSessionIds,
+    required this.sessionRevokeErrors,
+    required this.revokedSessionIds,
+    required this.onRevokeSession,
+    required this.onRevokeRetry,
     required this.onRetry,
   });
 
   final List<SessionDto> sessions;
   final bool loading;
   final AppException? error;
+  final Set<String> revokingSessionIds;
+  final Map<String, AppException> sessionRevokeErrors;
+  final Set<String> revokedSessionIds;
+  final ValueChanged<String> onRevokeSession;
+  final ValueChanged<String> onRevokeRetry;
   final VoidCallback onRetry;
 
   @override
@@ -1154,6 +1216,29 @@ class _SessionsSection extends StatelessWidget {
       children: [
         Text(l10n.accountSessionsTitle, style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
+        if (revokedSessionIds.isNotEmpty) ...[
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  color: theme.colorScheme.primary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.accountSessionRevokeSuccess,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (loading && sessions.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -1175,7 +1260,14 @@ class _SessionsSection extends StatelessWidget {
                 style: theme.textTheme.bodyMedium),
           )
         else ...[
-          for (final session in sessions) _SessionRow(session: session),
+          for (final session in sessions)
+            _SessionRow(
+              session: session,
+              isRevoking: revokingSessionIds.contains(session.id),
+              error: sessionRevokeErrors[session.id],
+              onRevoke: () => onRevokeSession(session.id),
+              onRetry: () => onRevokeRetry(session.id),
+            ),
           const SizedBox(height: 8),
           Text(l10n.accountSessionsNote, style: theme.textTheme.bodySmall),
         ],
@@ -1185,9 +1277,33 @@ class _SessionsSection extends StatelessWidget {
 }
 
 class _SessionRow extends StatelessWidget {
-  const _SessionRow({required this.session});
+  const _SessionRow({
+    required this.session,
+    required this.isRevoking,
+    required this.error,
+    required this.onRevoke,
+    required this.onRetry,
+  });
 
   final SessionDto session;
+  final bool isRevoking;
+  final AppException? error;
+  final VoidCallback onRevoke;
+  final VoidCallback onRetry;
+
+  /// Per-session revoke failure message. A 404 (or 403) renders a generic
+  /// message that never reveals whether the session exists or belongs to
+  /// another account, matching the backend's uniform response. Stale/invalid
+  /// tokens and transient failures stay retryable.
+  String _revokeFailureMessage(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (error) {
+      NotFoundException() ||
+      ForbiddenException() =>
+        l10n.accountSessionRevokeFailed,
+      _ => l10n.accountSessionRevokeRetryable,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1198,37 +1314,88 @@ class _SessionRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            active ? Icons.laptop : Icons.laptop_outlined,
-            color:
-                active ? theme.colorScheme.primary : theme.colorScheme.outline,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  active
-                      ? l10n.accountSessionActive
-                      : l10n.accountSessionInactive,
-                  style: theme.textTheme.bodyMedium,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                active ? Icons.laptop : Icons.laptop_outlined,
+                color: active
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active
+                          ? l10n.accountSessionActive
+                          : l10n.accountSessionInactive,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '${l10n.accountSessionsCreated}: '
+                      '${dateFormat.format(session.createdOn)}\n'
+                      '${l10n.accountSessionsLastUsed}: '
+                      '${dateFormat.format(session.lastUsedOn)}\n'
+                      '${l10n.accountSessionsExpires}: '
+                      '${dateFormat.format(session.expiresOn)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
                 ),
-                Text(
-                  '${l10n.accountSessionsCreated}: '
-                  '${dateFormat.format(session.createdOn)}\n'
-                  '${l10n.accountSessionsLastUsed}: '
-                  '${dateFormat.format(session.lastUsedOn)}\n'
-                  '${l10n.accountSessionsExpires}: '
-                  '${dateFormat.format(session.expiresOn)}',
-                  style: theme.textTheme.bodySmall,
+              ),
+              if (active && !isRevoking && error == null) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: l10n.accountSessionRevokeTooltip,
+                  child: TextButton.icon(
+                    key: Key('session-revoke-${session.id}'),
+                    onPressed: onRevoke,
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: Text(l10n.accountSessionRevoke),
+                  ),
                 ),
               ],
-            ),
+              if (active && isRevoking) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  label: l10n.accountSessionRevoking,
+                  child: const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ],
+            ],
           ),
+          if (error != null) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 38),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _LiveErrorText(
+                      message: _revokeFailureMessage(context),
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: Key('session-revoke-retry-${session.id}'),
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(l10n.homeRetry),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

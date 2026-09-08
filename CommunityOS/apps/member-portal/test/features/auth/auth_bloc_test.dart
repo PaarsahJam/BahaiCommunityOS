@@ -111,8 +111,8 @@ void main() {
 
   test('a successful login emits authenticated', () async {
     when(
-      () =>
-          repo.login(email: any(named: 'email'), password: any(named: 'password')),
+      () => repo.login(
+          email: any(named: 'email'), password: any(named: 'password')),
     ).thenAnswer(
       (_) async => const AuthLoginResult.authenticated(
         user: AuthUser(userAccountId: 'u1', email: 'ada@example.org'),
@@ -136,11 +136,11 @@ void main() {
 
   test('a login that requires MFA emits mfaRequired', () async {
     when(
-      () =>
-          repo.login(email: any(named: 'email'), password: any(named: 'password')),
+      () => repo.login(
+          email: any(named: 'email'), password: any(named: 'password')),
     ).thenAnswer(
-      (_) async =>
-          const AuthLoginResult.requiresMfa(accountId: 'u1', email: 'ada@example.org'),
+      (_) async => const AuthLoginResult.requiresMfa(
+          accountId: 'u1', email: 'ada@example.org'),
     );
     final bloc = AuthBloc(repo, coordinator);
     addTearDown(bloc.close);
@@ -162,10 +162,11 @@ void main() {
 
   test('a failed login emits failure with the mapped error', () async {
     when(
-      () =>
-          repo.login(email: any(named: 'email'), password: any(named: 'password')),
+      () => repo.login(
+          email: any(named: 'email'), password: any(named: 'password')),
     ).thenThrow(
-      const UnauthorizedException('bad', messageKey: 'login_invalidCredentials'),
+      const UnauthorizedException('bad',
+          messageKey: 'login_invalidCredentials'),
     );
     final bloc = AuthBloc(repo, coordinator);
     addTearDown(bloc.close);
@@ -187,11 +188,11 @@ void main() {
 
   test('an MFA code submission completes the sign-in', () async {
     when(
-      () =>
-          repo.login(email: any(named: 'email'), password: any(named: 'password')),
+      () => repo.login(
+          email: any(named: 'email'), password: any(named: 'password')),
     ).thenAnswer(
-      (_) async =>
-          const AuthLoginResult.requiresMfa(accountId: 'u1', email: 'ada@example.org'),
+      (_) async => const AuthLoginResult.requiresMfa(
+          accountId: 'u1', email: 'ada@example.org'),
     );
     when(
       () => repo.resolveMfa(
@@ -227,19 +228,19 @@ void main() {
 
   test('an invalid MFA code re-enters mfaRequired with the error', () async {
     when(
-      () =>
-          repo.login(email: any(named: 'email'), password: any(named: 'password')),
+      () => repo.login(
+          email: any(named: 'email'), password: any(named: 'password')),
     ).thenAnswer(
-      (_) async =>
-          const AuthLoginResult.requiresMfa(accountId: 'u1', email: 'ada@example.org'),
+      (_) async => const AuthLoginResult.requiresMfa(
+          accountId: 'u1', email: 'ada@example.org'),
     );
     when(
       () => repo.resolveMfa(
         email: any(named: 'email'),
         mfaCode: any(named: 'mfaCode'),
       ),
-    ).thenThrow(const UnauthorizedException('bad',
-        messageKey: 'mfa_invalidCode'));
+    ).thenThrow(
+        const UnauthorizedException('bad', messageKey: 'mfa_invalidCode'));
     final bloc = AuthBloc(repo, coordinator);
     addTearDown(bloc.close);
 

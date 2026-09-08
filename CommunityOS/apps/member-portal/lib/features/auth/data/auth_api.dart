@@ -61,6 +61,18 @@ abstract class AccountApi {
     @Extras() Map<String, dynamic>? extra,
   );
 
+  /// Revokes one session owned by the caller (`POST /me/sessions/{id}/revoke`).
+  ///
+  /// Non-idempotent in effect (it revokes server-side state): it must *never*
+  /// be transparently refresh+retried. The caller passes
+  /// `extra: {AuthInterceptor.noAutoRetryKey: true}` so a 401 is surfaced
+  /// verbatim for the upstream layer to discriminate.
+  @POST('me/sessions/{sessionId}/revoke')
+  Future<void> revokeSession(
+    @Path('sessionId') String sessionId,
+    @Extras() Map<String, dynamic>? extra,
+  );
+
   @POST('account/logout')
   Future<void> logout(@Body() LogoutRequestDto request);
 }

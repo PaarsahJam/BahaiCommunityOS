@@ -15,6 +15,11 @@ sealed class SecurityEvent with _$SecurityEvent {
   /// Loads (or reloads) the read-only session list for the section.
   const factory SecurityEvent.sessionsRequested() = SecuritySessionsRequested;
 
+  /// Revokes one of the caller's sessions (`POST /me/sessions/{id}/revoke`)
+  /// and then reloads the authoritative session list.
+  const factory SecurityEvent.sessionRevokeRequested(String sessionId) =
+      SecuritySessionRevokeRequested;
+
   /// Begins TOTP enrollment and reveals the one-time enrollment material.
   const factory SecurityEvent.mfaEnrollmentRequested() =
       SecurityMfaEnrollmentRequested;

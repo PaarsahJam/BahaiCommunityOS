@@ -38,13 +38,19 @@ sealed class MfaEnrollmentStatus with _$MfaEnrollmentStatus {
 }
 
 /// Page-scoped state for the Identity & Security section rendered inside the
-/// account page: the read-only session list plus the MFA enrollment flow.
+/// account page: the read-only session list, per-session revocation progress,
+/// and the MFA enrollment flow.
 ///
 /// Read-only session failures are non-fatal (the section renders its own error
-/// + retry) and are never conflated with an empty session list. MFA enrollment
-/// success never marks the account as MFA-enabled on its own — the page asks
-/// the existing [AccountBloc] to refresh `/me`, and the authoritative method
-/// list drives the enabled state.
+/// + retry) and are never conflated with an empty session list. Per-session
+/// revocation is tracked by session id: [revokingSessionIds] disables the
+/// in-flight row only, [sessionRevokeErrors] keeps a failed session visible and
+/// retryable, and [revokedSessionIds] holds only the ids the backend answered
+/// `204` for — a revocation is never fabricated from a failure, and the list is
+/// always re-fetched from the authoritative `/me/sessions` after a success.
+/// MFA enrollment success never marks the account as MFA-enabled on its own —
+/// the page asks the existing [AccountBloc] to refresh `/me`, and the
+/// authoritative method list drives the enabled state.
 @freezed
 sealed class SecurityState with _$SecurityState {
   const factory SecurityState.initial() = SecurityInitial;
@@ -54,5 +60,9 @@ sealed class SecurityState with _$SecurityState {
     @Default(false) bool isSessionsLoading,
     AppException? sessionsError,
     @Default(MfaEnrollmentStatus.idle()) MfaEnrollmentStatus mfaStatus,
+    @Default(<String>{}) Set<String> revokingSessionIds,
+    @Default(<String, AppException>{})
+    Map<String, AppException> sessionRevokeErrors,
+    @Default(<String>{}) Set<String> revokedSessionIds,
   }) = SecurityLoaded;
 }

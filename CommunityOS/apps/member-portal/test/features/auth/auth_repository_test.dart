@@ -59,7 +59,8 @@ void main() {
   setUpAll(() {
     registerFallbackValue(
         const LoginRequestDto(email: 'fallback@example.org', password: 'x'));
-    registerFallbackValue(const LogoutRequestDto(refreshToken: 'fallback-refresh'));
+    registerFallbackValue(
+        const LogoutRequestDto(refreshToken: 'fallback-refresh'));
   });
 
   setUp(() {

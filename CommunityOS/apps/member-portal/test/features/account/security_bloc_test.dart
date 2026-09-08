@@ -272,5 +272,228 @@ void main() {
       await _flush();
       expect(bloc.isClosed, isTrue);
     });
+
+    test(
+        'a successful revoke marks the session in-flight, confirms on 204, and '
+        'reloads the authoritative list', () async {
+      when(() => repository.revokeSession('s1')).thenAnswer((_) async {});
+      var readCount = 0;
+      when(() => repository.sessions()).thenAnswer((_) async {
+        readCount++;
+        if (readCount == 1) return [_session()];
+        return <SessionDto>[];
+      });
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      expect((states.last as SecurityLoaded).sessions, hasLength(1));
+
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      // The authorized `/me/sessions` re-fetch is the only removal source.
+      expect(loaded.sessions, isEmpty);
+      expect(loaded.revokedSessionIds, {'s1'});
+      expect(loaded.revokingSessionIds, isEmpty);
+      expect(loaded.sessionsError, isNull);
+      verify(() => repository.revokeSession('s1')).called(1);
+      verify(() => repository.sessions()).called(2);
+      await sub.cancel();
+    });
+
+    test(
+        'a mutation that succeeds but whose list reload fails keeps the stale '
+        'list and the success, exposing a retryable list error', () async {
+      when(() => repository.revokeSession('s1')).thenAnswer((_) async {});
+      var readCount = 0;
+      when(() => repository.sessions()).thenAnswer((_) async {
+        readCount++;
+        if (readCount == 1) return [_session()];
+        throw const ServerException('list reload failed');
+      });
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokedSessionIds, {'s1'});
+      // The stale list is kept rather than fabricated as empty.
+      expect(loaded.sessions, hasLength(1));
+      expect(loaded.sessionsError, isA<ServerException>());
+      expect(loaded.isSessionsLoading, isFalse);
+      await sub.cancel();
+    });
+
+    test(
+        'a failed revoke keeps the session visible and retryable with the '
+        'typed error, and never reports success', () async {
+      when(() => repository.sessions()).thenAnswer((_) async => [_session()]);
+      when(() => repository.revokeSession('s1')).thenThrow(
+        const NotFoundException('The session was not found.', statusCode: 404),
+      );
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.sessions, hasLength(1));
+      expect(loaded.revokedSessionIds, isEmpty);
+      expect(loaded.sessionRevokeErrors['s1'], isA<NotFoundException>());
+      expect(loaded.revokingSessionIds, isEmpty);
+      verify(() => repository.revokeSession('s1')).called(1);
+      // No reload happened for a failed mutation.
+      verify(() => repository.sessions()).called(1);
+      await sub.cancel();
+    });
+
+    test('a 401 revoke surfaces as UnauthorizedException, not a refresh',
+        () async {
+      when(() => repository.sessions()).thenAnswer((_) async => [_session()]);
+      when(() => repository.revokeSession('s1')).thenThrow(
+        const UnauthorizedException('token invalid', statusCode: 401),
+      );
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.sessionRevokeErrors['s1'], isA<UnauthorizedException>());
+      expect(loaded.revokedSessionIds, isEmpty);
+      expect(loaded.sessions, hasLength(1));
+      await sub.cancel();
+    });
+
+    test('a duplicate revoke while in flight is ignored', () async {
+      when(() => repository.sessions()).thenAnswer((_) async => [_session()]);
+      final gate = Completer<void>();
+      when(() => repository.revokeSession('s1')).thenAnswer((_) => gate.future);
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await pumpEventQueue();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await pumpEventQueue();
+
+      expect(
+        (bloc.state as SecurityLoaded).revokingSessionIds,
+        contains('s1'),
+      );
+      gate.complete();
+      await _flush();
+      verify(() => repository.revokeSession('s1')).called(1);
+      await sub.cancel();
+    });
+
+    test('concurrent revokes of different sessions stay independent', () async {
+      when(() => repository.sessions()).thenAnswer((_) async => [
+            _session(),
+            _session(id: 's2', deviceId: 'd2'),
+          ]);
+      when(() => repository.revokeSession('s1')).thenAnswer((_) async {});
+      when(() => repository.revokeSession('s2'))
+          .thenThrow(const NetworkException('offline'));
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s2'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokedSessionIds, {'s1'});
+      expect(loaded.sessionRevokeErrors.keys, {'s2'});
+      expect(loaded.revokingSessionIds, isEmpty);
+      verify(() => repository.revokeSession('s1')).called(1);
+      verify(() => repository.revokeSession('s2')).called(1);
+      await sub.cancel();
+    });
+
+    test(
+        'retrying after a failure clears the per-session error and completes '
+        'on the second attempt', () async {
+      var readCount = 0;
+      when(() => repository.sessions()).thenAnswer((_) async {
+        readCount++;
+        if (readCount == 1) return [_session()];
+        return <SessionDto>[];
+      });
+      var attempts = 0;
+      when(() => repository.revokeSession('s1')).thenAnswer((_) async {
+        attempts++;
+        if (attempts == 1) throw const NetworkException('offline');
+      });
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+      expect((states.last as SecurityLoaded).sessionRevokeErrors, isNotEmpty);
+
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokedSessionIds, {'s1'});
+      expect(loaded.sessionRevokeErrors, isEmpty);
+      expect(loaded.sessions, isEmpty);
+      verify(() => repository.revokeSession('s1')).called(2);
+      await sub.cancel();
+    });
+
+    test('a closed bloc never emits after an in-flight revoke completes',
+        () async {
+      when(() => repository.sessions()).thenAnswer((_) async => [_session()]);
+      final gate = Completer<void>();
+      when(() => repository.revokeSession('s1')).thenAnswer((_) => gate.future);
+
+      final bloc = SecurityBloc(repository);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await pumpEventQueue();
+      bloc.add(const SecurityEvent.sessionRevokeRequested('s1'));
+      await pumpEventQueue();
+      await bloc.close();
+
+      gate.complete();
+      await _flush();
+      expect(bloc.isClosed, isTrue);
+    });
   });
 }

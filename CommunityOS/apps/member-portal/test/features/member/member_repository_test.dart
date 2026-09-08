@@ -480,4 +480,59 @@ void main() {
       verifyNever(() => coordinator.refreshTokens());
     });
   });
+
+  group('revokeSession', () {
+    test('sends only the session id and flags never-auto-retry', () async {
+      when(() => accountApi.revokeSession(any(), any()))
+          .thenAnswer((_) async {});
+
+      await repository.revokeSession('s1');
+
+      final captured =
+          verify(() => accountApi.revokeSession(captureAny(), captureAny()))
+              .captured;
+      expect(captured[0], 's1');
+      final extra = captured[1] as Map<String, dynamic>;
+      expect(extra[AuthInterceptor.noAutoRetryKey], isTrue);
+    });
+
+    test('a uniform 404 maps to NotFoundException and never refreshes',
+        () async {
+      when(() => accountApi.revokeSession(any(), any()))
+          .thenThrow(_http(404, path: '/api/v1/me/sessions/s1/revoke'));
+
+      await expectLater(
+        repository.revokeSession('s1'),
+        throwsA(isA<NotFoundException>()),
+      );
+      verifyNever(() => coordinator.refreshTokens());
+    });
+
+    test('a 401 maps to UnauthorizedException and is never auto-retried',
+        () async {
+      when(() => accountApi.revokeSession(any(), any()))
+          .thenThrow(_http(401, path: '/api/v1/me/sessions/s1/revoke'));
+
+      await expectLater(
+        repository.revokeSession('s1'),
+        throwsA(isA<UnauthorizedException>()),
+      );
+      verifyNever(() => coordinator.refreshTokens());
+    });
+
+    test('a network failure maps to NetworkException', () async {
+      when(() => accountApi.revokeSession(any(), any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/me/sessions/s1/revoke'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        repository.revokeSession('s1'),
+        throwsA(isA<NetworkException>()),
+      );
+      verifyNever(() => coordinator.refreshTokens());
+    });
+  });
 }

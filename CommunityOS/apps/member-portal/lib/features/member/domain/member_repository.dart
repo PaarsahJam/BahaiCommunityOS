@@ -123,6 +123,22 @@ class MemberRepository {
   /// machinery.
   Future<List<SessionDto>> sessions() => _guard(() => _accountApi.sessions());
 
+  /// Revokes one session owned by the authenticated account
+  /// (`POST /me/sessions/{sessionId}/revoke`).
+  ///
+  /// The backend answers `204` on success and a uniform `404` for a session
+  /// that is unknown *or* owned by another account — it never reveals whether
+  /// the session exists or belongs to someone else. The request carries
+  /// [AuthInterceptor.noAutoRetryKey] so the transparent refresh+retry can
+  /// never re-submit this non-idempotent mutation; a 401 surfaces verbatim
+  /// through the existing error mapping.
+  Future<void> revokeSession(String sessionId) => _guard(
+        () => _accountApi.revokeSession(
+          sessionId,
+          {AuthInterceptor.noAutoRetryKey: true},
+        ),
+      );
+
   /// Begins TOTP enrollment for the authenticated account (`POST /mfa/enroll`).
   ///
   /// The returned [MfaEnrollmentDto.secret] and `.provisioningUri` are one-time
