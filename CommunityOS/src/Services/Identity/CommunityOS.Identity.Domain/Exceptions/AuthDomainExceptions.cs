@@ -39,6 +39,9 @@ public sealed class InvalidRefreshTokenException()
 public sealed class RefreshTokenReuseDetectedException()
     : Exception("Refresh token reuse was detected; the session has been revoked.");
 
+public sealed class SessionNotFoundException(Guid sessionId)
+    : Exception($"Session '{sessionId}' was not found.");
+
 public sealed class UnauthorisedAccessException(string resource)
     : Exception($"Access to '{resource}' is not permitted.");
 

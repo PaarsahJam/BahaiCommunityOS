@@ -11,6 +11,8 @@ public class GatewayRouteTableTests
     [InlineData("/api/v1/connect/token", DownstreamService.Identity)]
     [InlineData("/api/v1/.well-known/openid-configuration", DownstreamService.Identity)]
     [InlineData("/api/v1/me", DownstreamService.Identity)]
+    [InlineData("/api/v1/me/sessions", DownstreamService.Identity)]
+    [InlineData("/api/v1/me/sessions/00000000-0000-0000-0000-000000000000/revoke", DownstreamService.Identity)]
     [InlineData("/api/v1/account/password", DownstreamService.Identity)]
     [InlineData("/api/v1/mfa/status", DownstreamService.Identity)]
     [InlineData("/api/v1/authz/check", DownstreamService.Authorization)]

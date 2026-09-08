@@ -37,6 +37,17 @@ public sealed class MeController(IMediator mediator) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<SessionDto>>> ListSessions(CancellationToken ct)
         => Ok(await mediator.Send(new ListSessionsQuery(User.GetUserAccountId()), ct));
 
+    [HttpPost("sessions/{sessionId:guid}/revoke")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeSession(Guid sessionId, CancellationToken ct)
+    {
+        await mediator.Send(new RevokeSessionCommand(
+            User.GetUserAccountId(), sessionId), ct);
+        return NoContent();
+    }
+
     [HttpGet("security-events")]
     [ProducesResponseType<IReadOnlyList<SecurityEventDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SecurityEventDto>>> ListSecurityEvents(

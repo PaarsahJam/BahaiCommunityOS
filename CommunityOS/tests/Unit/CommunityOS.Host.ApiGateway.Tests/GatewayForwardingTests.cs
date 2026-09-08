@@ -87,6 +87,24 @@ public class GatewayForwardingTests
     }
 
     [Fact]
+    public async Task MeSessionRevoke_ForwardsToIdentityViaExistingMeSegment()
+    {
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => new HttpResponseMessage(HttpStatusCode.NoContent);
+
+        var response = await client.PostAsync(
+            "/api/v1/me/sessions/00000000-0000-0000-0000-000000000000/revoke", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var downstream = fixture.Handler.CapturedRequests.Should().ContainSingle().Subject;
+        downstream.Method.Should().Be(HttpMethod.Post);
+        downstream.RequestUri!.AbsolutePath.Should()
+            .Be("/api/v1/me/sessions/00000000-0000-0000-0000-000000000000/revoke");
+        downstream.RequestUri.GetLeftPart(UriPartial.Authority).Should().Be("http://localhost:5001");
+    }
+
+    [Fact]
     public async Task InternalOrganizationCoversRoute_IsNotExposed()
     {
         using var fixture = new GatewayTestFixture();

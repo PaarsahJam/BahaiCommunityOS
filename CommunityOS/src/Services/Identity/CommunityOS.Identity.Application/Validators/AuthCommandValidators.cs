@@ -76,6 +76,15 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
     }
 }
 
+public sealed class RevokeSessionCommandValidator : AbstractValidator<RevokeSessionCommand>
+{
+    public RevokeSessionCommandValidator()
+    {
+        RuleFor(x => x.UserAccountId).NotEmpty();
+        RuleFor(x => x.SessionId).NotEmpty();
+    }
+}
+
 public sealed class LinkExternalIdentityCommandValidator : AbstractValidator<LinkExternalIdentityCommand>
 {
     public LinkExternalIdentityCommandValidator()
