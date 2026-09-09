@@ -31,6 +31,17 @@ public sealed class MfaController(IMediator mediator) : ControllerBase
             User.GetUserAccountId(), request.MfaMethodId, request.Code), ct);
         return NoContent();
     }
+
+    [HttpDelete("{methodId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RemoveMfa(Guid methodId, CancellationToken ct)
+    {
+        await mediator.Send(new RemoveMfaCommand(User.GetUserAccountId(), methodId), ct);
+        return NoContent();
+    }
 }
 
 public sealed record CompleteMfaEnrollmentRequest(Guid MfaMethodId, string Code);

@@ -50,6 +50,15 @@ public sealed class CompleteMfaEnrollmentCommandValidator : AbstractValidator<Co
     }
 }
 
+public sealed class RemoveMfaCommandValidator : AbstractValidator<RemoveMfaCommand>
+{
+    public RemoveMfaCommandValidator()
+    {
+        RuleFor(x => x.UserAccountId).NotEmpty();
+        RuleFor(x => x.MfaMethodId).NotEmpty();
+    }
+}
+
 public sealed class RequestPasswordResetCommandValidator : AbstractValidator<RequestPasswordResetCommand>
 {
     public RequestPasswordResetCommandValidator()

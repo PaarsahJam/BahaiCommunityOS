@@ -62,3 +62,35 @@ internal sealed class CompleteMfaEnrollmentCommandHandler(
         await userAccounts.UpdateAsync(account, ct);
     }
 }
+
+public sealed record RemoveMfaCommand(
+    Guid UserAccountId, Guid MfaMethodId) : IRequest;
+
+internal sealed class RemoveMfaCommandHandler(
+    IUserAccountRepository userAccounts,
+    ISessionRepository sessions) : IRequestHandler<RemoveMfaCommand>
+{
+    public async Task Handle(RemoveMfaCommand cmd, CancellationToken ct)
+    {
+        var account = await userAccounts.GetByIdAsync(cmd.UserAccountId, ct)
+            ?? throw new UserAccountNotFoundException(cmd.UserAccountId);
+
+        var method = account.MfaMethods.FirstOrDefault(m => m.Id == cmd.MfaMethodId);
+
+        // Unknown method ids and methods belonging to another account resolve to
+        // the same non-existence failure (their owning account is never loaded),
+        // so ownership is never disclosed and no existence oracle exists.
+        if (method is null)
+            throw new MfaMethodNotFoundException(cmd.MfaMethodId);
+
+        var remainingVerified = account.MfaMethods.Count(
+            m => m.Id != cmd.MfaMethodId && m.IsVerified && m.IsActive);
+        if (remainingVerified == 0)
+            throw new MfaLastVerifiedMethodException();
+
+        account.RemoveMfa(cmd.MfaMethodId);
+        await userAccounts.UpdateAsync(account, ct);
+
+        await sessions.RevokeAllForUserAsync(account.Id, "MFA method removed.", ct);
+    }
+}

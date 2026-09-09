@@ -15,6 +15,7 @@ public class GatewayRouteTableTests
     [InlineData("/api/v1/me/sessions/00000000-0000-0000-0000-000000000000/revoke", DownstreamService.Identity)]
     [InlineData("/api/v1/account/password", DownstreamService.Identity)]
     [InlineData("/api/v1/mfa/status", DownstreamService.Identity)]
+    [InlineData("/api/v1/mfa/00000000-0000-0000-0000-000000000000", DownstreamService.Identity)]
     [InlineData("/api/v1/authz/check", DownstreamService.Authorization)]
     [InlineData("/api/v1/organizations", DownstreamService.Organization)]
     [InlineData("/api/v1/orgunits/1", DownstreamService.Organization)]

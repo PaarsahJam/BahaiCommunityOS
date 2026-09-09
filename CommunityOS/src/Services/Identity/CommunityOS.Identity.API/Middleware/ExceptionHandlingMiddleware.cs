@@ -37,6 +37,7 @@ internal sealed partial class ExceptionHandlingMiddleware(
             UserAccountNotFoundByEmailException  => (StatusCodes.Status404NotFound,     ex.Message),
             SessionNotFoundException             => (StatusCodes.Status404NotFound,     ex.Message),
             MfaMethodNotFoundException           => (StatusCodes.Status404NotFound,     ex.Message),
+            MfaLastVerifiedMethodException       => (StatusCodes.Status409Conflict,      ex.Message),
             DuplicateEmailException              => (StatusCodes.Status409Conflict,      ex.Message),
             AccountNotVerifiedException          => (StatusCodes.Status403Forbidden,     ex.Message),
             AccountLockedException               => (StatusCodes.Status423Locked,        ex.Message),

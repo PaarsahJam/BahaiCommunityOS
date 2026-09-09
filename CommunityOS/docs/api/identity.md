@@ -1,12 +1,14 @@
 # Identity Service API
 
-> **STATUS: RATIFIED IN PART — SELF-SERVICE SESSION MANAGEMENT (Prompt 46)
-> AND MFA ENROLLMENT-COMPLETION OWNERSHIP (Prompt 49).**
+> **STATUS: RATIFIED IN PART — SELF-SERVICE SESSION MANAGEMENT (Prompt 46),
+> MFA ENROLLMENT-COMPLETION OWNERSHIP (Prompt 49), AND SELF-SERVICE MFA
+> METHOD REMOVAL (Prompt 52).**
 > This document covers the authenticated **self-service session management**
-> surface (`/api/v1/me/sessions`) and the corrected **MFA enrollment
-> completion** ownership contract (`/api/v1/mfa/enroll/complete`). The broader
-> authentication contract (login, tokens, MFA setup) is owned by the ratified
-> Identity/Authorization arrangements and is not restated here.
+> surface (`/api/v1/me/sessions`), the corrected **MFA enrollment
+> completion** ownership contract (`/api/v1/mfa/enroll/complete`), and the
+> **self-service MFA method removal** contract (`DELETE /api/v1/mfa/{methodId}`).
+> The broader authentication contract (login, tokens, MFA setup) is owned by
+> the ratified Identity/Authorization arrangements and is not restated here.
 
 The session-management surface is versioned under `/api/v1/me/sessions`,
 requires a valid access token (`[Authorize]`), and is **self-scoped**: the
@@ -108,3 +110,46 @@ Semantics:
 | 401 | Missing / invalid access token, or invalid verification code |
 | 404 | MFA method not found **or** not owned by the caller (uniform, no existence oracle) |
 | 204 | (success) enrollment completed |
+
+## MFA method removal — `DELETE /api/v1/mfa/{methodId}`
+
+`DELETE /mfa/{methodId}` removes one of the caller's own verified MFA methods.
+It requires a valid access token (`[Authorize]`) and is **self-scoped**: the
+acting user account is resolved exclusively from the JWT `sub` subject. The
+route carries only the MFA-method identifier; there is no request body and no
+client-supplied account identity.
+
+Semantics:
+
+- **Authenticated-sub binding** — the account is derived solely from the `sub`
+  claim; the endpoint accepts **no** client-supplied `userAccountId`,
+  `personId`, `membershipId`, or any other account identity.
+- **Ownership scope** — the `{methodId}` is a selector within the
+  authenticated account's own MFA methods only. A method belonging to another
+  account cannot be found or removed from this endpoint. There is no global
+  MFA-method lookup.
+- **Uniform non-existence (no oracle)** — an unknown method id, a method
+  belonging to another account, and an already-removed method all return the
+  same `404`, with identical semantics and no information about the target
+  account or method.
+- **Final verified MFA method guard** — a user **must** keep at least one
+  verified MFA method. Removing the final verified method returns `409
+  Conflict`; the account is unchanged and no sessions are revoked.
+- **Session revocation** — a successful removal revokes **all** of the actor's
+  sessions via the existing `RevokeAllForUserAsync` path. The Flutter client
+  returns control to the centralized session-expiry/re-authentication path.
+- **Non-idempotent** — removal is a single-use mutation. A second request for
+  the same already-removed method returns `404`.
+- **No secret or provisioning URI returned** — the response body is empty on
+  success; MFA secrets and provisioning URIs are never exposed after the
+  one-time enrollment flow.
+- **No step-up authentication in this contract** — a current authenticated
+  session is sufficient for this slice. Step-up authentication is a future
+  architectural concern and is not part of this endpoint.
+
+| HTTP status | Meaning |
+|-------------|---------|
+| 401 | Missing / invalid access token |
+| 404 | MFA method not found, not owned by the caller, or already removed (uniform, no existence oracle); non-GUID method id not routable |
+| 409 | Removal would eliminate the final verified MFA method |
+| 204 | (success) MFA method removed and all sessions revoked |

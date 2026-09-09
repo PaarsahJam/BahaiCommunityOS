@@ -105,6 +105,24 @@ public class GatewayForwardingTests
     }
 
     [Fact]
+    public async Task MfaRemove_ForwardsDeleteToIdentity_PreservingMethodAndPath()
+    {
+        using var fixture = new GatewayTestFixture();
+        var client = fixture.CreateClient();
+        fixture.Handler.Responder = _ => new HttpResponseMessage(HttpStatusCode.NoContent);
+
+        var response = await client.DeleteAsync(
+            "/api/v1/mfa/00000000-0000-0000-0000-000000000000");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var downstream = fixture.Handler.CapturedRequests.Should().ContainSingle().Subject;
+        downstream.Method.Should().Be(HttpMethod.Delete);
+        downstream.RequestUri!.AbsolutePath.Should()
+            .Be("/api/v1/mfa/00000000-0000-0000-0000-000000000000");
+        downstream.RequestUri.GetLeftPart(UriPartial.Authority).Should().Be("http://localhost:5001");
+    }
+
+    [Fact]
     public async Task InternalOrganizationCoversRoute_IsNotExposed()
     {
         using var fixture = new GatewayTestFixture();

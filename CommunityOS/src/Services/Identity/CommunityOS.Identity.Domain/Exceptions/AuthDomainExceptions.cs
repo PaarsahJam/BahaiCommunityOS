@@ -45,6 +45,9 @@ public sealed class SessionNotFoundException(Guid sessionId)
 public sealed class MfaMethodNotFoundException(Guid mfaMethodId)
     : Exception($"MFA method '{mfaMethodId}' was not found.");
 
+public sealed class MfaLastVerifiedMethodException()
+    : Exception("The final verified MFA method cannot be removed; at least one verified MFA method must remain.");
+
 public sealed class UnauthorisedAccessException(string resource)
     : Exception($"Access to '{resource}' is not permitted.");
 
