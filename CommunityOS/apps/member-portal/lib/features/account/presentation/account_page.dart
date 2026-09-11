@@ -132,11 +132,51 @@ class _AccountPageState extends State<AccountPage> {
     _securityBloc.add(const SecurityEvent.mfaEnrollmentCancelled());
   }
 
+  /// Dismisses a failed MFA removal and returns the section to its idle state.
+  /// The authoritative MFA-enabled state always comes from the refreshed
+  /// account overview, never from local fabrication.
+  void _cancelRemoveMfa() =>
+      _securityBloc.add(const SecurityEvent.mfaRemovalCancelled());
+
+  /// Retries a failed removal directly. The method id is explicit and was
+  /// already confirmed by the user before the first attempt; nothing was
+  /// removed, so re-confirming would be pointless friction.
+  void _retryRemoveMfa(String methodId) =>
+      _securityBloc.add(SecurityEvent.mfaRemovalRequested(methodId));
+
   void _submitMfaCode() {
     if (!(_mfaFormKey.currentState?.validate() ?? false)) return;
     _securityBloc.add(SecurityEvent.mfaEnrollmentCompleted(
       code: _mfaCodeController.text.trim(),
     ));
+  }
+
+  Future<void> _confirmRemoveMfa(
+    BuildContext context,
+    String methodId,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.accountMfaRemoveTitle),
+        content: Text(l10n.accountMfaRemoveBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.accountMfaRemoveCancel),
+          ),
+          FilledButton(
+            key: const Key('mfa-remove-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.accountMfaRemoveConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      _securityBloc.add(SecurityEvent.mfaRemovalRequested(methodId));
+    }
   }
 
   void _submitPassword() {
@@ -178,14 +218,18 @@ class _AccountPageState extends State<AccountPage> {
         },
         child: BlocListener<SecurityBloc, SecurityState>(
           listener: (context, state) {
+            if (state is! SecurityLoaded) return;
             // Successful enrollment cleared the one-time material; the
             // authoritative MFA-enabled state comes from the refreshed /me.
-            if (state is SecurityLoaded &&
-                state.mfaStatus is MfaEnrollmentSucceeded) {
+            if (state.mfaStatus is MfaEnrollmentSucceeded) {
               _mfaCodeController.clear();
               context
                   .read<AccountBloc>()
                   .add(const AccountEvent.retryRequested());
+            }
+            // Successful removal revokes all sessions on the server.
+            if (state.mfaRemovalStatus is MfaRemovalSucceeded) {
+              context.read<AuthBloc>().add(const AuthEvent.sessionExpired());
             }
           },
           child: Scaffold(
@@ -210,6 +254,10 @@ class _AccountPageState extends State<AccountPage> {
                       onSetupMfa: _setupMfa,
                       onCancelMfa: _cancelMfa,
                       onSubmitMfaCode: _submitMfaCode,
+                      onRemoveMfa: (methodId) =>
+                          _confirmRemoveMfa(context, methodId),
+                      onCancelRemoveMfa: _cancelRemoveMfa,
+                      onRetryRemoveMfa: _retryRemoveMfa,
                       onRetrySessions: _retrySessions,
                       onRevokeSession: (sessionId) =>
                           _confirmRevokeSession(context, sessionId),
@@ -248,6 +296,9 @@ class _AccountContent extends StatelessWidget {
     required this.onSetupMfa,
     required this.onCancelMfa,
     required this.onSubmitMfaCode,
+    required this.onRemoveMfa,
+    required this.onCancelRemoveMfa,
+    required this.onRetryRemoveMfa,
     required this.onRetrySessions,
     required this.onRevokeSession,
     required this.onRetryRevokeSession,
@@ -269,6 +320,9 @@ class _AccountContent extends StatelessWidget {
   final VoidCallback onSetupMfa;
   final VoidCallback onCancelMfa;
   final VoidCallback onSubmitMfaCode;
+  final ValueChanged<String> onRemoveMfa;
+  final VoidCallback onCancelRemoveMfa;
+  final ValueChanged<String> onRetryRemoveMfa;
   final VoidCallback onRetrySessions;
   final ValueChanged<String> onRevokeSession;
   final ValueChanged<String> onRetryRevokeSession;
@@ -289,6 +343,9 @@ class _AccountContent extends StatelessWidget {
           onSetupMfa: onSetupMfa,
           onCancelMfa: onCancelMfa,
           onSubmitMfaCode: onSubmitMfaCode,
+          onRemoveMfa: onRemoveMfa,
+          onCancelRemoveMfa: onCancelRemoveMfa,
+          onRetryRemoveMfa: onRetryRemoveMfa,
           onRetrySessions: onRetrySessions,
           onRevokeSession: onRevokeSession,
           onRetryRevokeSession: onRetryRevokeSession,
@@ -712,6 +769,9 @@ class _IdentitySecurityCard extends StatelessWidget {
     required this.onSetupMfa,
     required this.onCancelMfa,
     required this.onSubmitMfaCode,
+    required this.onRemoveMfa,
+    required this.onCancelRemoveMfa,
+    required this.onRetryRemoveMfa,
     required this.onRetrySessions,
     required this.onRevokeSession,
     required this.onRetryRevokeSession,
@@ -724,6 +784,9 @@ class _IdentitySecurityCard extends StatelessWidget {
   final VoidCallback onSetupMfa;
   final VoidCallback onCancelMfa;
   final VoidCallback onSubmitMfaCode;
+  final ValueChanged<String> onRemoveMfa;
+  final VoidCallback onCancelRemoveMfa;
+  final ValueChanged<String> onRetryRemoveMfa;
   final VoidCallback onRetrySessions;
   final ValueChanged<String> onRevokeSession;
   final ValueChanged<String> onRetryRevokeSession;
@@ -734,6 +797,12 @@ class _IdentitySecurityCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final mfaEnabled =
         account.mfaMethods.any((m) => m.isVerified && m.isActive);
+    // The only verified-active method id; used to drive the removal action.
+    final activeMfaMethodId = account.mfaMethods
+            .where((m) => m.isVerified && m.isActive)
+            .map((m) => m.id)
+            .firstOrNull ??
+        '';
 
     // The page-scoped bloc starts in [SecurityInitial] and moves to
     // [SecurityLoaded] on the first frames; a not-yet-loaded state renders as
@@ -765,12 +834,17 @@ class _IdentitySecurityCard extends StatelessWidget {
             const SizedBox(height: 12),
             _MfaSection(
               mfaStatus: security.mfaStatus,
+              mfaRemovalStatus: security.mfaRemovalStatus,
               mfaEnabled: mfaEnabled,
+              activeMfaMethodId: activeMfaMethodId,
               mfaFormKey: mfaFormKey,
               mfaCodeController: mfaCodeController,
               onSetupMfa: onSetupMfa,
               onCancelMfa: onCancelMfa,
               onSubmitMfaCode: onSubmitMfaCode,
+              onRemoveMfa: onRemoveMfa,
+              onCancelRemoveMfa: onCancelRemoveMfa,
+              onRetryRemoveMfa: onRetryRemoveMfa,
             ),
             const Divider(height: 24),
             _DevicesSection(devices: account.devices),
@@ -796,24 +870,50 @@ class _IdentitySecurityCard extends StatelessWidget {
 class _MfaSection extends StatelessWidget {
   const _MfaSection({
     required this.mfaStatus,
+    required this.mfaRemovalStatus,
     required this.mfaEnabled,
+    required this.activeMfaMethodId,
     required this.mfaFormKey,
     required this.mfaCodeController,
     required this.onSetupMfa,
     required this.onCancelMfa,
     required this.onSubmitMfaCode,
+    required this.onRemoveMfa,
+    required this.onCancelRemoveMfa,
+    required this.onRetryRemoveMfa,
   });
 
   final MfaEnrollmentStatus mfaStatus;
+  final MfaRemovalStatus mfaRemovalStatus;
   final bool mfaEnabled;
+  final String activeMfaMethodId;
   final GlobalKey<FormState> mfaFormKey;
   final TextEditingController mfaCodeController;
   final VoidCallback onSetupMfa;
   final VoidCallback onCancelMfa;
   final VoidCallback onSubmitMfaCode;
+  final ValueChanged<String> onRemoveMfa;
+  final VoidCallback onCancelRemoveMfa;
+  final ValueChanged<String> onRetryRemoveMfa;
 
   @override
   Widget build(BuildContext context) {
+    // A removal in progress or completed overrides the enrollment idle view.
+    if (mfaRemovalStatus is MfaRemovalInProgress) {
+      return const _MfaRemoving();
+    }
+    if (mfaRemovalStatus is MfaRemovalSucceeded) {
+      return _MfaRemovalSuccess(onRetry: onSetupMfa);
+    }
+    if (mfaRemovalStatus is MfaRemovalFailed) {
+      return _MfaRemovalFailed(
+        error: (mfaRemovalStatus as MfaRemovalFailed).error,
+        methodId: (mfaRemovalStatus as MfaRemovalFailed).methodId,
+        onRetry: onRetryRemoveMfa,
+        onCancel: onCancelRemoveMfa,
+      );
+    }
+
     return switch (mfaStatus) {
       MfaEnrollmentStarting() => const _MfaStarting(),
       MfaEnrollmentPending(
@@ -850,17 +950,26 @@ class _MfaSection extends StatelessWidget {
         ),
       MfaEnrollmentIdle() => _MfaIdle(
           mfaEnabled: mfaEnabled,
+          activeMfaMethodId: activeMfaMethodId,
           onSetupMfa: onSetupMfa,
+          onRemoveMfa: onRemoveMfa,
         ),
     };
   }
 }
 
 class _MfaIdle extends StatelessWidget {
-  const _MfaIdle({required this.mfaEnabled, required this.onSetupMfa});
+  const _MfaIdle({
+    required this.mfaEnabled,
+    required this.activeMfaMethodId,
+    required this.onSetupMfa,
+    required this.onRemoveMfa,
+  });
 
   final bool mfaEnabled;
+  final String activeMfaMethodId;
   final VoidCallback onSetupMfa;
+  final ValueChanged<String> onRemoveMfa;
 
   @override
   Widget build(BuildContext context) {
@@ -875,7 +984,14 @@ class _MfaIdle extends StatelessWidget {
               child: Text(l10n.accountMfaSectionTitle,
                   style: theme.textTheme.titleSmall),
             ),
-            if (!mfaEnabled)
+            if (mfaEnabled)
+              OutlinedButton.icon(
+                key: const Key('mfa-remove'),
+                onPressed: () => onRemoveMfa(activeMfaMethodId),
+                icon: const Icon(Icons.delete_outline),
+                label: Text(l10n.accountMfaRemove),
+              )
+            else
               OutlinedButton.icon(
                 key: const Key('mfa-setup'),
                 onPressed: onSetupMfa,
@@ -1090,6 +1206,118 @@ class _MfaFailed extends StatelessWidget {
             TextButton(
               onPressed: onCancel,
               child: Text(l10n.accountMfaCancel),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MfaRemoving extends StatelessWidget {
+  const _MfaRemoving();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Semantics(
+          label: l10n.accountMfaRemoving,
+          child: const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(l10n.accountMfaRemoving,
+              style: Theme.of(context).textTheme.bodySmall),
+        ),
+      ],
+    );
+  }
+}
+
+class _MfaRemovalSuccess extends StatelessWidget {
+  const _MfaRemovalSuccess({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          liveRegion: true,
+          child: Row(
+            children: [
+              Icon(Icons.check_circle_outline,
+                  color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(l10n.accountMfaRemoveSuccess,
+                    style: theme.textTheme.bodyMedium),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.add),
+          label: Text(l10n.accountMfaSetUp),
+        ),
+      ],
+    );
+  }
+}
+
+class _MfaRemovalFailed extends StatelessWidget {
+  const _MfaRemovalFailed({
+    required this.methodId,
+    required this.error,
+    required this.onRetry,
+    required this.onCancel,
+  });
+
+  final String methodId;
+  final AppException? error;
+  final ValueChanged<String> onRetry;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    // The mapped/server detail is only ever secondary; the primary message is
+    // a stable, localized failure text that never leaks raw exception material.
+    final detail = error == null ? null : exceptionMessage(context, error);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _LiveErrorText(message: l10n.accountMfaRemoveFailed),
+        if (detail != null && detail != l10n.accountMfaRemoveFailed)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(detail, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            TextButton.icon(
+              key: Key('mfa-remove-retry-$methodId'),
+              onPressed: () => onRetry(methodId),
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n.homeRetry),
+            ),
+            TextButton(
+              key: const Key('mfa-remove-cancel'),
+              onPressed: onCancel,
+              child: Text(l10n.accountMfaRemoveCancel),
             ),
           ],
         ),

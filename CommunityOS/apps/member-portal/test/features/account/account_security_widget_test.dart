@@ -355,4 +355,176 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 1));
   });
+
+  // ── MFA removal ──────────────────────────────────────────────────────
+
+  testWidgets(
+      'an MFA-enabled account exposes the remove button and the confirm '
+      'dialog gates the removal', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _mfaEnabledAccount());
+    when(() => repository.removeMfaMethod('m1')).thenAnswer((_) async {});
+
+    await pumpHarness(tester);
+
+    expect(find.text('Security code (MFA): Enabled'), findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove')), findsOneWidget);
+    // The "Set up" button is not rendered when MFA is already active.
+    expect(find.byKey(const Key('mfa-setup')), findsNothing);
+
+    // Cancel closes the dialog and never issues a request.
+    await tester.tap(find.byKey(const Key('mfa-remove')));
+    await pumpFrames(tester);
+    expect(find.text('Remove this security method?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+    expect(find.text('Remove this security method?'), findsNothing);
+    verifyNever(() => repository.removeMfaMethod(any()));
+
+    // Confirming triggers removal; success triggers session expiry.
+    await tester.tap(find.byKey(const Key('mfa-remove')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('mfa-remove-confirm')));
+    await pumpFrames(tester);
+
+    verify(() => repository.removeMfaMethod('m1')).called(1);
+    // Session expiry is issued because the backend revoked every session.
+    verify(() => authRepo.clearLocalAuth()).called(1);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'while a removal is in flight the section shows in-progress indicator '
+      'and suppresses a second tap', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _mfaEnabledAccount());
+    final gate = Completer<void>();
+    when(() => repository.removeMfaMethod('m1')).thenAnswer((_) => gate.future);
+
+    await pumpHarness(tester);
+
+    await tester.tap(find.byKey(const Key('mfa-remove')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('mfa-remove-confirm')));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const Key('mfa-remove')), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await pumpFrames(tester);
+
+    verify(() => repository.removeMfaMethod('m1')).called(1);
+    verify(() => authRepo.clearLocalAuth()).called(1);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'a failed removal shows a retryable error and retry re-dispatches',
+      (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _mfaEnabledAccount());
+    var attempts = 0;
+    when(() => repository.removeMfaMethod('m1')).thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) {
+        throw const ValidationException('final mfa', statusCode: 409);
+      }
+    });
+
+    await pumpHarness(tester);
+
+    await tester.tap(find.byKey(const Key('mfa-remove')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('mfa-remove-confirm')));
+    await pumpFrames(tester);
+
+    expect(find.text('This security method could not be removed.'),
+        findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove-retry-m1')), findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('mfa-remove-retry-m1')));
+    await pumpFrames(tester);
+
+    // Retry re-dispatches directly: no confirm dialog, no duplicate dispatch.
+    expect(find.text('Remove this security method?'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const Key('mfa-remove-retry-m1')), findsNothing);
+    verify(() => repository.removeMfaMethod('m1')).called(2);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'cancelling a failed removal returns to the idle remove control '
+      'without re-dispatching', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _mfaEnabledAccount());
+    when(() => repository.removeMfaMethod('m1')).thenThrow(
+      const ValidationException('final mfa', statusCode: 409),
+    );
+
+    await pumpHarness(tester);
+
+    await tester.tap(find.byKey(const Key('mfa-remove')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('mfa-remove-confirm')));
+    await pumpFrames(tester);
+
+    // The failure view carries the stable localized message and a cancel.
+    expect(find.text('This security method could not be removed.'),
+        findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove-cancel')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('mfa-remove-cancel')));
+    await pumpFrames(tester);
+
+    // Back to the idle remove control; no second request is dispatched.
+    expect(find.byKey(const Key('mfa-remove')), findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove-cancel')), findsNothing);
+    verify(() => repository.removeMfaMethod('m1')).called(1);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'an MFA-disabled account still shows the set-up button, not the '
+      'remove button', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount()).thenAnswer((_) async => _account());
+
+    await pumpHarness(tester);
+
+    expect(find.byKey(const Key('mfa-setup')), findsOneWidget);
+    expect(find.byKey(const Key('mfa-remove')), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets('the remove control scales to large text without overflow',
+      (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _mfaEnabledAccount());
+
+    await pumpHarness(tester, textScale: 2.0);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('mfa-remove')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
 }

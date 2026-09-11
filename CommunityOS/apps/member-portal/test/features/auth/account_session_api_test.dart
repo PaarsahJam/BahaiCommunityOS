@@ -100,5 +100,65 @@ void main() {
         throwsA(isA<DioException>()),
       );
     });
+
+    test(
+        'removeMfaMethod DELETEs the method-specific endpoint and carries '
+        'the no-auto-retry extra', () async {
+      when(() => adapter.fetch(any(), any(), any()))
+          .thenAnswer((_) async => jsonBody('', 204));
+
+      await api.removeMfaMethod('m1', {AuthInterceptor.noAutoRetryKey: true});
+
+      final options = verify(() => adapter.fetch(captureAny(), any(), any()))
+          .captured
+          .single as RequestOptions;
+      expect(options.method, 'DELETE');
+      expect(options.path, 'mfa/m1');
+      expect(options.queryParameters, isEmpty);
+      // Non-idempotent mutation must never be transparently refresh+retried.
+      expect(options.extra[AuthInterceptor.noAutoRetryKey], isTrue);
+      // Nothing but the path id travels: no payload, no member/account id.
+      expect(options.data, isNull);
+      expect(options.path.contains('member'), isFalse);
+      expect(options.path.contains('account'), isFalse);
+    });
+
+    test('an adapter 404 on removeMfaMethod propagates as DioException',
+        () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: 'mfa/m1'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: 'mfa/m1'),
+            statusCode: 404,
+          ),
+        ),
+      );
+
+      expect(
+        api.removeMfaMethod('m1', null),
+        throwsA(isA<DioException>()),
+      );
+    });
+
+    test('an adapter 409 on removeMfaMethod propagates as DioException',
+        () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: 'mfa/m1'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: 'mfa/m1'),
+            statusCode: 409,
+          ),
+        ),
+      );
+
+      expect(
+        api.removeMfaMethod('m1', null),
+        throwsA(isA<DioException>()),
+      );
+    });
   });
 }

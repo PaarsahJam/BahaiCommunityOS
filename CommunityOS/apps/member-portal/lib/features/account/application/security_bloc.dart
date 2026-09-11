@@ -26,6 +26,8 @@ class SecurityBloc extends Bloc<SecurityEvent, SecurityState> {
     on<SecurityMfaEnrollmentRequested>(_onMfaEnrollmentRequested);
     on<SecurityMfaEnrollmentCancelled>(_onMfaEnrollmentCancelled);
     on<SecurityMfaEnrollmentCompleted>(_onMfaEnrollmentCompleted);
+    on<SecurityMfaRemovalRequested>(_onMfaRemovalRequested);
+    on<SecurityMfaRemovalCancelled>(_onMfaRemovalCancelled);
   }
 
   final MemberRepository _repository;
@@ -187,6 +189,42 @@ class SecurityBloc extends Bloc<SecurityEvent, SecurityState> {
     }
   }
 
+  Future<void> _onMfaRemovalRequested(
+    SecurityMfaRemovalRequested event,
+    Emitter<SecurityState> emit,
+  ) async {
+    final current = state;
+    if (current is! SecurityLoaded) return;
+    // Only one removal can be in flight at a time.
+    if (current.mfaRemovalStatus is MfaRemovalInProgress) return;
+
+    emit(_with(mfaRemovalStatus: const MfaRemovalStatus.inProgress()));
+    try {
+      await _repository.removeMfaMethod(event.methodId);
+      if (isClosed) return;
+      emit(_with(mfaRemovalStatus: const MfaRemovalStatus.succeeded()));
+    } on AppException catch (error) {
+      if (isClosed) return;
+      emit(_with(
+        mfaRemovalStatus: MfaRemovalStatus.failed(
+          methodId: event.methodId,
+          error: error,
+        ),
+      ));
+    }
+  }
+
+  void _onMfaRemovalCancelled(
+    SecurityMfaRemovalCancelled event,
+    Emitter<SecurityState> emit,
+  ) {
+    final current = state;
+    if (current is! SecurityLoaded) return;
+    // Only a settled removal (failed) can be cancelled from the UI; a no-op
+    // reset is harmless for any other state and never fabricates a success.
+    emit(_with(mfaRemovalStatus: const MfaRemovalStatus.idle()));
+  }
+
   /// Copies the current loaded sections with the given overrides, treating a
   /// not-yet-loaded state as empty defaults. MFA material, per-session
   /// revocation progress, errors, and confirmed-revoked ids are preserved
@@ -197,6 +235,7 @@ class SecurityBloc extends Bloc<SecurityEvent, SecurityState> {
     AppException? sessionsError,
     bool clearSessionsError = false,
     MfaEnrollmentStatus? mfaStatus,
+    MfaRemovalStatus? mfaRemovalStatus,
     Set<String>? revokingSessionIds,
     Map<String, AppException>? sessionRevokeErrors,
     String? clearRevokeErrorFor,
@@ -216,6 +255,7 @@ class SecurityBloc extends Bloc<SecurityEvent, SecurityState> {
       sessionsError:
           clearSessionsError ? null : (sessionsError ?? prior.sessionsError),
       mfaStatus: mfaStatus ?? prior.mfaStatus,
+      mfaRemovalStatus: mfaRemovalStatus ?? prior.mfaRemovalStatus,
       revokingSessionIds: revokingSessionIds ?? prior.revokingSessionIds,
       sessionRevokeErrors: nextErrors,
       revokedSessionIds: revokedSessionIds ?? prior.revokedSessionIds,

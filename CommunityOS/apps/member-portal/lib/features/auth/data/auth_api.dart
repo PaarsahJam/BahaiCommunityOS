@@ -73,6 +73,18 @@ abstract class AccountApi {
     @Extras() Map<String, dynamic>? extra,
   );
 
+  /// Removes one MFA method owned by the caller (`DELETE /mfa/{methodId}`).
+  ///
+  /// Non-idempotent: a first call removes the method and revokes *all* sessions;
+  /// a repeated call for the same id returns 404. The request carries
+  /// [AuthInterceptor.noAutoRetryKey] so the transparent refresh+retry can
+  /// never re-submit it.
+  @DELETE('mfa/{methodId}')
+  Future<void> removeMfaMethod(
+    @Path('methodId') String methodId,
+    @Extras() Map<String, dynamic>? extra,
+  );
+
   @POST('account/logout')
   Future<void> logout(@Body() LogoutRequestDto request);
 }

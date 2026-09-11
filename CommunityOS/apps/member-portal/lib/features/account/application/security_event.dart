@@ -33,4 +33,15 @@ sealed class SecurityEvent with _$SecurityEvent {
   /// opened by the caller's own `POST /mfa/enroll` operation.
   const factory SecurityEvent.mfaEnrollmentCompleted({required String code}) =
       SecurityMfaEnrollmentCompleted;
+
+  /// Removes one of the caller's MFA methods (`DELETE /mfa/{methodId}`).
+  /// On success the backend revokes *all* sessions for the account.
+  const factory SecurityEvent.mfaRemovalRequested(String methodId) =
+      SecurityMfaRemovalRequested;
+
+  /// Abandons a failed MFA-method removal and returns the section to its idle
+  /// state. Never fabricates a success: the authoritative MFA-enabled state
+  /// always comes from the refreshed `/me`.
+  const factory SecurityEvent.mfaRemovalCancelled() =
+      SecurityMfaRemovalCancelled;
 }

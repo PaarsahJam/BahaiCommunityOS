@@ -139,6 +139,23 @@ class MemberRepository {
         ),
       );
 
+  /// Removes one MFA method owned by the authenticated account
+  /// (`DELETE /mfa/{methodId}`).
+  ///
+  /// The backend answers `204` on success and a uniform `404` for a method
+  /// that is unknown *or* belongs to another account — it never reveals
+  /// whether the method exists or belongs to someone else. A `409` is returned
+  /// when the method is the caller's final verified MFA method. The request
+  /// carries [AuthInterceptor.noAutoRetryKey] so the transparent refresh+retry
+  /// can never re-submit this non-idempotent mutation; a 401 surfaces verbatim
+  /// through the existing error mapping.
+  Future<void> removeMfaMethod(String methodId) => _guard(
+        () => _accountApi.removeMfaMethod(
+          methodId,
+          {AuthInterceptor.noAutoRetryKey: true},
+        ),
+      );
+
   /// Begins TOTP enrollment for the authenticated account (`POST /mfa/enroll`).
   ///
   /// The returned [MfaEnrollmentDto.secret] and `.provisioningUri` are one-time

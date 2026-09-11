@@ -495,5 +495,111 @@ void main() {
       await _flush();
       expect(bloc.isClosed, isTrue);
     });
+
+    // ── MFA removal ──────────────────────────────────────────────────────
+
+    test('successful mfa removal transitions through inProgress → succeeded',
+        () async {
+      when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
+      when(() => repository.removeMfaMethod('m1')).thenAnswer((_) async {});
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.mfaRemovalRequested('m1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.mfaRemovalStatus, isA<MfaRemovalSucceeded>());
+      verify(() => repository.removeMfaMethod('m1')).called(1);
+      await sub.cancel();
+    });
+
+    test('failed mfa removal surfaces error and retains method id', () async {
+      when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
+      when(() => repository.removeMfaMethod('m1')).thenThrow(
+        const ValidationException('final mfa', statusCode: 409),
+      );
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.mfaRemovalRequested('m1'));
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      final failed = loaded.mfaRemovalStatus as MfaRemovalFailed;
+      expect(failed.methodId, 'm1');
+      expect(failed.error, isA<ValidationException>());
+      await sub.cancel();
+    });
+
+    test('a duplicate mfa removal while in flight is ignored', () async {
+      when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
+      final gate = Completer<void>();
+      when(() => repository.removeMfaMethod('m1'))
+          .thenAnswer((_) => gate.future);
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.mfaRemovalRequested('m1'));
+      await pumpEventQueue();
+      bloc.add(const SecurityEvent.mfaRemovalRequested('m1'));
+      await pumpEventQueue();
+
+      gate.complete();
+      await _flush();
+
+      // The repository call happened only once.
+      verify(() => repository.removeMfaMethod('m1')).called(1);
+      await sub.cancel();
+    });
+
+    test('cancelling a failed mfa removal returns the section to idle',
+        () async {
+      when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
+      when(() => repository.removeMfaMethod('m1')).thenThrow(
+        const ValidationException('final mfa', statusCode: 409),
+      );
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.mfaRemovalRequested('m1'));
+      await _flush();
+      expect(
+        (states.last as SecurityLoaded).mfaRemovalStatus,
+        isA<MfaRemovalFailed>(),
+      );
+
+      bloc.add(const SecurityEvent.mfaRemovalCancelled());
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      // The failure view is dismissed; removal is idle, no success is
+      // fabricated, and the session list is untouched.
+      expect(loaded.mfaRemovalStatus, isA<MfaRemovalIdle>());
+      expect(loaded.mfaStatus, isA<MfaEnrollmentIdle>());
+      expect(loaded.sessions, isEmpty);
+      verify(() => repository.removeMfaMethod('m1')).called(1);
+      await sub.cancel();
+    });
   });
 }

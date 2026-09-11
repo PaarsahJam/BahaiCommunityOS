@@ -37,6 +37,19 @@ sealed class MfaEnrollmentStatus with _$MfaEnrollmentStatus {
       MfaEnrollmentFailed;
 }
 
+/// Lifecycle of an MFA-method removal operation.
+@freezed
+sealed class MfaRemovalStatus with _$MfaRemovalStatus {
+  const factory MfaRemovalStatus.idle() = MfaRemovalIdle;
+
+  const factory MfaRemovalStatus.inProgress() = MfaRemovalInProgress;
+
+  const factory MfaRemovalStatus.succeeded() = MfaRemovalSucceeded;
+
+  const factory MfaRemovalStatus.failed(
+      {required String methodId, AppException? error}) = MfaRemovalFailed;
+}
+
 /// Page-scoped state for the Identity & Security section rendered inside the
 /// account page: the read-only session list, per-session revocation progress,
 /// and the MFA enrollment flow.
@@ -60,6 +73,7 @@ sealed class SecurityState with _$SecurityState {
     @Default(false) bool isSessionsLoading,
     AppException? sessionsError,
     @Default(MfaEnrollmentStatus.idle()) MfaEnrollmentStatus mfaStatus,
+    @Default(MfaRemovalStatus.idle()) MfaRemovalStatus mfaRemovalStatus,
     @Default(<String>{}) Set<String> revokingSessionIds,
     @Default(<String, AppException>{})
     Map<String, AppException> sessionRevokeErrors,
