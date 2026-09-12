@@ -22,13 +22,30 @@ ownership of the session row is the sole server-side authorization
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/me/sessions` | List the caller's own sessions (id, device id, created/expires/last-used times, active flag) |
+| GET | `/me/sessions` | List the caller's own sessions (id, device id, created/expires/last-used times, active flag, device name/platform) |
 | POST | `/me/sessions/{sessionId}/revoke` | Revoke a single one of the caller's own sessions; idempotent |
 
 `GET /me/sessions` returns only the authenticated actor's sessions. The
 `SessionDto` items expose `id`, `deviceId`, `createdOn`, `expiresOn`,
 `lastUsedOn` and `isActive`; no refresh-token material, no token-family
 metadata, and no other account's sessions.
+
+Starting with the device-metadata release, each item also exposes two
+**optional** `deviceName`/`devicePlatform` strings that resolve from the
+actor's own owned `Device` rows at read time:
+
+- **Nullable** — a value is present only when the actor's account carries an
+  owned device row with a matching `deviceId`. A session whose `deviceId` does
+  not resolve, or whose device row carries no name/platform, serializes `null`
+  for the corresponding field. Absent fields are never fabricated server-side.
+- **Self-scoped** — resolution can only ever use the actor's own `Device`
+  rows; a `deviceId` referencing another account's device yields `null`. This
+  is display metadata derived from already-encrypted cross-service device
+  records; it is **not** an IP address, user-agent string, or network/geographic
+  identifier.
+- **Read-only** — the fields change nothing about authorization, revocation,
+  or the route contract; the response shape for older responses with the
+  fields absent remains valid (client treats them as nullable).
 
 `POST /me/sessions/{sessionId}/revoke` revokes **exactly one** session row by
 its id. Request body: none. The `sessionId` is a server-side id retrieved from

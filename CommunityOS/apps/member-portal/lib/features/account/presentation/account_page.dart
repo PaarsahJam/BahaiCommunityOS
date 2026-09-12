@@ -1519,6 +1519,16 @@ class _SessionRow extends StatelessWidget {
   final VoidCallback onRevoke;
   final VoidCallback onRetry;
 
+  /// Combined device label rendered from backend-supplied metadata only.
+  /// Null is returned when neither a name nor a platform is present: the row
+  /// then stays bare and never fabricates a device identity from [SessionDto.deviceId].
+  String? _deviceLabel(SessionDto session) {
+    final name = session.deviceName?.trim() ?? '';
+    final platform = session.devicePlatform?.trim() ?? '';
+    if (name.isEmpty && platform.isEmpty) return null;
+    return [name, platform].where((part) => part.isNotEmpty).join(' · ');
+  }
+
   /// Per-session revoke failure message. A 404 (or 403) renders a generic
   /// message that never reveals whether the session exists or belongs to
   /// another account, matching the backend's uniform response. Stale/invalid
@@ -1539,6 +1549,7 @@ class _SessionRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final dateFormat = DateFormat.yMMMd(l10n.localeName).add_jm();
     final active = session.isActive;
+    final deviceLabel = _deviceLabel(session);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1565,6 +1576,13 @@ class _SessionRow extends StatelessWidget {
                           : l10n.accountSessionInactive,
                       style: theme.textTheme.bodyMedium,
                     ),
+                    if (deviceLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        deviceLabel,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                     Text(
                       '${l10n.accountSessionsCreated}: '
                       '${dateFormat.format(session.createdOn)}\n'

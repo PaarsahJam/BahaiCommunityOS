@@ -37,6 +37,8 @@ void main() {
           [{
             "id": "s1",
             "deviceId": "d1",
+            "deviceName": "Back office terminal",
+            "devicePlatform": "Windows",
             "createdOn": "2026-09-01T09:00:00Z",
             "expiresOn": "2026-09-08T09:00:00Z",
             "lastUsedOn": "2026-09-07T12:00:00Z",
@@ -58,6 +60,32 @@ void main() {
       expect(options.path.contains('account'), isFalse);
       expect(items.single.id, 's1');
       expect(items.single.isActive, isTrue);
+      expect(items.single.deviceId, 'd1');
+      expect(items.single.deviceName, 'Back office terminal');
+      expect(items.single.devicePlatform, 'Windows');
+    });
+
+    test('SessionDto tolerates absent optional device metadata', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+        (_) async => jsonBody('''
+          [{
+            "id": "s1",
+            "deviceId": "d1",
+            "createdOn": "2026-09-01T09:00:00Z",
+            "expiresOn": "2026-09-08T09:00:00Z",
+            "lastUsedOn": "2026-09-07T12:00:00Z",
+            "isActive": false
+          }]
+        '''),
+      );
+
+      final items = await api.sessions();
+
+      // Older responses without the additive fields remain deserializable.
+      expect(items.single.id, 's1');
+      expect(items.single.deviceName, isNull);
+      expect(items.single.devicePlatform, isNull);
+      expect(items.single.isActive, isFalse);
     });
 
     test(

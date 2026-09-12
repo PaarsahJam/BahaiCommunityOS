@@ -180,14 +180,17 @@ abstract class CompleteMfaEnrollmentRequestDto
 
 /// A read-only session record from `GET /me/sessions`.
 ///
-/// The backend contract carries no device-name, IP/user-agent, geographic or
-/// current-session fields; the UI therefore renders only the fields below and
-/// never fabricates "this device" or device names.
+/// The backend contract carries no IP, network, geographic or current-session
+/// fields; the additive nullable [deviceName]/[devicePlatform] resolve from the
+/// actor's own owned device rows and are rendered only when present. The UI
+/// therefore never fabricates "this device" or device names.
 @freezed
 abstract class SessionDto with _$SessionDto {
   const factory SessionDto({
     required String id,
     required String deviceId,
+    String? deviceName,
+    String? devicePlatform,
     required DateTime createdOn,
     required DateTime expiresOn,
     required DateTime lastUsedOn,

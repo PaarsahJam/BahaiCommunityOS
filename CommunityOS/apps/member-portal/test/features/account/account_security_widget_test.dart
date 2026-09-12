@@ -55,11 +55,15 @@ MfaEnrollmentDto _enrollment({String methodId = 'm1'}) => MfaEnrollmentDto(
 SessionDto _session({
   String id = 's1',
   String deviceId = 'd1',
+  String? deviceName,
+  String? devicePlatform,
   bool isActive = true,
 }) =>
     SessionDto(
       id: id,
       deviceId: deviceId,
+      deviceName: deviceName,
+      devicePlatform: devicePlatform,
       createdOn: DateTime(2026, 9, 1, 9),
       expiresOn: DateTime(2026, 9, 8, 9),
       lastUsedOn: DateTime(2026, 9, 7, 12),
@@ -150,24 +154,37 @@ void main() {
       ]),
     );
     when(() => repository.sessions()).thenAnswer((_) async => [
-          _session(),
-          _session(id: 's2', deviceId: 'd2', isActive: false),
+          _session(
+              deviceName: 'Back office terminal', devicePlatform: 'Windows'),
+          _session(
+            id: 's2',
+            deviceId: 'd2',
+            deviceName: 'Personal',
+            isActive: false,
+          ),
         ]);
 
     await pumpHarness(tester);
 
     expect(find.text('Identity & Security'), findsOneWidget);
     expect(find.text('Devices'), findsOneWidget);
-    expect(find.text('Back office terminal'), findsOneWidget);
+    expect(find.text('Back office terminal'), findsOneWidget); // device row
     expect(find.text('Trusted'), findsOneWidget);
     expect(find.text('Not trusted'), findsOneWidget);
     expect(find.text('Active sessions'), findsOneWidget);
     expect(find.text('Active'), findsNWidgets(2)); // overview + session row
     expect(find.text('Inactive'), findsOneWidget);
 
+    // Session rows render backend-supplied device metadata only:
+    // "name · platform" when present, bare name when platform is absent.
+    expect(find.text('Back office terminal · Windows'), findsOneWidget);
+    expect(find.text('Personal'), findsOneWidget);
+
     // Backend fields are authoritative; invented details are never rendered.
     expect(find.textContaining('IP'), findsNothing);
     expect(find.textContaining('User-Agent'), findsNothing);
+    expect(find.textContaining('· last seen'), findsNothing);
+    expect(find.textContaining('Unknown device'), findsNothing);
     // Internal identifiers must never leak into the UI.
     expect(find.text('u1'), findsNothing);
     expect(find.text('d1'), findsNothing);
@@ -343,7 +360,14 @@ void main() {
     when(() => repository.loadAccount()).thenAnswer(
       (_) async => _mfaEnabledAccount(),
     );
-    when(() => repository.sessions()).thenAnswer((_) async => [_session()]);
+    when(() => repository.sessions()).thenAnswer(
+      (_) async => [
+        _session(
+          deviceName: 'Back office terminal',
+          devicePlatform: 'Windows',
+        ),
+      ],
+    );
 
     // double scale pushes the old fixed-width row layouts to overflow.
     await pumpHarness(tester, textScale: 2.0);
@@ -351,6 +375,49 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Identity & Security'), findsOneWidget);
     expect(find.text('Active sessions'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'session rows render device metadata as "name · platform", each '
+      'component alone, or not at all', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount())
+        .thenAnswer((_) async => _account(devices: []));
+    when(() => repository.sessions()).thenAnswer((_) async => [
+          _session(
+            id: 's-name',
+            deviceId: 'd1',
+            deviceName: 'Phone',
+          ),
+          _session(
+            id: 's-platform',
+            deviceId: 'd2',
+            devicePlatform: 'Android',
+          ),
+          _session(
+            id: 's-both',
+            deviceId: 'd3',
+            deviceName: 'Back office terminal',
+            devicePlatform: 'Windows',
+          ),
+          _session(id: 's-neither', deviceId: 'd4'),
+        ]);
+
+    await pumpHarness(tester);
+
+    expect(find.text('Phone'), findsOneWidget);
+    expect(find.text('Android'), findsOneWidget);
+    expect(find.text('Back office terminal · Windows'), findsOneWidget);
+    // Contained exactly once inside the combined label, never duplicated.
+    expect(find.text('Back office terminal'), findsNothing);
+    expect(find.text('Windows'), findsNothing);
+
+    // No label is fabricated for a session without device metadata.
+    expect(find.textContaining('Unknown device'), findsNothing);
+    expect(find.text('d4'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 1));

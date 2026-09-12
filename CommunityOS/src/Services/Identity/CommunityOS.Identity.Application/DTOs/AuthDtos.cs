@@ -35,6 +35,8 @@ public sealed record DeviceDto(Guid Id, string Name, string? Platform, DateTime 
 public sealed record SessionDto(
     Guid Id,
     Guid DeviceId,
+    string? DeviceName,
+    string? DevicePlatform,
     DateTime CreatedOn,
     DateTime ExpiresOn,
     DateTime LastUsedOn,

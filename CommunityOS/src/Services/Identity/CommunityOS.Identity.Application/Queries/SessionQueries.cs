@@ -13,12 +13,29 @@ internal sealed class ListSessionsQueryHandler(
 {
     public async Task<IReadOnlyList<SessionDto>> Handle(ListSessionsQuery query, CancellationToken ct)
     {
-        _ = await userAccounts.GetByIdAsync(query.UserAccountId, ct)
+        // The account aggregate (with its owned devices) is loaded both to
+        // enforce existence and to resolve each session's device metadata.
+        // Owned entity types are always included when the owner is queried, so
+        // no separate device query is issued.
+        var account = await userAccounts.GetByIdAsync(query.UserAccountId, ct)
             ?? throw new UserAccountNotFoundException(query.UserAccountId);
 
+        var deviceById = account.Devices.ToDictionary(d => d.Id);
+
         var result = await sessions.GetActiveByUserAsync(query.UserAccountId, ct);
-        return result.Select(s => new SessionDto(
-                s.Id, s.DeviceId, s.CreatedOn, s.ExpiresOn, s.LastUsedOn, s.IsActive))
+        return result.Select(s =>
+            {
+                var device = deviceById.GetValueOrDefault(s.DeviceId);
+                return new SessionDto(
+                    s.Id,
+                    s.DeviceId,
+                    device?.Name,
+                    device?.Platform,
+                    s.CreatedOn,
+                    s.ExpiresOn,
+                    s.LastUsedOn,
+                    s.IsActive);
+            })
             .ToList().AsReadOnly();
     }
 }
