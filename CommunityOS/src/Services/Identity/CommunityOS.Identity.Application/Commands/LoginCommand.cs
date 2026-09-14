@@ -69,7 +69,8 @@ internal sealed class LoginCommandHandler(
             account.Id, device.Id, TokenHasher.Hash(refreshToken), RefreshTokenLifetime);
         await sessions.AddAsync(session, ct);
 
-        var accessToken = tokenService.GenerateAccessToken(account.Id, account.Email.Value);
+        var accessToken = tokenService.GenerateAccessToken(
+            account.Id, session.TokenFamilyId, account.Email.Value);
         return new TokenDto(accessToken, refreshToken, DateTime.UtcNow.AddMinutes(15));
     }
 }

@@ -22,7 +22,7 @@ ownership of the session row is the sole server-side authorization
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/me/sessions` | List the caller's own sessions (id, device id, created/expires/last-used times, active flag, device name/platform) |
+| GET | `/me/sessions` | List the caller's own sessions (id, device id, created/expires/last-used times, active flag, current flag, device name/platform) |
 | POST | `/me/sessions/{sessionId}/revoke` | Revoke a single one of the caller's own sessions; idempotent |
 
 `GET /me/sessions` returns only the authenticated actor's sessions. The
@@ -46,6 +46,30 @@ actor's own owned `Device` rows at read time:
 - **Read-only** — the fields change nothing about authorization, revocation,
   or the route contract; the response shape for older responses with the
   fields absent remains valid (client treats them as nullable).
+
+Starting with the current-session identification release, each `SessionDto`
+item also includes a non-nullable **`isCurrent`** boolean that indicates
+whether the server considers that row the currently-active session of the
+authenticated caller:
+
+- **Server-authoritative** — `isCurrent` is derived from the signed `sid`
+  claim on the caller's access token. The claim carries the issuing session's
+  logical token-family id; a row is marked current when its own
+  `TokenFamilyId` matches the claimed value. The claim is signed and
+  immutable; no client-supplied parameter influences the result.
+- **Legacy / absent claim** — tokens issued before this feature carry no `sid`
+  claim; in this case, `isCurrent` is `false` for every row. A malformed or
+  non-GUID `sid` value is treated identically (null correlation → all false).
+- **Family-level semantics** — multiple rows in the same token family may all
+  be marked `true` simultaneously (e.g., a superseded row that shares the same
+  logical session id). The list never collapses families, removes superseded
+  rows, or applies a latest-row-only rule; each row is evaluated independently
+  within its own family.
+- **No token-family exposure** — neither the token-family id nor the `sid`
+  claim value is returned in the response; only the derived boolean is
+  exposed.
+- **No Gateway change** — the existing transparent pass-through of `/me` to
+  the Identity service is unchanged.
 
 `POST /me/sessions/{sessionId}/revoke` revokes **exactly one** session row by
 its id. Request body: none. The `sessionId` is a server-side id retrieved from

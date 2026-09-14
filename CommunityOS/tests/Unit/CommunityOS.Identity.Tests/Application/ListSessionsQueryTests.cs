@@ -137,6 +137,56 @@ public sealed class ListSessionsQueryTests
     }
 
     [Fact]
+    public async Task Handle_SameFamilyMarkedCurrent_OthersNot()
+    {
+        var account = UserAccount.Register(Email.Create("ada@example.org"), "password-hash");
+        var device = account.RegisterDevice(DeviceName, DevicePlatform, null);
+        var first = Session.Create(account.Id, device.Id, "hash-1", TimeSpan.FromHours(1));
+        var second = Session.Create(account.Id, device.Id, "hash-2", TimeSpan.FromHours(1));
+
+        var handler = Handler(account, [first, second]);
+
+        var result = await handler.Handle(
+            new ListSessionsQuery(account.Id, first.TokenFamilyId), CancellationToken.None);
+
+        result.ElementAt(0).IsCurrent.Should().BeTrue();
+        result.ElementAt(1).IsCurrent.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_EveryRowInTheFamily_IsMarkedCurrent()
+    {
+        var account = UserAccount.Register(Email.Create("ada@example.org"), "password-hash");
+        var device = account.RegisterDevice(DeviceName, DevicePlatform, null);
+        var original = Session.Create(account.Id, device.Id, "hash-1", TimeSpan.FromHours(1));
+        // A rotated row shares the same logical family; the superseded row is
+        // still returned and, being family-scoped, is equally current.
+        var rotated = original.Rotate("hash-2", TimeSpan.FromHours(1));
+
+        var handler = Handler(account, [original, rotated]);
+
+        var result = await handler.Handle(
+            new ListSessionsQuery(account.Id, original.TokenFamilyId), CancellationToken.None);
+
+        result.Should().OnlyContain(x => x.IsCurrent);
+    }
+
+    [Fact]
+    public async Task Handle_MissingClaim_IsCurrentFalseForEveryRow()
+    {
+        var account = UserAccount.Register(Email.Create("ada@example.org"), "password-hash");
+        var device = account.RegisterDevice(DeviceName, DevicePlatform, null);
+        var first = Session.Create(account.Id, device.Id, "hash-1", TimeSpan.FromHours(1));
+        var second = Session.Create(account.Id, device.Id, "hash-2", TimeSpan.FromHours(1));
+
+        var handler = Handler(account, [first, second]);
+
+        var result = await handler.Handle(new ListSessionsQuery(account.Id), CancellationToken.None);
+
+        result.Should().OnlyContain(x => !x.IsCurrent);
+    }
+
+    [Fact]
     public async Task Handle_UnknownAccount_ThrowsNotFound()
     {
         var sessions = Substitute.For<ISessionRepository>();

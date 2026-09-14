@@ -161,7 +161,8 @@ internal sealed class ExchangeAuthorizationCodeCommandHandler(
             account.Id, device.Id, TokenHasher.Hash(refreshToken), RefreshTokenLifetime, client.ClientId);
         await sessions.AddAsync(session, ct);
 
-        var accessToken = tokenService.GenerateAccessToken(account.Id, account.Email.Value);
+        var accessToken = tokenService.GenerateAccessToken(
+            account.Id, session.TokenFamilyId, account.Email.Value);
         var wantsOpenId = code.Scope
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Contains("openid", StringComparer.Ordinal);

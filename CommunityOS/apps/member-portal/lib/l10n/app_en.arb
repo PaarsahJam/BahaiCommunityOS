@@ -116,6 +116,7 @@
   "accountSessionsEmpty": "No active session records.",
   "accountSessionActive": "Active",
   "accountSessionInactive": "Inactive",
+  "accountSessionCurrent": "Current session",
   "accountSessionsCreated": "Created",
   "accountSessionsLastUsed": "Last used",
   "accountSessionsExpires": "Expires",

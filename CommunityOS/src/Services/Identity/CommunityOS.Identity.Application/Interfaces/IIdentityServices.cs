@@ -6,7 +6,12 @@ namespace CommunityOS.Identity.Application.Interfaces;
 /// </summary>
 public interface ITokenService
 {
-    string GenerateAccessToken(Guid userAccountId, string email);
+    /// <summary>
+    /// Issues an access token for the account. <paramref name="tokenFamilyId"/>
+    /// is the issuing session's logical session identifier and is carried as the
+    /// signed <c>sid</c> claim so the session list can mark the current session.
+    /// </summary>
+    string GenerateAccessToken(Guid userAccountId, Guid tokenFamilyId, string email);
     string GenerateIdToken(Guid userAccountId, string email, bool emailVerified, string audience, string? nonce);
     string GenerateRefreshToken();
 }

@@ -40,7 +40,7 @@ public sealed class RsaSigningKeyProviderTests
         var provider = new RsaSigningKeyProvider(EmptyConfig());
         var sut = new JwtTokenService(provider, EmptyConfig());
 
-        var token = sut.GenerateAccessToken(Guid.NewGuid(), "user@example.com");
+        var token = sut.GenerateAccessToken(Guid.NewGuid(), Guid.NewGuid(), "user@example.com");
         var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
         var principal = handler.ValidateToken(token, new TokenValidationParameters
         {
@@ -62,14 +62,34 @@ public sealed class RsaSigningKeyProviderTests
         var provider = new RsaSigningKeyProvider(EmptyConfig());
         var sut = new JwtTokenService(provider, EmptyConfig());
         var id = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
 
-        var token = sut.GenerateAccessToken(id, "user@example.com");
+        var token = sut.GenerateAccessToken(id, familyId, "user@example.com");
 
         var handler = new JwtSecurityTokenHandler();
         handler.CanReadToken(token).Should().BeTrue();
         var jwt = handler.ReadJwtToken(token);
         jwt.Subject.Should().Be(id.ToString());
         jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Jti);
+    }
+
+    [Fact]
+    public void AccessToken_SidCarriesIssuingTokenFamilyId_DistinctFromJti()
+    {
+        var provider = new RsaSigningKeyProvider(EmptyConfig());
+        var sut = new JwtTokenService(provider, EmptyConfig());
+        var familyId = Guid.NewGuid();
+
+        var token = sut.GenerateAccessToken(Guid.NewGuid(), familyId, "user@example.com");
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        var sid = jwt.Claims.Single(c => c.Type == JwtRegisteredClaimNames.Sid).Value;
+        var jti = jwt.Claims.Single(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
+
+        sid.Should().Be(familyId.ToString());
+        // The token instance id (jti) is unrelated to the logical session id.
+        jti.Should().NotBe(sid);
     }
 
     [Fact]

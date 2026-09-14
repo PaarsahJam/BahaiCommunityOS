@@ -35,7 +35,8 @@ public sealed class MeController(IMediator mediator) : ControllerBase
     [HttpGet("sessions")]
     [ProducesResponseType<IReadOnlyList<SessionDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SessionDto>>> ListSessions(CancellationToken ct)
-        => Ok(await mediator.Send(new ListSessionsQuery(User.GetUserAccountId()), ct));
+        => Ok(await mediator.Send(new ListSessionsQuery(
+            User.GetUserAccountId(), User.GetSessionFamilyId()), ct));
 
     [HttpPost("sessions/{sessionId:guid}/revoke")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

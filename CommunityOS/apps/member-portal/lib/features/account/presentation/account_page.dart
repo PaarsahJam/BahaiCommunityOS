@@ -1576,6 +1576,29 @@ class _SessionRow extends StatelessWidget {
                           : l10n.accountSessionInactive,
                       style: theme.textTheme.bodyMedium,
                     ),
+                    if (session.isCurrent) ...[
+                      const SizedBox(height: 2),
+                      Semantics(
+                        label: l10n.accountSessionCurrent,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 14,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.accountSessionCurrent,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (deviceLabel != null) ...[
                       const SizedBox(height: 2),
                       Text(

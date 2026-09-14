@@ -40,7 +40,8 @@ public sealed record SessionDto(
     DateTime CreatedOn,
     DateTime ExpiresOn,
     DateTime LastUsedOn,
-    bool IsActive);
+    bool IsActive,
+    bool IsCurrent);
 
 public sealed record SecurityEventDto(Guid Id, string EventType, string? Description, DateTime OccurredOn);
 

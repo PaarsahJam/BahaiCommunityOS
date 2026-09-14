@@ -5,7 +5,15 @@ using MediatR;
 
 namespace CommunityOS.Identity.Application.Queries;
 
-public sealed record ListSessionsQuery(Guid UserAccountId) : IRequest<IReadOnlyList<SessionDto>>;
+/// <summary>
+/// Lists the account's own active-session rows. <paramref name="SessionFamilyId"/>
+/// is the logical session id read from the authenticated token's signed <c>sid</c>
+/// claim and is used solely to mark the current session; a null value (legacy or
+/// malformed claim) yields <c>IsCurrent = false</c> for every row.
+/// </summary>
+public sealed record ListSessionsQuery(
+    Guid UserAccountId,
+    Guid? SessionFamilyId = null) : IRequest<IReadOnlyList<SessionDto>>;
 
 internal sealed class ListSessionsQueryHandler(
     ISessionRepository sessions,
@@ -34,7 +42,9 @@ internal sealed class ListSessionsQueryHandler(
                     s.CreatedOn,
                     s.ExpiresOn,
                     s.LastUsedOn,
-                    s.IsActive);
+                    s.IsActive,
+                    query.SessionFamilyId.HasValue &&
+                        s.TokenFamilyId == query.SessionFamilyId.Value);
             })
             .ToList().AsReadOnly();
     }

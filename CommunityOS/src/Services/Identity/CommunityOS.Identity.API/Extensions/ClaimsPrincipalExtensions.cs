@@ -16,4 +16,17 @@ internal static class ClaimsPrincipalExtensions
 
         return Guid.Parse(value);
     }
+
+    /// <summary>
+    /// Reads the logical-session identifier from the token's signed <c>sid</c>
+    /// claim (the issuing session's token-family id). Returns <see langword="null"/>
+    /// for absent or malformed claims so callers can only fall back to
+    /// "no current session correlation" — never throw.
+    /// </summary>
+    internal static Guid? GetSessionFamilyId(this ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirstValue(JwtRegisteredClaimNames.Sid);
+        if (value is null) return null;
+        return Guid.TryParse(value, out var parsed) ? parsed : null;
+    }
 }

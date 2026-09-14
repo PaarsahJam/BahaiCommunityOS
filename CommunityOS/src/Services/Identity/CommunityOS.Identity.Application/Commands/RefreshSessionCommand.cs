@@ -63,7 +63,8 @@ internal sealed class RefreshSessionCommandHandler(
         await sessions.UpdateAsync(session, ct);
         await sessions.AddAsync(rotated, ct);
 
-        var accessToken = tokenService.GenerateAccessToken(account.Id, account.Email.Value);
+        var accessToken = tokenService.GenerateAccessToken(
+            account.Id, rotated.TokenFamilyId, account.Email.Value);
         return new TokenDto(accessToken, newRefreshToken, DateTime.UtcNow.AddMinutes(15));
     }
 

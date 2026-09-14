@@ -9,7 +9,8 @@ namespace CommunityOS.Identity.Infrastructure.Security;
 
 /// <summary>
 /// Issues short-lived RS256-signed access tokens (JWT) and opaque refresh
-/// tokens. Access tokens carry only the user identity and issued-at/lifetime
+/// tokens. Access tokens carry only the user identity, the logical session id
+/// (<c>sid</c> = the issuing session's token-family id), and issued-at/lifetime
 /// claims. Tokens are never logged by this service.
 /// </summary>
 public sealed class JwtTokenService(
@@ -18,14 +19,15 @@ public sealed class JwtTokenService(
 {
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
 
-    public string GenerateAccessToken(Guid userAccountId, string email)
+    public string GenerateAccessToken(Guid userAccountId, Guid tokenFamilyId, string email)
     {
         var audience = configuration["Jwt:Audience"] ?? "CommunityOS";
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, userAccountId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new Claim(JwtRegisteredClaimNames.Sid, tokenFamilyId.ToString())
         };
 
         return WriteSignedToken(claims, audience, AccessTokenLifetime);

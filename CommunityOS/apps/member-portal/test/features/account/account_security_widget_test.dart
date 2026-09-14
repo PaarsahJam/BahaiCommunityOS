@@ -58,6 +58,7 @@ SessionDto _session({
   String? deviceName,
   String? devicePlatform,
   bool isActive = true,
+  bool isCurrent = false,
 }) =>
     SessionDto(
       id: id,
@@ -68,6 +69,7 @@ SessionDto _session({
       expiresOn: DateTime(2026, 9, 8, 9),
       lastUsedOn: DateTime(2026, 9, 7, 12),
       isActive: isActive,
+      isCurrent: isCurrent,
     );
 
 DeviceDto _device({
@@ -185,6 +187,8 @@ void main() {
     expect(find.textContaining('User-Agent'), findsNothing);
     expect(find.textContaining('· last seen'), findsNothing);
     expect(find.textContaining('Unknown device'), findsNothing);
+    // No current-session marker without a backend-computed flag.
+    expect(find.text('Current session'), findsNothing);
     // Internal identifiers must never leak into the UI.
     expect(find.text('u1'), findsNothing);
     expect(find.text('d1'), findsNothing);
@@ -192,6 +196,73 @@ void main() {
     expect(find.text('s1'), findsNothing);
     expect(find.text('s2'), findsNothing);
     expect(find.text('m1'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'marks only the backend-designated current session with an accessible '
+      'indicator, distinct from the active/inactive status', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount()).thenAnswer(
+      (_) async => _account(devices: [
+        _device(),
+        _device(id: 'd2', name: 'Phone'),
+      ]),
+    );
+    when(() => repository.sessions()).thenAnswer((_) async => [
+          _session(
+            deviceName: 'Back office terminal',
+            devicePlatform: 'Windows',
+            isCurrent: true,
+          ),
+          _session(id: 's2', deviceId: 'd2', isActive: false),
+        ]);
+
+    await pumpHarness(tester);
+
+    // The current-session marker appears only on the backend-authored row.
+    expect(find.text('Current session'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+    // Independent of, and in addition to, the active/inactive status labels.
+    expect(find.text('Active'), findsNWidgets(2)); // overview + session row
+    expect(find.text('Inactive'), findsOneWidget);
+    // The marker is wired with an accessible label.
+    expect(
+      find.ancestor(
+        of: find.byIcon(Icons.check_circle_outline),
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.label == 'Current session',
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 1));
+  });
+
+  testWidgets(
+      'the current-session indicator never implies a device or fabricates a '
+      'device name from the never-rendered internal id', (tester) async {
+    stubDefaults();
+    when(() => repository.loadAccount()).thenAnswer(
+      (_) async => _account(devices: [_device()]),
+    );
+    when(() => repository.sessions()).thenAnswer((_) async => [
+          _session(isCurrent: true),
+          _session(id: 's2', deviceId: 'd2', isCurrent: true),
+        ]);
+
+    await pumpHarness(tester);
+
+    // Two current rows is valid family semantics; each row is marked.
+    expect(find.text('Current session'), findsNWidgets(2));
+    // No identifier and no invented "this device" label.
+    expect(find.text('s1'), findsNothing);
+    expect(find.text('s2'), findsNothing);
+    expect(find.textContaining('Unknown device'), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 1));

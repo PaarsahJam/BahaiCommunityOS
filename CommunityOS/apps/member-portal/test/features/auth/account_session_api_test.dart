@@ -60,6 +60,7 @@ void main() {
       expect(options.path.contains('account'), isFalse);
       expect(items.single.id, 's1');
       expect(items.single.isActive, isTrue);
+      expect(items.single.isCurrent, isFalse);
       expect(items.single.deviceId, 'd1');
       expect(items.single.deviceName, 'Back office terminal');
       expect(items.single.devicePlatform, 'Windows');
@@ -86,6 +87,48 @@ void main() {
       expect(items.single.deviceName, isNull);
       expect(items.single.devicePlatform, isNull);
       expect(items.single.isActive, isFalse);
+      expect(items.single.isCurrent, isFalse);
+    });
+
+    test('SessionDto parses an explicit current-session flag', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+        (_) async => jsonBody('''
+          [{
+            "id": "s1",
+            "deviceId": "d1",
+            "createdOn": "2026-09-01T09:00:00Z",
+            "expiresOn": "2026-09-08T09:00:00Z",
+            "lastUsedOn": "2026-09-07T12:00:00Z",
+            "isActive": true,
+            "isCurrent": true
+          }]
+        '''),
+      );
+
+      final items = await api.sessions();
+
+      expect(items.single.isCurrent, isTrue);
+      expect(items.single.isActive, isTrue);
+    });
+
+    test('SessionDto parses an explicit non-current session', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+        (_) async => jsonBody('''
+          [{
+            "id": "s2",
+            "deviceId": "d2",
+            "createdOn": "2026-09-01T09:00:00Z",
+            "expiresOn": "2026-09-08T09:00:00Z",
+            "lastUsedOn": "2026-09-07T12:00:00Z",
+            "isActive": true,
+            "isCurrent": false
+          }]
+        '''),
+      );
+
+      final items = await api.sessions();
+
+      expect(items.single.isCurrent, isFalse);
     });
 
     test(

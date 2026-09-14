@@ -184,6 +184,8 @@ abstract class CompleteMfaEnrollmentRequestDto
 /// fields; the additive nullable [deviceName]/[devicePlatform] resolve from the
 /// actor's own owned device rows and are rendered only when present. The UI
 /// therefore never fabricates "this device" or device names.
+/// [isCurrent] is computed server-side from the signed [sid] claim and never
+/// trusts any client-supplied value.
 @freezed
 abstract class SessionDto with _$SessionDto {
   const factory SessionDto({
@@ -195,6 +197,7 @@ abstract class SessionDto with _$SessionDto {
     required DateTime expiresOn,
     required DateTime lastUsedOn,
     required bool isActive,
+    @Default(false) bool isCurrent,
   }) = _SessionDto;
 
   factory SessionDto.fromJson(Map<String, dynamic> json) =>
