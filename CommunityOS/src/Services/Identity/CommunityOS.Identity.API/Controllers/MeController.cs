@@ -3,6 +3,8 @@ using CommunityOS.Identity.API.Extensions;
 using CommunityOS.Identity.Application.Commands;
 using CommunityOS.Identity.Application.DTOs;
 using CommunityOS.Identity.Application.Queries;
+using FluentValidation;
+using FluentValidation.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,6 +48,25 @@ public sealed class MeController(IMediator mediator) : ControllerBase
     {
         await mediator.Send(new RevokeSessionCommand(
             User.GetUserAccountId(), sessionId), ct);
+        return NoContent();
+    }
+
+    [HttpPost("sessions/revoke-others")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RevokeOthers(CancellationToken ct)
+    {
+        var userAccountId = User.GetUserAccountId();
+        var currentFamilyId = User.GetSessionFamilyId()
+            ?? throw new ValidationException([
+                new ValidationFailure(
+                    nameof(RevokeOthersCommand.CurrentTokenFamilyId),
+                    "The current session family claim (sid) is required.")
+            ]);
+
+        await mediator.Send(new RevokeOthersCommand(
+            userAccountId, currentFamilyId), ct);
         return NoContent();
     }
 

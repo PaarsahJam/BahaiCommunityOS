@@ -73,6 +73,20 @@ abstract class AccountApi {
     @Extras() Map<String, dynamic>? extra,
   );
 
+  /// Revokes every session owned by the caller except the current one
+  /// (`POST /me/sessions/revoke-others`).
+  ///
+  /// The backend derives the actor from the access-token `sub` claim and the
+  /// current logical session from the signed `sid` claim, so this call carries
+  /// no body and no identity parameter. Non-idempotent in effect: it must
+  /// *never* be transparently refresh+retried. The caller passes
+  /// `extra: {AuthInterceptor.noAutoRetryKey: true}` so a 401 is surfaced
+  /// verbatim for the upstream layer to discriminate.
+  @POST('me/sessions/revoke-others')
+  Future<void> revokeOtherSessions(
+    @Extras() Map<String, dynamic>? extra,
+  );
+
   /// Removes one MFA method owned by the caller (`DELETE /mfa/{methodId}`).
   ///
   /// Non-idempotent: a first call removes the method and revokes *all* sessions;

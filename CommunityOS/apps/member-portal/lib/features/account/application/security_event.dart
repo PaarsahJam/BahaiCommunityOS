@@ -20,6 +20,12 @@ sealed class SecurityEvent with _$SecurityEvent {
   const factory SecurityEvent.sessionRevokeRequested(String sessionId) =
       SecuritySessionRevokeRequested;
 
+  /// Revokes every session owned by the caller except the current one
+  /// (`POST /me/sessions/revoke-others`) and then reloads the authoritative
+  /// session list.
+  const factory SecurityEvent.revokeOthersRequested() =
+      SecurityRevokeOthersRequested;
+
   /// Begins TOTP enrollment and reveals the one-time enrollment material.
   const factory SecurityEvent.mfaEnrollmentRequested() =
       SecurityMfaEnrollmentRequested;

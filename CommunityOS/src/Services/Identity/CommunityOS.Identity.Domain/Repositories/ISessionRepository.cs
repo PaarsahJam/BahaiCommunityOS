@@ -11,4 +11,6 @@ public interface ISessionRepository
     Task AddAsync(Session session, CancellationToken ct = default);
     Task UpdateAsync(Session session, CancellationToken ct = default);
     Task RevokeAllForUserAsync(Guid userAccountId, string reason, CancellationToken ct = default);
+    Task RevokeAllExceptFamilyForUserAsync(
+        Guid userAccountId, Guid tokenFamilyId, string reason, CancellationToken ct = default);
 }

@@ -139,6 +139,12 @@ class MemberRepository {
         ),
       );
 
+  Future<void> revokeOtherSessions() => _guard(
+        () => _accountApi.revokeOtherSessions(
+          {AuthInterceptor.noAutoRetryKey: true},
+        ),
+      );
+
   /// Removes one MFA method owned by the authenticated account
   /// (`DELETE /mfa/{methodId}`).
   ///

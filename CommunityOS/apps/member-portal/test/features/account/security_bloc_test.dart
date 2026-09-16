@@ -496,6 +496,183 @@ void main() {
       expect(bloc.isClosed, isTrue);
     });
 
+    // ── Revoke others ─────────────────────────────────────────────────────
+
+    test(
+        'a successful revoke-others marks in-flight, confirms on 204, and '
+        'reloads the authoritative session list', () async {
+      when(() => repository.revokeOtherSessions()).thenAnswer((_) async {});
+      var readCount = 0;
+      when(() => repository.sessions()).thenAnswer((_) async {
+        readCount++;
+        if (readCount == 1) {
+          return [_session(), _session(id: 's2', deviceId: 'd2')];
+        }
+        // The backend preserves the current family; the authoritative list
+        // comes back with the current session only.
+        return [_session()];
+      });
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      expect((states.last as SecurityLoaded).sessions, hasLength(2));
+
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(
+        states.any((s) => s is SecurityLoaded && s.revokingOthers),
+        isTrue,
+        reason: 'an intermediate in-flight state must be emitted',
+      );
+      expect(loaded.revokeOthersSucceeded, isTrue);
+      expect(loaded.revokeOthersError, isNull);
+      expect(loaded.sessions, hasLength(1));
+      verify(() => repository.revokeOtherSessions()).called(1);
+      verify(() => repository.sessions()).called(2);
+      await sub.cancel();
+    });
+
+    test('a duplicate revoke-others while in flight is ignored', () async {
+      when(() => repository.sessions())
+          .thenAnswer((_) async => [_session(), _session(id: 's2')]);
+      final gate = Completer<void>();
+      when(() => repository.revokeOtherSessions())
+          .thenAnswer((_) => gate.future);
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await pumpEventQueue();
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await pumpEventQueue();
+
+      expect((bloc.state as SecurityLoaded).revokingOthers, isTrue);
+      gate.complete();
+      await _flush();
+      verify(() => repository.revokeOtherSessions()).called(1);
+      await sub.cancel();
+    });
+
+    test(
+        'a failed revoke-others keeps the operation retryable and never '
+        'reports success', () async {
+      when(() => repository.sessions())
+          .thenAnswer((_) async => [_session(), _session(id: 's2')]);
+      when(() => repository.revokeOtherSessions())
+          .thenThrow(const NetworkException('offline'));
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokeOthersError, isA<NetworkException>());
+      expect(loaded.revokeOthersSucceeded, isFalse);
+      expect(loaded.revokingOthers, isFalse);
+      // A failed mutation never triggers a list reload.
+      verify(() => repository.sessions()).called(1);
+      await sub.cancel();
+    });
+
+    test('a 401 revoke-others surfaces as UnauthorizedException, not success',
+        () async {
+      when(() => repository.sessions())
+          .thenAnswer((_) async => [_session(), _session(id: 's2')]);
+      when(() => repository.revokeOtherSessions()).thenThrow(
+        const UnauthorizedException('token invalid', statusCode: 401),
+      );
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokeOthersError, isA<UnauthorizedException>());
+      expect(loaded.revokeOthersSucceeded, isFalse);
+      await sub.cancel();
+    });
+
+    test(
+        'retrying a failed revoke-others clears the error and completes on '
+        'the second attempt', () async {
+      when(() => repository.sessions())
+          .thenAnswer((_) async => [_session(), _session(id: 's2')]);
+      var attempts = 0;
+      when(() => repository.revokeOtherSessions()).thenAnswer((_) async {
+        attempts++;
+        if (attempts == 1) throw const NetworkException('offline');
+        return;
+      });
+      var readCount = 0;
+      when(() => repository.sessions()).thenAnswer((_) async {
+        readCount++;
+        if (readCount == 1) return [_session(), _session(id: 's2')];
+        return [_session()];
+      });
+
+      final bloc = SecurityBloc(repository);
+      addTearDown(bloc.close);
+      final states = <SecurityState>[];
+      final sub = bloc.stream.listen(states.add);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await _flush();
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await _flush();
+      expect(
+        (states.last as SecurityLoaded).revokeOthersError,
+        isA<NetworkException>(),
+      );
+
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await _flush();
+
+      final loaded = states.last as SecurityLoaded;
+      expect(loaded.revokeOthersError, isNull);
+      expect(loaded.revokeOthersSucceeded, isTrue);
+      verify(() => repository.revokeOtherSessions()).called(2);
+      await sub.cancel();
+    });
+
+    test('a closed bloc never emits after an in-flight revoke-others completes',
+        () async {
+      when(() => repository.sessions()).thenAnswer((_) async => <SessionDto>[]);
+      final gate = Completer<void>();
+      when(() => repository.revokeOtherSessions())
+          .thenAnswer((_) => gate.future);
+
+      final bloc = SecurityBloc(repository);
+      bloc.add(const SecurityEvent.sessionsRequested());
+      await pumpEventQueue();
+      bloc.add(const SecurityEvent.revokeOthersRequested());
+      await pumpEventQueue();
+      await bloc.close();
+
+      gate.complete();
+      await _flush();
+      expect(bloc.isClosed, isTrue);
+    });
+
     // ── MFA removal ──────────────────────────────────────────────────────
 
     test('successful mfa removal transitions through inProgress → succeeded',

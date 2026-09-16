@@ -78,5 +78,8 @@ sealed class SecurityState with _$SecurityState {
     @Default(<String, AppException>{})
     Map<String, AppException> sessionRevokeErrors,
     @Default(<String>{}) Set<String> revokedSessionIds,
+    @Default(false) bool revokingOthers,
+    AppException? revokeOthersError,
+    @Default(false) bool revokeOthersSucceeded,
   }) = SecurityLoaded;
 }

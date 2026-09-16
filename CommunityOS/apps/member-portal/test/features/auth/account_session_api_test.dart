@@ -173,6 +173,49 @@ void main() {
     });
 
     test(
+        'revokeOtherSessions POSTs the revoke-others endpoint with no '
+        'auto-retry and no payload or identity', () async {
+      when(() => adapter.fetch(any(), any(), any()))
+          .thenAnswer((_) async => jsonBody('', 204));
+
+      await api.revokeOtherSessions({AuthInterceptor.noAutoRetryKey: true});
+
+      final options = verify(() => adapter.fetch(captureAny(), any(), any()))
+          .captured
+          .single as RequestOptions;
+      expect(options.method, 'POST');
+      expect(options.path, 'me/sessions/revoke-others');
+      expect(options.queryParameters, isEmpty);
+      // Non-idempotent mutation must never be transparently refresh+retried.
+      expect(options.extra[AuthInterceptor.noAutoRetryKey], isTrue);
+      // The backend derives the actor from the token and the current logical
+      // session from the signed sid claim: no body and no identifiers travel.
+      expect(options.data, isNull);
+      expect(options.path.contains('member'), isFalse);
+      expect(options.path.contains('account'), isFalse);
+      expect(options.path.contains('{'), isFalse);
+    });
+
+    test('an adapter 401 on revokeOtherSessions propagates as DioException',
+        () async {
+      when(() => adapter.fetch(any(), any(), any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: 'me/sessions/revoke-others'),
+          type: DioExceptionType.badResponse,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: 'me/sessions/revoke-others'),
+            statusCode: 401,
+          ),
+        ),
+      );
+
+      expect(
+        api.revokeOtherSessions(null),
+        throwsA(isA<DioException>()),
+      );
+    });
+
+    test(
         'removeMfaMethod DELETEs the method-specific endpoint and carries '
         'the no-auto-retry extra', () async {
       when(() => adapter.fetch(any(), any(), any()))

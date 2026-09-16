@@ -95,6 +95,15 @@ public sealed class RevokeSessionCommandValidator : AbstractValidator<RevokeSess
     }
 }
 
+public sealed class RevokeOthersCommandValidator : AbstractValidator<RevokeOthersCommand>
+{
+    public RevokeOthersCommandValidator()
+    {
+        RuleFor(x => x.UserAccountId).NotEmpty();
+        RuleFor(x => x.CurrentTokenFamilyId).NotEmpty();
+    }
+}
+
 public sealed class LinkExternalIdentityCommandValidator : AbstractValidator<LinkExternalIdentityCommand>
 {
     public LinkExternalIdentityCommandValidator()

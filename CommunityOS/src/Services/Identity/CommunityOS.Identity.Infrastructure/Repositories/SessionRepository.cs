@@ -48,4 +48,20 @@ public sealed class SessionRepository(IdentityDbContext db) : ISessionRepository
         if (active.Count != 0)
             await db.SaveChangesAsync(ct);
     }
+
+    public async Task RevokeAllExceptFamilyForUserAsync(
+        Guid userAccountId, Guid tokenFamilyId, string reason, CancellationToken ct = default)
+    {
+        var active = await db.Sessions
+            .Where(x => x.UserAccountId == userAccountId
+                && !x.IsRevoked
+                && x.TokenFamilyId != tokenFamilyId)
+            .ToListAsync(ct);
+
+        foreach (var session in active)
+            session.Revoke(reason);
+
+        if (active.Count != 0)
+            await db.SaveChangesAsync(ct);
+    }
 }

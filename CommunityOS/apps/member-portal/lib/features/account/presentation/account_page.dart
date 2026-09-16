@@ -96,6 +96,36 @@ class _AccountPageState extends State<AccountPage> {
   void _retryRevokeSession(String sessionId) =>
       _securityBloc.add(SecurityEvent.sessionRevokeRequested(sessionId));
 
+  /// Retries a failed revoke-others operation directly. Nothing was revoked,
+  /// so re-confirming would be pointless friction.
+  void _retryRevokeOthers() =>
+      _securityBloc.add(const SecurityEvent.revokeOthersRequested());
+
+  Future<void> _confirmRevokeOthers(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.accountSessionRevokeOthersTitle),
+        content: Text(l10n.accountSessionRevokeOthersBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.accountSessionRevokeOthersCancel),
+          ),
+          FilledButton(
+            key: const Key('session-revoke-others-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.accountSessionRevokeOthersConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      _securityBloc.add(const SecurityEvent.revokeOthersRequested());
+    }
+  }
+
   Future<void> _confirmRevokeSession(
     BuildContext context,
     String sessionId,
@@ -262,6 +292,8 @@ class _AccountPageState extends State<AccountPage> {
                       onRevokeSession: (sessionId) =>
                           _confirmRevokeSession(context, sessionId),
                       onRetryRevokeSession: _retryRevokeSession,
+                      onRevokeOthers: () => _confirmRevokeOthers(context),
+                      onRetryRevokeOthers: _retryRevokeOthers,
                     ),
                   AccountFailed(:final error) => _AccountErrorView(
                       error: error,
@@ -302,6 +334,8 @@ class _AccountContent extends StatelessWidget {
     required this.onRetrySessions,
     required this.onRevokeSession,
     required this.onRetryRevokeSession,
+    required this.onRevokeOthers,
+    required this.onRetryRevokeOthers,
   });
 
   final UserAccountDto account;
@@ -326,6 +360,8 @@ class _AccountContent extends StatelessWidget {
   final VoidCallback onRetrySessions;
   final ValueChanged<String> onRevokeSession;
   final ValueChanged<String> onRetryRevokeSession;
+  final VoidCallback onRevokeOthers;
+  final VoidCallback onRetryRevokeOthers;
 
   @override
   Widget build(BuildContext context) {
@@ -349,6 +385,8 @@ class _AccountContent extends StatelessWidget {
           onRetrySessions: onRetrySessions,
           onRevokeSession: onRevokeSession,
           onRetryRevokeSession: onRetryRevokeSession,
+          onRevokeOthers: onRevokeOthers,
+          onRetryRevokeOthers: onRetryRevokeOthers,
         ),
         const SizedBox(height: 16),
         _PasswordCard(
@@ -775,6 +813,8 @@ class _IdentitySecurityCard extends StatelessWidget {
     required this.onRetrySessions,
     required this.onRevokeSession,
     required this.onRetryRevokeSession,
+    required this.onRevokeOthers,
+    required this.onRetryRevokeOthers,
   });
 
   final UserAccountDto account;
@@ -790,6 +830,8 @@ class _IdentitySecurityCard extends StatelessWidget {
   final VoidCallback onRetrySessions;
   final ValueChanged<String> onRevokeSession;
   final ValueChanged<String> onRetryRevokeSession;
+  final VoidCallback onRevokeOthers;
+  final VoidCallback onRetryRevokeOthers;
 
   @override
   Widget build(BuildContext context) {
@@ -859,6 +901,11 @@ class _IdentitySecurityCard extends StatelessWidget {
               onRevokeSession: onRevokeSession,
               onRevokeRetry: onRetryRevokeSession,
               onRetry: onRetrySessions,
+              revokingOthers: security.revokingOthers,
+              revokeOthersError: security.revokeOthersError,
+              revokeOthersSucceeded: security.revokeOthersSucceeded,
+              onRevokeOthers: onRevokeOthers,
+              onRetryRevokeOthers: onRetryRevokeOthers,
             ),
           ],
         ),
@@ -1423,6 +1470,11 @@ class _SessionsSection extends StatelessWidget {
     required this.onRevokeSession,
     required this.onRevokeRetry,
     required this.onRetry,
+    required this.revokingOthers,
+    required this.revokeOthersError,
+    required this.revokeOthersSucceeded,
+    required this.onRevokeOthers,
+    required this.onRetryRevokeOthers,
   });
 
   final List<SessionDto> sessions;
@@ -1434,6 +1486,25 @@ class _SessionsSection extends StatelessWidget {
   final ValueChanged<String> onRevokeSession;
   final ValueChanged<String> onRevokeRetry;
   final VoidCallback onRetry;
+  final bool revokingOthers;
+  final AppException? revokeOthersError;
+  final bool revokeOthersSucceeded;
+  final VoidCallback onRevokeOthers;
+  final VoidCallback onRetryRevokeOthers;
+
+  /// Revoke-others failure message. A 404 (or 403) renders a generic message
+  /// that never reveals account/session details, matching the backend's
+  /// uniform response. Stale/invalid tokens and transient failures stay
+  /// retryable.
+  String _revokeOthersFailureMessage(BuildContext context, AppException error) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (error) {
+      NotFoundException() ||
+      ForbiddenException() =>
+        l10n.accountSessionRevokeOthersFailed,
+      _ => l10n.accountSessionRevokeOthersRetryable,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1444,25 +1515,86 @@ class _SessionsSection extends StatelessWidget {
       children: [
         Text(l10n.accountSessionsTitle, style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: revokingOthers
+              ? Semantics(
+                  label: l10n.accountSessionRevokeOthersRevoking,
+                  child: const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : TextButton(
+                  key: const Key('session-revoke-others'),
+                  onPressed: onRevokeOthers,
+                  style: TextButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.logout, size: 18),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          l10n.accountSessionRevokeOthers,
+                          textAlign: TextAlign.start,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        if (revokeOthersSucceeded) ...[
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: _SectionResultRow(
+              icon: Icons.check_circle_outline,
+              color: theme.colorScheme.primary,
+              message: l10n.accountSessionRevokeOthersSuccess,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (revokeOthersError != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _LiveErrorText(
+                  message: _revokeOthersFailureMessage(
+                    context,
+                    revokeOthersError!,
+                  ),
+                ),
+                TextButton.icon(
+                  key: const Key('session-revoke-others-retry'),
+                  onPressed: onRetryRevokeOthers,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.homeRetry),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (revokedSessionIds.isNotEmpty) ...[
           Semantics(
             container: true,
             liveRegion: true,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  color: theme.colorScheme.primary,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n.accountSessionRevokeSuccess,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              ],
+            child: _SectionResultRow(
+              icon: Icons.check_circle_outline,
+              color: theme.colorScheme.primary,
+              message: l10n.accountSessionRevokeSuccess,
             ),
           ),
           const SizedBox(height: 8),
@@ -1687,6 +1819,34 @@ class _SessionsError extends StatelessWidget {
           onPressed: onRetry,
           icon: const Icon(Icons.refresh),
           label: Text(l10n.homeRetry),
+        ),
+      ],
+    );
+  }
+}
+
+/// Successful-operation confirmation row (icon + message) used by the sessions
+/// section's success banners.
+class _SectionResultRow extends StatelessWidget {
+  const _SectionResultRow({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(message, style: theme.textTheme.bodyMedium),
         ),
       ],
     );

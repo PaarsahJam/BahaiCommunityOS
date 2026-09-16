@@ -24,6 +24,7 @@ ownership of the session row is the sole server-side authorization
 |--------|------|-------------|
 | GET | `/me/sessions` | List the caller's own sessions (id, device id, created/expires/last-used times, active flag, current flag, device name/platform) |
 | POST | `/me/sessions/{sessionId}/revoke` | Revoke a single one of the caller's own sessions; idempotent |
+| POST | `/me/sessions/revoke-others` | Revoke every one of the caller's other logical sessions, preserving the current session's family |
 
 `GET /me/sessions` returns only the authenticated actor's sessions. The
 `SessionDto` items expose `id`, `deviceId`, `createdOn`, `expiresOn`,
@@ -92,13 +93,64 @@ Semantics:
 - **Route constraint** — `{sessionId:guid}`; a non-GUID value is not routable
   and yields `404`.
 
+## Revoke-others — `POST /me/sessions/revoke-others`
+
+`POST /me/sessions/revoke-others` revokes every session row the caller owns
+**except** those belonging to the caller's current logical session family.
+Request body: **none**. Success returns `204 No Content`.
+
+Authentication and identity derivation:
+
+- Requires a valid access token (`[Authorize]`).
+- The current user account is resolved **exclusively** from the JWT `sub`
+  claim; the current logical session family is resolved exclusively from the
+  signed `sid` claim. No client-supplied `userAccountId`, family id, session id,
+  or request body is accepted anywhere on the endpoint.
+- A missing or malformed (non-GUID) `sid` claim yields `400 Bad Request`
+  (problem-details) and the operation is never dispatched.
+- The repository operation is scoped by the authenticated `userAccountId`;
+  a missing `UserAccountId` ownership predicate would be a security bug.
+
+Semantics:
+
+- **Family-level revocation** — a logical session family may own many
+  historical rows (refresh-token rotation creates a sibling row per rotation).
+  Every **non-revoked** row belonging to every other family owned by the user
+  is revoked in one operation, including rows that are already expired but
+  never revoked.
+- **Current family preserved** — no row in the current logical family
+  (`TokenFamilyId == sid` value) is modified, including superseded historical
+  rows within that family.
+- **Other accounts untouched** — rows belonging to another account are never
+  selected or modified.
+- **No-op safety** — when there are no other non-revoked rows, the operation
+  succeeds with `204` and nothing is persisted.
+- **Idempotence of rows** — already-revoked rows are never re-recorded;
+  `Session.Revoke` is idempotent and preserves the original reason and
+  timestamp.
+- **Access-token caveat** — revoking another session prevents **future
+  refresh** from that session. Already-issued short-lived access tokens from
+  those sessions may remain valid until their normal expiration (currently
+  15 minutes). No access-token blacklisting, introspection, or session-state
+  validation is performed by this feature.
+- **No data returned** — the `204` response body is empty. No family ids,
+  session ids, token data, or counts of revoked sessions are ever returned.
+- **No security event** — this operation emits no security event and introduces
+  no security-event policy.
+
+| HTTP status | Meaning |
+|-------------|---------|
+| 400 | Missing or malformed `sid` claim (validation failure) |
+| 401 | Missing / invalid access token |
+| 204 | (success) all other logical sessions revoked, current session preserved |
+
 ## Error handling
 
 Errors are returned as JSON problem-details. Common codes:
 
 | HTTP status | Meaning |
 |-------------|---------|
-| 400 | Validation failure (empty route values) |
+| 400 | Validation failure (empty route values), or missing/malformed `sid` claim on `revoke-others` |
 | 401 | Missing / invalid access token |
 | 404 | Session not found **or** not owned by the caller (uniform, no existence oracle); non-GUID session id not routable |
 | 204 | (success) session revoked |
