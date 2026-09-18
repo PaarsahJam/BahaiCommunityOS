@@ -41,6 +41,7 @@ This directory contains ADRs for CommunityOS.
 | ADR-033 | Communications / VoIP slot disposition: no dedicated bounded context | Accepted |
 | ADR-034 | Analytics / cross-domain reporting slot disposition: no dedicated bounded context | Accepted |
 | ADR-035 | API Gateway as the client-facing boundary                          | Accepted |
+| ADR-036 | Session Revocation and Access-Token Validity Model                 | Proposed |
 
 
 ## ADR-004 — Transport-independent event bus (MassTransit + RabbitMQ; NATS/Kafka future)
@@ -4476,3 +4477,476 @@ configuration, or runtime behavior are created here.
 - Superseded decisions: none. The only prior "API gateway/BFF" reference was an
   intent line in the placeholder `specifications/01-Architecture-Overview.md`;
   this ADR is the authoritative client-facing-boundary decision.
+
+## ADR-036 — Session Revocation and Access-Token Validity Model
+
+**Status:** Proposed (not ratified)
+
+**Date:** 2026-09-17
+
+**Decision:** Not yet decided — this ADR records the current model, clarifies
+terminology, and presents alternatives for project-owner review. No option is
+selected here.
+
+**Implementation:** None. This ADR performs no implementation and introduces no
+mechanism.
+
+### 1. Context
+
+CommunityOS authenticates users through the Identity bounded context
+(ADR-018). Clients hold two distinct token types: short-lived access tokens
+used to call service APIs, and longer-lived refresh tokens used to obtain new
+access tokens. Revocation today primarily affects the *refresh* path; it does
+not invalidate previously issued access tokens before their JWT expiration.
+
+This ADR documents the current session-revocation and access-token-validity
+model, distinguishes refresh-token revocation from already-issued access-token
+invalidation, describes the architectural options, and identifies the decisions
+that require explicit approval from the project owner.
+
+All statements below were verified against the current repository at commit
+`349bfbb` unless explicitly labeled as an **assumption** or **open question**.
+
+### 2. Current authentication and token model
+
+- **Access tokens** are self-contained RS256 JWTs issued by the Identity
+  service (`JwtTokenService`). They carry the `sub` (user account id), `email`,
+  `jti`, and `sid` claims; `sid` is the issuing session's logical
+  token-family id (`JwtTokenService.GenerateAccessToken`).
+- **Access-token lifetime** is hard-coded to 15 minutes
+  (`AccessTokenLifetime = TimeSpan.FromMinutes(15)`, and the 15-minute expiry
+  echoed in the login and refresh `TokenDto` responses).
+- **Refresh tokens** are opaque 64-byte random values, never persisted in raw
+  form — only a hash is stored on the `sessions` row. They are **rotating**:
+  each use creates a new row in the same logical token family and marks the
+  previous row as used (`Session.Rotate`). Refresh-token lifetime is 30 days.
+- **Session records** are PostgreSQL-backed (`Session` aggregate, `sessions`
+  table). Multiple rows can share one token-family id; a family is the logical
+  session.
+- **The `sid` claim** identifies the token family. It is a server-signed claim
+  added at issuance and is the basis for "current session" identification in
+  the self-service session surface (`ClaimsPrincipalExtensions.GetSessionFamilyId`).
+- **Services independently validate JWTs.** Each protected service (Identity,
+  Authorization, Organization, Community, Documents, Records, Workflow,
+  Notifications, Search, Finance, Audit, Knowledge, Localization,
+  Correspondence, AI)
+  runs its own `JwtBearer` validation of signature, issuer, audience and
+  lifetime against the Identity-issued RS256 key/JWKS. Some services additionally
+  assert a subject claim in their `OnTokenValidated` handler; **no service
+  performs a session-state, `sid`, family, or revocation lookup during token
+  validation.**
+  Identity enables `ValidateTokenReplay = true` but registers no
+  `TokenReplayCache`, so replay validation is currently inert.
+- **Existing access tokens from revoked sessions remain valid until JWT
+  expiration** under the current model. No access-token blacklist,
+  introspection, token-version/epoch check, or session-state validation exists.
+- **Redis** is present in the development infrastructure
+  (`docker-compose.yml` runs `redis:7-alpine`) and in package references
+  (`StackExchange.Redis` 2.8.16; `Microsoft.Extensions.Caching.StackExchangeRedis`
+  9.0.0 referenced by `CommunityOS.Infrastructure.Common`), but **nothing in
+  the C# implementation uses a Redis client**. Redis must not be described as
+  an active revocation mechanism.
+
+### 3. Current session-revocation behavior
+
+Verification of the revocation surface:
+
+| Security operation | Command / handler | Affected session rows |
+|--------------------|-------------------|-----------------------|
+| Revoke one session | `RevokeSessionCommand` / `RevokeSessionCommandHandler` | The single owned session row (`{sessionId:guid}`), idempotent; actor from `sub` |
+| Revoke all other sessions | `RevokeOthersCommand` / `RevokeOthersCommandHandler` via `RevokeAllExceptFamilyForUserAsync` | Every non-revoked row of the caller except rows in the current `sid` family; never touches other accounts |
+| Logout | `LogoutCommand` | The single row matching the presented refresh-token hash |
+| Password change | `ChangePasswordCommand` → `RevokeAllForUserAsync("Password changed.")` | **Account-wide** invalidation of every non-revoked session |
+| Password reset | `ResetPasswordCommand` → `RevokeAllForUserAsync("Password reset.")` | **Account-wide** invalidation of every non-revoked session |
+| MFA removal | `RemoveMfaCommand` → `RevokeAllForUserAsync("MFA method removed.")` | **Account-wide** invalidation of every non-revoked session |
+| Refresh-reuse detection | `RefreshSessionCommand` (theft detection) | The whole token family of the reused token |
+
+Revocation affects future refresh operations: once a session row is revoked,
+`IsActive` is false and the refresh path rejects the refresh token
+(`RefreshSessionCommand`, `InvalidRefreshTokenException`). No session row is
+ever hard-deleted; superseded rotated rows persist and are listed (the session
+list never collapses families). At the repository level, the account-wide
+`RevokeAllForUserAsync` and the all-families-except-one
+`RevokeAllExceptFamilyForUserAsync` are the revocation abstractions, in
+addition to the refresh handler's private family-revocation path used for
+reuse detection.
+
+The API Gateway (`src/Host/CommunityOS.Host.ApiGateway`, ADR-035) is a thin,
+transparent forwarding boundary. It does **not** validate JWT signatures or
+claims, does not introspect tokens, does not call Identity session endpoints,
+and does not enforce any revocation check; the caller's `Authorization` header
+is forwarded unchanged.
+
+**Current revocation → access-token relationship:** revocation already
+prevents future use of the affected refresh-token records according to each
+operation's scope and token-family semantics; the differentiator among the
+options below is whether already-issued access tokens are also invalidated
+before their JWT (15-minute) expiration. No revocation has identical scope:
+single-row, family-wide (`revoke-others`, reuse detection) and account-wide
+(password change/reset, MFA removal) operations each affect a different set
+of refresh-token records.
+
+### 4. Terminology and definitions
+
+This ADR uses the following terms consistently:
+
+- **Immediate refresh revocation:** the next refresh attempt is rejected after
+  the revocation transaction commits. This is the behavior of the current
+  model for every revocation operation.
+- **Near-immediate access revocation:** access-token rejection occurs after
+  revocation state propagates or becomes available through the revocation
+  store or cache. There is a bounded propagation window during which a token
+  may still be accepted.
+- **Immediate access revocation:** previously issued access tokens are no
+  longer accepted after the authoritative revocation decision, subject to
+  stated propagation and failure guarantees. "Immediate" here is relative to
+  the authoritative decision record; the practical latency still depends on
+  how and where the decision is consulted.
+
+These three terms describe distinct claims. They are not interchangeable, and
+a design that provides one does not automatically provide another.
+
+### 5. Problem statement
+
+The current model guarantees **immediate refresh revocation** only. A revoked
+session can present its already-issued access token to any service and be
+accepted until the token's 15-minute expiry. Consequences:
+
+- A user who revokes a single session or a stolen/compromised device cannot
+  stop that session from acting until its access tokens expire naturally.
+- Account-wide security events (password change, password reset, MFA removal)
+  invalidate refresh tokens but leave already-issued access tokens usable for
+  up to 15 minutes.
+- There is no centralized enforcement point: revocation state lives in the
+  Identity database, while every service validates access tokens locally
+  without consulting that state.
+
+The accepted 15-minute residual validity window may be acceptable or not —
+that is a security/product decision for the project owner (see open
+questions). The purpose of this ADR is to make the trade-off explicit and to
+give the owner the information needed to decide whether any change is
+warranted.
+
+### 6. Revocation scope by security operation
+
+| Operation                         | Expected revocation scope                                   |
+| --------------------------------- | ----------------------------------------------------------- |
+| Revoke one session                | One token family / `sid`                                    |
+| Revoke all other sessions         | All other token families while preserving the current `sid` |
+| Password change or password reset | Usually account-wide invalidation                           |
+| MFA removal or security reset     | Usually account-wide invalidation                           |
+
+Notes:
+
+- **Row vs family:** the current self-service single-session endpoint
+  (`POST /me/sessions/{sessionId}/revoke`) revokes one session **row**; rows
+  sharing a `sid`/token family together form the logical session. "One token
+  family / `sid`" above is the expected logical unit, not a claim that today's
+  endpoint revokes sibling rows in the same family.
+- "Usually" reflects that the *expected* scope for account-security events is
+  account-wide; the current implementation already performs account-wide
+  refresh invalidation for these operations, but the expected access-token
+  invalidation scope is a decision this ADR records for the owner.
+- A mechanism designed only for `revoke-others` may be **insufficient** for
+  account-wide security events. `revoke-others` deliberately preserves the
+  current `sid` family; a password change, password reset, or MFA removal is
+  normally expected to invalidate **every** family, including the acting one.
+  Any future revocation mechanism must be scoped per operation; it must not
+  assume the `revoke-others` scope satisfies account-wide semantics.
+- Session-list semantics (which rows are shown, how families are represented,
+  whether superseded rows are collapsed) and expired/revoked-row cleanup are
+  **separate concerns** and must not be silently folded into the access-token
+  revocation decision.
+
+### 7. Security and functional requirements
+
+Candidate requirements the options are compared against (proposed, not yet
+ratified):
+
+- **Scope correctness.** Revocation must invalidate exactly the intended
+  sessions/families per operation (Section 6), never another account, and never
+  the wrong family.
+- **Explicitness of the residual window.** The interval during which an
+  already-issued token remains accepted after a revocation decision must be
+  known and stated (15 minutes today).
+- **Consistency between refresh and access paths.** A revocation that ends the
+  refresh path should, at the owner's chosen guarantee, also constrain the
+  access path.
+- **Fail-closed vs fail-open discipline.** Where verification of revocation
+  state is required, the behavior when that state is unavailable (store down,
+  cache miss, timeout) must be an explicit, approved decision.
+- **No weakening of existing guarantees.** Any change must preserve current
+  behaviors: opaque rotating refresh tokens, `sid` family semantics, RS256
+  validation, and the fail-closed posture of existing services.
+- **Observability.** Revocation decisions and any access-token rejections must
+  be observable and auditable.
+
+### 8. Decision drivers
+
+- **Security posture for compromised devices.** How quickly must a revoked
+  session stop being able to act?
+- **Account-wide security events.** Password change, password reset, and MFA
+  removal are high-value targets; the owner must decide whether refresh-only
+  invalidation is sufficient.
+- **Operational simplicity.** The current model has no revocation store, no
+  cache, and no per-request identity dependency for access-token validation.
+- **Latency and availability.** Any per-request revocation check adds a
+  dependency to the request path and an availability/consistency question
+  (fail-open or fail-closed).
+- **Client compatibility.** The Flutter client relies on the current
+  refresh-driven lifecycle and centralized re-authentication; changes must
+  consider how clients observe 401s and re-authentication.
+- **Cross-cutting change surface.** Some options touch every service's token
+  validation path (or signing keys), which is broad and disruptive.
+
+### 9. Architectural options
+
+All options are presented as alternatives for review. **None is selected or
+recommended here.**
+
+#### Option A — Retain the current refresh-only revocation model
+
+Keep the current design: revocation stops future refresh; already-issued
+access tokens remain valid until their 15-minute expiry; no revocation state is
+consulted during access-token validation.
+
+- **Mechanism:** no change; the existing session rows and refresh checks.
+- **Benefits:** zero change, zero new dependency, established behavior.
+- **Costs:** the residual access-token validity window is a permanent property;
+  a revoked session can act for up to 15 minutes.
+- **Consistency:** the access path has no revocation state at all; "consistent"
+  only in the sense that expiration is the single invalidation rule.
+- **Availability:** no new availability dependency; access-token validation
+  stays local and stateless.
+- **Unresolved questions:** whether the residual window is acceptable for
+  compromised-device and account-wide security events.
+
+#### Option B — Shorten access-token lifetime
+
+Reduce the hard-coded access-token lifetime below 15 minutes to shrink the
+residual window.
+
+- **Mechanism:** configuration/constant change in `JwtTokenService`; clients
+  refresh more often.
+- **Benefits:** reduces the residual window without introducing revocation
+  state; small surface.
+- **Costs:** more frequent refreshes, more load on the refresh path, and a
+  shorter effective working session; the window shrinks but is never zero.
+- **Consistency:** unchanged — no revocation state is consulted; the window is
+  simply smaller.
+- **Availability:** no new dependency.
+- **Unresolved questions:** how short is acceptable, and whether clients and
+  tests can tolerate the increased refresh cadence.
+
+#### Option C — Add shared revocation state (e.g., Redis) checked by each service
+
+Introduce a shared revocation store/cache (Redis is present in development
+infrastructure and package references but is currently unused) that records
+revoked sessions/families, and have each service check it during access-token
+validation, keyed by `sid` (and/or `jti`).
+
+- **Mechanism:** services consult shared state per request; Identity publishes
+  revocation records on revocation.
+- **Benefits:** enables revocation of already-issued access tokens
+  (near-immediate or immediate per propagation/consistency guarantees).
+- **Costs:** a new runtime dependency and cache-management concern in every
+  service's request path; consistency between Identity's authoritative session
+  rows and the shared state must be managed.
+- **Consistency:** eventual (propagation-dependent) unless strictly coupled to
+  the authoritative store; failure behavior is the fail-open/fail-closed
+  question.
+- **Availability:** a new dependency; an unavailable store forces the
+  fail-open/fail-closed decision into effect.
+- **Unresolved questions:** store choice, eviction/propagation policy, cache
+  freshness, and whether per-request latency is acceptable.
+
+#### Option D — Account/session epoch or token-version claim with shared state
+
+Add a monotonically increasing version/epoch (per account or per token family)
+as a signed claim, revoke by incrementing the version, and require services to
+check the current version against shared/authoritative state.
+
+- **Mechanism:** signed `ver`/epoch claim plus a shared check, like Option C but
+  with a signed counter.
+- **Benefits:** a single signed value can invalidate many tokens at once
+  (account-wide or family-wide) and works with stateless claims once state is
+  consulted.
+- **Costs:** same shared-state dependency and consistency/failure questions as
+  Option C, plus claim/validation changes on every service.
+- **Consistency:** dependent on the shared state and the check policy.
+- **Availability:** same dependency profile as Option C.
+- **Unresolved questions:** keying (account vs family), storage of the current
+  version, and migration of already-issued tokens.
+
+#### Option E — Per-request Identity/database/introspection checks
+
+Validate each access token by calling Identity (or the session store) on every
+request to ask whether the session is still active.
+
+- **Mechanism:** a per-request revocation/introspection call during validation.
+- **Benefits:** access-token acceptance mirrors the authoritative session rows
+  directly (immediate relative to the authoritative decision).
+- **Costs:** per-request synchronous dependency on Identity/its database; high
+  load; latency and availability coupling across all services.
+- **Consistency:** strongest (reads the authoritative source) but only as good
+  as the propagation to/from Identity and its failure policy.
+- **Availability:** significant — every request depends on an extra service;
+  failure handling must be approved.
+- **Unresolved questions:** whether an introspection endpoint is acceptable,
+  caching, and the failure policy.
+
+#### Option F — Rotate signing keys
+
+Rotate the Identity signing key (or use a key set) so previously issued
+tokens fail signature validation.
+
+- **Mechanism:** new signing keys; services validate against the rotated
+  key set.
+- **Benefits:** can invalidate all previously issued tokens at a rotation
+  boundary.
+- **Costs:** **broad and operationally disruptive**: every client and every
+  service must re-authenticate; rotation cannot target a single session/family;
+  it invalidates all tokens, not just revoked ones.
+- **Consistency:** abrupt and global; not session-granular.
+- **Availability:** risk of mass sign-out and outage during rotation.
+- **Unresolved questions:** rotation cadence, JWKS propagation, and whether
+  session-granular revocation is needed at all.
+
+### 10. Option comparison
+
+The options differ primarily on: (1) **granularity** of invalidation (none /
+token-family / account / all-issued-tokens), (2) **whether the access path
+consults revocation state**, (3) **the residual window** (fixed, shorter, or
+near-zero), and (4) **the availability/consistency/failure profile** added to
+the request path.
+
+| Dimension | A (retain) | B (shorter lifetime) | C (shared state) | D (epoch/version) | E (per-request check) | F (key rotation) |
+|-----------|-----------|----------------------|------------------|-------------------|-----------------------|------------------|
+| Access path consults revocation state | No | No | Yes (shared store) | Yes (shared store) | Yes (authoritative) | No (key-level) |
+| Session-granular invalidation | No | No | Yes | Family/account | Yes | No |
+| Residual window | 15 min | < 15 min | Near-immediate or immediate (propagation-dependent) | Near-immediate (propagation-dependent) | Immediate | Zero at rotation boundary |
+| New runtime dependency | None | None | Yes | Yes | Yes (major) | None (but rekey) |
+| Change surface | None | Small | Every service's validation path | Every service's validation path + claims | Every service's validation path | Signing/JWKS + re-auth everywhere |
+| Failure question | n/a | n/a | Fail-open/closed | Fail-open/closed | Fail-open/closed | n/a |
+
+This table is descriptive, not evaluative. It assigns no scores, no ranking,
+no winner, and no recommendation. The trade-offs — especially the residual
+window vs. the new dependency and the failure policy — are decisions for the
+project owner.
+
+### 11. Failure and availability policy
+
+Any mechanism that introduces a revocation check on the access path (options
+C, D, E) must define behavior when the revocation state is unavailable (store
+down, cache miss, timeout):
+
+- **Fail-open:** requests proceed when revocation state cannot be checked.
+  Preserves availability of the access path but allows rejected sessions'
+  tokens to act during the outage — the security-relevant failure.
+- **Fail-closed:** requests are rejected when revocation state cannot be
+  checked. Preserves revocation guarantees but turns a store/cache outage into
+  a service-wide denial, and conflicts with the validated-token-is-good
+  baseline of the current model.
+
+Choosing fail-open or fail-closed is a **decision requiring explicit approval**
+because each trades a different incident class. Neither mode is proposed as a
+default for production.
+
+### 12. Gateway and service-boundary implications
+
+- The API Gateway (ADR-035) is a transparent forwarder: it does not validate
+  JWT signatures or claims, does not introspect tokens, does not call Identity
+  session endpoints, and does not make allow/deny decisions. Any option that
+  requires centralized enforcement (C, D, E) must either change the Gateway's
+  role (a new decision amending ADR-035) or be enforced at each service's own
+  validation boundary. This ADR makes no Gateway change.
+- Identity remains the authentication authority and the sole owner of session
+  and revocation state (ADR-018). Access tokens are validated by every service;
+  revocation state, if any, must be produced from Identity's authoritative
+  model without other services reaching into Identity's database.
+- If revocation state is introduced, each service's validation path gains a
+  dependency; this is a cross-service change with lifecycle, config, and
+  fail-open/fail-closed considerations for each service.
+
+### 13. Client compatibility
+
+- Under the **retain** option there is no client change. Clients already
+  observe the current behavior: expired access tokens yield `401`, the client
+  attempts refresh, a revoked session's refresh is rejected, and the client
+  returns to the centralized sign-in path.
+- Options B/C/D/E change when and how `401` and re-authentication occur for
+  revoked sessions. Clients (Flutter member portal) may react either by trying
+  a refresh (which will still fail, because refresh revocation is immediate —
+  see Section 4 for the defined terms)
+  or by forcing sign-out when the store/cache indicates revocation.
+- Nothing in this ADR changes the Flutter client or its APIs.
+
+### 14. Operational and observability requirements
+
+Any approved change must remain measurable and auditable:
+
+- Revocation and any access-token rejection events must be observable
+  (existing security-event and logging conventions) without exposing token
+  material, family ids, or `sid` values.
+- Propagation state (for near-immediate access revocation) must be monitorable:
+  freshness, eviction, and divergence from Identity's authoritative rows.
+- The Identity outbox/audit conventions (ADR-015, ADR-027) define how
+  revocation-relevant facts are published; a new mechanism must fit those
+  conventions, not bypass them.
+
+### 15. Rollout considerations
+
+Introduce any new mechanism behind a feature flag and use an explicitly
+approved rollout policy. A temporary fail-open mode may be considered for
+controlled observability or compatibility testing, but it must not be enabled
+in production without an explicit risk decision.
+
+The fail-open/fail-closed distinction from Section 11 carries into rollout:
+an unapproved fail-open run in production is a security-relevant configuration,
+not a benign experiment. Rollout, flags, enabling, and disabling are all
+owners' decisions.
+
+### 16. Consequences
+
+- If the current model is retained, the residual 15-minute access-token
+  window continues to apply for revoked sessions.
+- If the access path is made revocation-aware, services gain a dependency and
+  an owner-approved fail-open/fail-closed policy; the change surface is every
+  service's validation path and any central store.
+- If signing-key rotation is used, mass re-authentication is the expected
+  effect.
+- Regardless of the outcome, session-list semantics and expired/revoked-row
+  cleanup remain separate concerns and are not changed by this ADR.
+
+### 17. Open questions requiring project-owner approval
+
+1. Is the residual access-token validity window (up to 15 minutes for
+   already-issued tokens of a revoked session) acceptable?
+2. Are account-wide security events (password change, password reset, MFA
+   removal) adequately served by refresh-only invalidation, or must already-issued
+   access tokens be invalidated too?
+3. Should any revocation mechanism be session/family-granular, account-granular,
+   or both?
+4. If shared access-revocation state is desired: which store, where, and with
+   what propagation and eviction policy?
+5. Failure policy: fail-open or fail-closed for the access-path revocation
+   check, and under what outage/incident conditions?
+6. What rollout visibility and feature-flag policy is required before any
+   mechanism can be enabled in production?
+7. Is the Gateway boundary to remain a transparent forwarder (no centralized
+   revocation enforcement), or is a Gateway role change sought?
+
+### 18. Decision record
+
+- **Status:** Proposed
+- **Date:** 2026-09-17
+- **Decision:** Not yet decided. No architectural option has been selected;
+  nothing in this ADR ratifies Redis, token introspection, blacklists, token
+  epochs/versions, shorter lifetimes, or signing-key rotation.
+- **Implementation:** None.
+- **No implementation performed** — no backend, Flutter, infrastructure,
+  migration, package, endpoint, configuration, or test changes were made.
+- **Decision required from the project owner** — the unresolved questions in
+  Section 17, including whether the residual access-token validity window is
+  acceptable, must be answered before any follow-up design or implementation
+  is approved.
