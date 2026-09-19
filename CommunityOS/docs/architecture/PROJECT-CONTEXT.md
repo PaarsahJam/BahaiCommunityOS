@@ -165,8 +165,12 @@ Verified model at commit `349bfbb` (labels as defined at the top):
 - **File:** `docs/architecture/ADR.md` (ADR-036 near end of file).
 - **Title:** **ADR-036 — Session Revocation and Access-Token Validity Model**.
 - **Status:** **Proposed** (not ratified).
-- **Decision:** **Not yet decided** — no architectural option selected, ranked,
-  scored, approved, or ratified.
+- **Decision:** **Two owner policy decisions approved** (ADR-036 §17): residual
+  access-token validity of up to the current 15-minute JWT lifetime is retained
+  for ordinary session revocation, and a separate emergency account-wide
+  invalidation mechanism is required for higher-risk events. ADR-036 §18
+  records the remaining **eight open technical questions**; no architectural
+  option is selected, ranked, scored, or ratified.
 - **Implementation:** **None**.
 
 History:
@@ -204,6 +208,12 @@ the service inventory now includes **Knowledge** (15 services), and the
 validation-handler description was aligned with the verified facts — not all
 services assert a subject claim; only some add an `OnTokenValidated` check.
 
+Owner-policy decisions (2026-09-18): recorded in ADR-036 §17 as Decision 1
+(residual access-token validity for ordinary session revocation) and Decision 2
+(separate emergency account-wide invalidation for higher-risk events). ADR-036
+§18 holds the eight open **technical** questions. ADR-036 remains **Proposed**:
+policy is approved; the implementation is not decided.
+
 ## 7. Architectural options under consideration
 
 Presented for project-owner review — **not recommended or ranked**:
@@ -229,31 +239,49 @@ These remain **alternatives** until the project owner decides.
   accepted after the authoritative revocation decision, subject to stated
   propagation and failure guarantees ("immediate" relative to the authoritative
   decision record).
+- **Emergency account-wide invalidation:** account-wide invalidation of
+  already-issued access tokens for designated higher-risk security events
+  (ADR-036 §17). Conceptually distinct from ordinary session revocation; it must
+  provide a stronger guarantee than ordinary refresh-token revocation. Its exact
+  propagation, availability, and failure semantics are not yet designed.
 
 A design that provides one does not automatically provide another.
 
-## 9. Remaining project-owner decisions
+## 9. Owner decisions — approved policy and open technical questions
 
-These are **project-owner architectural decisions**; the AI agent must not decide
-them unilaterally:
+**Approved policy (ADR-036 §17):**
 
-1. Is the residual access-token validity window (up to 15 minutes for already-issued
-   tokens of a revoked session) acceptable?
-2. How deep should account-wide security events (password change/reset, MFA removal)
-   invalidate sessions — refresh-only, or also already-issued access tokens?
-3. What revocation granularity is required — session/family-granular,
-   account-granular, or both?
-4. What shared store/propagation mechanism, if any, should be used?
-5. What should happen when revocation state is unavailable — **fail-open or
-   fail-closed** (and under what outage/incident conditions)?
-6. What rollout/feature-flag policy is acceptable before any mechanism is enabled
-   in production?
-7. Should the API Gateway role change (centralized revocation enforcement, amending
-   ADR-035), or should enforcement remain at each service's validation boundary?
+- **Decision 1 — Ordinary session revocation.** Refresh-token-family revocation
+  remains immediate; already-issued JWT access tokens are **not** immediately
+  invalidated and may remain usable until natural expiration (maximum current
+  lifetime 15 minutes). Applies to revoke-one-session, revoke-all-other-
+  sessions, sign-out-another-device, remove-a-remembered-device. This is **not**
+  immediate access-token revocation.
+- **Decision 2 — Emergency account-wide invalidation.** A separate, stronger
+  mechanism is required for higher-risk events (account disablement, confirmed
+  or suspected compromise, administrator emergency action, password-recovery
+  events, other designated incidents). It is conceptually distinct from ordinary
+  session revocation and must provide a stronger guarantee than ordinary
+  refresh-token revocation. The implementation technology and whether
+  invalidation must be literally instantaneous are **not** defined.
 
-## 10. Prohibited work before architectural approval
+**Open technical questions (ADR-036 §18)** — these are **project-owner
+decisions**; the AI agent must not decide them unilaterally:
 
-Until ADR-036 is approved, do **not**:
+1. Exact emergency-invalidation mechanism.
+2. Revocation-state store, if any.
+3. Propagation model and consistency guarantees.
+4. Fail-open versus fail-closed when revocation state is unavailable.
+5. Required emergency-invalidation latency.
+6. Scope and granularity of emergency invalidation (and mapping of existing
+   account-wide events such as password change/reset and MFA removal).
+7. Gateway versus downstream-service responsibilities for enforcement.
+8. Rollout and feature-flag strategy.
+
+## 10. Prohibited work before implementation approval
+
+Until ADR-036's technical implementation is approved by the project owner, do
+**not**:
 
 - Implement Redis revocation.
 - Implement token introspection.
@@ -268,9 +296,12 @@ Until ADR-036 is approved, do **not**:
 ## 11. Recommended continuation plan
 
 1. Preserve project context in `PROJECT-CONTEXT.md` (this document).
-2. Treat ADR-036 as the current decision document (Proposed, not yet decided).
-3. Obtain project-owner decisions on the Section 9 questions.
-4. Create a detailed implementation plan **only after** an approach is approved.
+2. Treat ADR-036 as the current decision document (**Proposed**; policy decisions
+   approved, technical implementation not decided).
+3. Obtain project-owner decisions on the open technical questions (Section 9 /
+   ADR-036 §18).
+4. Create a detailed implementation plan **only after** the technical approach
+   is approved.
 5. Implement the approved design in small, auditable stages with tests.
 6. Validate backend, service-level security behavior, Flutter compatibility, and
    failure modes.

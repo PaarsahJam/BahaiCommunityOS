@@ -4484,9 +4484,14 @@ configuration, or runtime behavior are created here.
 
 **Date:** 2026-09-17
 
-**Decision:** Not yet decided — this ADR records the current model, clarifies
-terminology, and presents alternatives for project-owner review. No option is
-selected here.
+**Decision:** Two owner policy decisions are approved (Section 17): ordinary
+session revocation retains residual access-token validity up to the current
+15-minute JWT lifetime, and a separate emergency account-wide invalidation
+mechanism is required with a guarantee stronger than ordinary refresh-token
+revocation. The technical implementation of that mechanism remains undecided;
+no architectural option is selected here (Section 9). This ADR records the
+current model, clarifies terminology, and presents alternatives for
+project-owner review.
 
 **Implementation:** None. This ADR performs no implementation and introduces no
 mechanism.
@@ -4602,8 +4607,14 @@ This ADR uses the following terms consistently:
   stated propagation and failure guarantees. "Immediate" here is relative to
   the authoritative decision record; the practical latency still depends on
   how and where the decision is consulted.
+- **Emergency account-wide invalidation:** account-wide invalidation of
+  already-issued access tokens for designated higher-risk security events
+  (Section 17). It is conceptually distinct from ordinary session revocation
+  and must provide a stronger invalidation guarantee than ordinary
+  refresh-token revocation; its exact propagation, availability, and failure
+  semantics are not yet designed.
 
-These three terms describe distinct claims. They are not interchangeable, and
+These terms describe distinct claims. They are not interchangeable, and
 a design that provides one does not automatically provide another.
 
 ### 5. Problem statement
@@ -4918,35 +4929,91 @@ owners' decisions.
 - Regardless of the outcome, session-list semantics and expired/revoked-row
   cleanup remain separate concerns and are not changed by this ADR.
 
-### 17. Open questions requiring project-owner approval
+### 17. Owner Decisions — Approved Policy
 
-1. Is the residual access-token validity window (up to 15 minutes for
-   already-issued tokens of a revoked session) acceptable?
-2. Are account-wide security events (password change, password reset, MFA
-   removal) adequately served by refresh-only invalidation, or must already-issued
-   access tokens be invalidated too?
-3. Should any revocation mechanism be session/family-granular, account-granular,
-   or both?
-4. If shared access-revocation state is desired: which store, where, and with
-   what propagation and eviction policy?
-5. Failure policy: fail-open or fail-closed for the access-path revocation
-   check, and under what outage/incident conditions?
-6. What rollout visibility and feature-flag policy is required before any
-   mechanism can be enabled in production?
-7. Is the Gateway boundary to remain a transparent forwarder (no centralized
-   revocation enforcement), or is a Gateway role change sought?
+The project owner has approved two policy decisions. They settle *policy*; the
+technical implementation remains under design and is not selected here.
 
-### 18. Decision record
+**Decision 1 — Residual access-token validity (ordinary session revocation).**
+
+For ordinary session-revocation operations, CommunityOS retains the current
+self-contained JWT access-token model:
+
+- Revoking a session or a refresh-token family must **immediately prevent
+  further use of that refresh-token family** (immediate refresh revocation,
+  Section 4).
+- It must **not** immediately invalidate already-issued access tokens.
+- An already-issued access token from a revoked session may remain usable
+  until its natural expiration, with a maximum lifetime of the current
+  15 minutes. This is the **residual access-token validity** window.
+- This is **not** described as immediate access-token revocation.
+
+This policy applies to ordinary operations, including:
+
+- Revoke one session
+- Revoke all other sessions
+- Sign out another device
+- Remove a remembered device
+
+**Decision 2 — Separate emergency account-wide invalidation.**
+
+CommunityOS should support a **separate, stronger security mechanism** for
+account-wide access-token invalidation, intended for higher-risk events such
+as:
+
+- Account disablement
+- Confirmed or suspected account compromise
+- Administrator emergency action
+- Password-recovery security events
+- Other explicitly designated security incidents
+
+This emergency mechanism is **conceptually distinct** from ordinary session
+revocation (Sections 5-6): it targets already-issued access tokens account-wide
+and must provide a **stronger invalidation guarantee** than ordinary
+refresh-token revocation.
+
+This decision does **not** select an implementation technology. Redis,
+database introspection, token epochs/versions, or any other mechanism remain
+**alternatives only** (Section 9); none is chosen, ranked, or ratified here.
+The decision also does not define whether invalidation must be literally
+instantaneous; the mechanism's propagation and failure semantics require
+technical design (Section 18).
+
+### 18. Open technical questions
+
+The policy questions above are approved. The following **technical** questions
+for the emergency invalidation mechanism remain **explicitly unresolved**:
+
+1. Exact emergency-invalidation mechanism — no technology is selected.
+2. Revocation-state store, if any.
+3. Propagation model and consistency guarantees.
+4. Fail-open versus fail-closed behavior when revocation state is unavailable.
+5. Required emergency-invalidation latency (whether "immediate" is required).
+6. Scope and granularity of emergency invalidation — account-wide only, or
+   per-family options as well; whether existing account-wide events (password
+   change, password reset, MFA removal) are mapped to the emergency mechanism.
+7. Gateway versus downstream-service responsibilities for enforcement.
+8. Rollout and feature-flag strategy.
+
+These questions must be answered before any follow-up design or implementation
+is approved. They are decisions for the project owner, not for an AI agent.
+
+### 19. Decision record
 
 - **Status:** Proposed
 - **Date:** 2026-09-17
-- **Decision:** Not yet decided. No architectural option has been selected;
-  nothing in this ADR ratifies Redis, token introspection, blacklists, token
-  epochs/versions, shorter lifetimes, or signing-key rotation.
+- **Owner policy decisions approved:** 2026-09-18
+- **Decision:** Two owner policy decisions are approved (Section 17):
+  (1) ordinary session revocation retains residual access-token validity up to
+  the current 15-minute JWT lifetime; (2) a separate emergency account-wide
+  invalidation mechanism is required with a guarantee stronger than ordinary
+  refresh-token revocation. The emergency mechanism's implementation is
+  **not** decided. No architectural option has been selected; nothing in this
+  ADR ratifies Redis, token introspection, blacklists, token epochs/versions,
+  shorter lifetimes, or signing-key rotation.
 - **Implementation:** None.
 - **No implementation performed** — no backend, Flutter, infrastructure,
   migration, package, endpoint, configuration, or test changes were made.
-- **Decision required from the project owner** — the unresolved questions in
-  Section 17, including whether the residual access-token validity window is
-  acceptable, must be answered before any follow-up design or implementation
-  is approved.
+- **Technical decisions required from the project owner** — the open technical
+  questions in Section 18 must be answered before any follow-up design or
+  implementation is approved.
