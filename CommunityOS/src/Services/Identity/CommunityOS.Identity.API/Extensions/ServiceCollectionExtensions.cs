@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using CommunityOS.EventBus;
+using CommunityOS.Identity.API.Security;
 using CommunityOS.Identity.Application;
 using CommunityOS.Identity.Infrastructure;
 using CommunityOS.Identity.Infrastructure.Persistence;
@@ -72,6 +73,11 @@ internal sealed class ConfigureJwtBearerOptions(
             ValidIssuer              = config["Jwt:Issuer"] ?? "CommunityOS.Identity",
             ValidAudience            = config["Jwt:Audience"] ?? "CommunityOS",
             IssuerSigningKey         = signingKeyProvider.SecurityKey
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = AccessTokenEpochValidationEvents.OnTokenValidatedAsync
         };
     }
 

@@ -34,9 +34,14 @@ public sealed class SessionIssuanceTests
         var tokenService = Substitute.For<ITokenService>();
         tokenService.GenerateRefreshToken().Returns("refresh-token-1");
         var issuedFamily = Guid.Empty;
-        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>())
+        var issuedEpoch = long.MinValue;
+        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<long>())
             .Returns("access-token-1")
-            .AndDoes(call => issuedFamily = call.ArgAt<Guid>(1));
+            .AndDoes(call =>
+            {
+                issuedFamily = call.ArgAt<Guid>(1);
+                issuedEpoch = call.ArgAt<long>(3);
+            });
 
         var sessions = Substitute.For<ISessionRepository>();
         Session? added = null;
@@ -60,8 +65,12 @@ public sealed class SessionIssuanceTests
 
         result.Tokens.Should().NotBeNull();
         added.Should().NotBeNull();
-        issuedFamily.Should().Be(added!.TokenFamilyId);
+        added!.SessionRevocationEpochAtIssue.Should().Be(account.SessionRevocationEpoch,
+            "a newly issued refresh family binds to the account epoch observed at issuance");
+        issuedFamily.Should().Be(added.TokenFamilyId);
         issuedFamily.Should().NotBe(Guid.Empty);
+        issuedEpoch.Should().Be(account.SessionRevocationEpoch,
+            "a newly issued access token must carry the account's current epoch");
     }
 
     [Fact]
@@ -69,13 +78,17 @@ public sealed class SessionIssuanceTests
     {
         var account = UserAccount.Register(Email.Create("ada@example.org"), "password-hash");
         account.Verify();
+        account.AdvanceSessionRevocationEpochOnce();
         var device = account.RegisterDevice("Phone", "Android", null);
         var session = Session.Create(
-            account.Id, device.Id, TokenHasher.Hash("refresh-token-original"), TimeSpan.FromDays(30));
+            account.Id, device.Id, TokenHasher.Hash("refresh-token-original"), TimeSpan.FromDays(30),
+            sessionRevocationEpochAtIssue: account.SessionRevocationEpoch);
 
         var sessions = Substitute.For<ISessionRepository>();
         sessions.GetByRefreshTokenHashAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(session);
+        sessions.ReloadAsync(Arg.Any<Session>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
         sessions.UpdateAsync(Arg.Any<Session>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
         Session? rotated = null;
@@ -84,14 +97,26 @@ public sealed class SessionIssuanceTests
             .AndDoes(call => rotated = call.Arg<Session>());
 
         var userAccounts = Substitute.For<IUserAccountRepository>();
-        userAccounts.GetByIdAsync(session.UserAccountId, Arg.Any<CancellationToken>()).Returns(account);
+        // The decision must use the account obtained under the row lock; the
+        // plain pre-lock loader must never be consulted during a refresh.
+        userAccounts.GetByIdForUpdateAsync(session.UserAccountId, Arg.Any<CancellationToken>())
+            .Returns(account);
+
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.BeginTransactionAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        unitOfWork.CommitAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
 
         var tokenService = Substitute.For<ITokenService>();
         tokenService.GenerateRefreshToken().Returns("refresh-token-rotated");
         var issuedFamily = Guid.Empty;
-        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>())
+        var issuedEpoch = long.MinValue;
+        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<long>())
             .Returns("access-token-1")
-            .AndDoes(call => issuedFamily = call.ArgAt<Guid>(1));
+            .AndDoes(call =>
+            {
+                issuedFamily = call.ArgAt<Guid>(1);
+                issuedEpoch = call.ArgAt<long>(3);
+            });
 
         var securityEvents = Substitute.For<ISecurityEventRepository>();
         securityEvents.AddAsync(Arg.Any<SecurityEvent>(), Arg.Any<CancellationToken>())
@@ -99,14 +124,34 @@ public sealed class SessionIssuanceTests
         var logger = NullLogger<RefreshSessionCommandHandler>.Instance;
 
         var handler = new RefreshSessionCommandHandler(
-            sessions, userAccounts, tokenService, securityEvents, logger);
+            sessions, userAccounts, tokenService, securityEvents, unitOfWork, logger);
 
         await handler.Handle(
             new RefreshSessionCommand("refresh-token-original"), CancellationToken.None);
 
         rotated.Should().NotBeNull();
         rotated!.TokenFamilyId.Should().Be(session.TokenFamilyId);
+        rotated.SessionRevocationEpochAtIssue.Should().Be(account.SessionRevocationEpoch,
+            "the rotated session binds to the epoch read under the account lock");
         issuedFamily.Should().Be(session.TokenFamilyId);
+        issuedEpoch.Should().Be(account.SessionRevocationEpoch,
+            "a refreshed access token must carry the account's current epoch");
+
+        // The refresh performed its decision inside one explicit transaction:
+        // it began before the account lock, committed exactly once, and the
+        // rotation rows were flushed before that single commit.
+        Received.InOrder(() =>
+        {
+            unitOfWork.BeginTransactionAsync(Arg.Any<CancellationToken>());
+            userAccounts.GetByIdForUpdateAsync(session.UserAccountId, Arg.Any<CancellationToken>());
+            sessions.ReloadAsync(session, Arg.Any<CancellationToken>());
+            sessions.UpdateAsync(session, Arg.Any<CancellationToken>());
+            sessions.AddAsync(rotated!, Arg.Any<CancellationToken>());
+            unitOfWork.CommitAsync(Arg.Any<CancellationToken>());
+        });
+
+        await userAccounts.DidNotReceive().GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await unitOfWork.DidNotReceive().RollbackAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -151,9 +196,14 @@ public sealed class SessionIssuanceTests
         tokenService.GenerateIdToken(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<bool>(),
             Arg.Any<string>(), Arg.Any<string?>()).Returns("id-token-1");
         var issuedFamily = Guid.Empty;
-        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>())
+        var issuedEpoch = long.MinValue;
+        tokenService.GenerateAccessToken(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<long>())
             .Returns("access-token-1")
-            .AndDoes(call => issuedFamily = call.ArgAt<Guid>(1));
+            .AndDoes(call =>
+            {
+                issuedFamily = call.ArgAt<Guid>(1);
+                issuedEpoch = call.ArgAt<long>(3);
+            });
 
         var mediator = Substitute.For<MediatR.IMediator>();
 
@@ -166,8 +216,12 @@ public sealed class SessionIssuanceTests
             CancellationToken.None);
 
         added.Should().NotBeNull();
-        issuedFamily.Should().Be(added!.TokenFamilyId);
+        added!.SessionRevocationEpochAtIssue.Should().Be(account.SessionRevocationEpoch,
+            "an OAuth-issued refresh family binds to the account epoch observed at issuance");
+        issuedFamily.Should().Be(added.TokenFamilyId);
         issuedFamily.Should().NotBe(Guid.Empty);
+        issuedEpoch.Should().Be(account.SessionRevocationEpoch,
+            "an OAuth-issued access token must carry the account's current epoch");
         result.AccessToken.Should().Be("access-token-1");
         result.RefreshToken.Should().Be("refresh-token-1");
     }

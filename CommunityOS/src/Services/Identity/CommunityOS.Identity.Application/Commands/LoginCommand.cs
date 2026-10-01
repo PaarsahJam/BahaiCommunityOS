@@ -66,11 +66,12 @@ internal sealed class LoginCommandHandler(
 
         var refreshToken = tokenService.GenerateRefreshToken();
         var session = Session.Create(
-            account.Id, device.Id, TokenHasher.Hash(refreshToken), RefreshTokenLifetime);
+            account.Id, device.Id, TokenHasher.Hash(refreshToken), RefreshTokenLifetime,
+            sessionRevocationEpochAtIssue: account.SessionRevocationEpoch);
         await sessions.AddAsync(session, ct);
 
         var accessToken = tokenService.GenerateAccessToken(
-            account.Id, session.TokenFamilyId, account.Email.Value);
+            account.Id, session.TokenFamilyId, account.Email.Value, account.SessionRevocationEpoch);
         return new TokenDto(accessToken, refreshToken, DateTime.UtcNow.AddMinutes(15));
     }
 }

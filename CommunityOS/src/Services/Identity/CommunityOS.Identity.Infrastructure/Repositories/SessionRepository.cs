@@ -24,6 +24,9 @@ public sealed class SessionRepository(IdentityDbContext db) : ISessionRepository
             .Where(x => x.TokenFamilyId == tokenFamilyId)
             .ToListAsync(ct);
 
+    public async Task ReloadAsync(Session session, CancellationToken ct = default) =>
+        await db.Entry(session).ReloadAsync(ct);
+
     public async Task AddAsync(Session session, CancellationToken ct = default)
     {
         await db.Sessions.AddAsync(session, ct);
@@ -39,7 +42,7 @@ public sealed class SessionRepository(IdentityDbContext db) : ISessionRepository
     public async Task RevokeAllForUserAsync(Guid userAccountId, string reason, CancellationToken ct = default)
     {
         var active = await db.Sessions
-            .Where(x => x.UserAccountId == userAccountId && !x.IsRevoked)
+            .Where(x => x.UserAccountId == userAccountId && x.RevokedOn == null)
             .ToListAsync(ct);
 
         foreach (var session in active)
@@ -54,7 +57,7 @@ public sealed class SessionRepository(IdentityDbContext db) : ISessionRepository
     {
         var active = await db.Sessions
             .Where(x => x.UserAccountId == userAccountId
-                && !x.IsRevoked
+                && x.RevokedOn == null
                 && x.TokenFamilyId != tokenFamilyId)
             .ToListAsync(ct);
 

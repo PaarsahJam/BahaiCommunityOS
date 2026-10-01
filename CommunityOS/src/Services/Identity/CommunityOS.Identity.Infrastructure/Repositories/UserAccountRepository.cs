@@ -11,6 +11,11 @@ public sealed class UserAccountRepository(IdentityDbContext db) : IUserAccountRe
     public async Task<UserAccount?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         await db.UserAccounts.FirstOrDefaultAsync(x => x.Id == id, ct);
 
+    public async Task<UserAccount?> GetByIdForUpdateAsync(Guid id, CancellationToken ct = default) =>
+        await db.UserAccounts.FromSqlInterpolated(
+                $"""SELECT u.* FROM identity.user_accounts AS u WHERE u."Id" = {id} FOR UPDATE""")
+            .SingleOrDefaultAsync(ct);
+
     public async Task<UserAccount?> GetByEmailAsync(Email email, CancellationToken ct = default) =>
         await db.UserAccounts.FirstOrDefaultAsync(x => x.Email == email, ct);
 

@@ -64,6 +64,14 @@ public sealed class IdentityIntegrationEventPublisher<TDomainEvent>(
                 await publishEndpoint.Publish(
                     new DeviceRegistered(e.UserAccountId, e.DeviceId, e.Name, e.OccurredOn), cancellationToken);
                 break;
+            case SessionRevocationEpochAdvancedEvent e:
+                // ADR-036 Q4: published inside the emergency-invalidation
+                // transaction so the MassTransit bus outbox captures it
+                // atomically with the epoch advance (one commit, at least-once
+                // delivery to consumers).
+                await publishEndpoint.Publish(
+                    new SessionRevocationEpochAdvanced(e.UserAccountId, e.Epoch, e.OccurredOn), cancellationToken);
+                break;
             case RefreshTokenIssuedEvent e:
                 await publishEndpoint.Publish(
                     new RefreshTokenIssued(e.UserAccountId, e.SessionId, e.OccurredOn), cancellationToken);

@@ -64,3 +64,13 @@ public sealed record DeviceRegistered(Guid UserAccountId, Guid DeviceId, string 
 /// Raised when a refresh token session is issued.
 /// </summary>
 public sealed record RefreshTokenIssued(Guid UserAccountId, Guid SessionId, DateTime OccurredOn);
+
+/// <summary>
+/// Raised after an emergency session invalidation advances the account's
+/// session-revocation epoch by exactly one. Carries the affected account and
+/// the resulting epoch so downstream services can invalidate account-scoped,
+/// epoch-bound state. Delivery is at least once (ADR-036 Q4): consumers must be
+/// idempotent and monotonic, never reducing a locally known epoch, and
+/// harmless for stale or duplicate deliveries.
+/// </summary>
+public sealed record SessionRevocationEpochAdvanced(Guid UserAccountId, long SessionRevocationEpoch, DateTime OccurredOn);

@@ -27,6 +27,16 @@ public sealed class UserAccount : AggregateRoot<Guid>
     public Email Email { get; private set; }
     public AccountStatus Status { get; private set; }
     public DateTime CreatedOn { get; private set; }
+
+    /// <summary>
+    /// <para>ADR-036 D1: session-revocation epoch for this account. Starts at 0
+    /// (set in every constructor) and only ever increments by exactly one via
+    /// <see cref="AdvanceSessionRevocationEpochOnce"/>. The value is monotonic —
+    /// never decremented, never reset. A session-artifact is revoked when this
+    /// stored (and later embedded) epoch is greater than the one the artifact
+    /// carries.</para>
+    /// </summary>
+    public long SessionRevocationEpoch { get; private set; }
     public DateTime? VerifiedOn { get; private set; }
     public DateTime? DeactivatedOn { get; private set; }
     public DateTime? LastLoginOn { get; private set; }
@@ -42,6 +52,7 @@ public sealed class UserAccount : AggregateRoot<Guid>
     {
         Email = email;
         Status = AccountStatus.PendingVerification;
+        SessionRevocationEpoch = 0;
         CreatedOn = DateTime.UtcNow;
     }
 
@@ -189,5 +200,22 @@ public sealed class UserAccount : AggregateRoot<Guid>
     {
         LastLoginOn = DateTime.UtcNow;
         ResetFailedLogins();
+    }
+
+    /// <summary>
+    /// <para>ADR-036 D1: advances the session-revocation epoch by exactly one.
+    /// This is the only domain seam that mutates the epoch; it never decrements
+    /// and never resets. Call exactly once per emergency/sign-out-everywhere
+    /// (ADR-036 D-D3). When raised, the domain event is the minimal seam future
+    /// Q4 consumes; it carries no transport concerns.</para>
+    /// </summary>
+    public void AdvanceSessionRevocationEpochOnce()
+    {
+        if (SessionRevocationEpoch == long.MaxValue)
+            throw new InvalidOperationException(
+                "Session revocation epoch exhausted; the account can no longer be invalidated.");
+
+        SessionRevocationEpoch++;
+        RaiseDomainEvent(new SessionRevocationEpochAdvancedEvent(Id, SessionRevocationEpoch));
     }
 }

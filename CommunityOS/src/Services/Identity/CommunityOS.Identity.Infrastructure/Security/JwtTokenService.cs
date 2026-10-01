@@ -1,6 +1,7 @@
 using CommunityOS.Identity.Application.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -19,7 +20,8 @@ public sealed class JwtTokenService(
 {
     private static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
 
-    public string GenerateAccessToken(Guid userAccountId, Guid tokenFamilyId, string email)
+    public string GenerateAccessToken(
+        Guid userAccountId, Guid tokenFamilyId, string email, long sessionRevocationEpoch)
     {
         var audience = configuration["Jwt:Audience"] ?? "CommunityOS";
         var claims = new[]
@@ -27,7 +29,8 @@ public sealed class JwtTokenService(
             new Claim(JwtRegisteredClaimNames.Sub, userAccountId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-            new Claim(JwtRegisteredClaimNames.Sid, tokenFamilyId.ToString())
+            new Claim(JwtRegisteredClaimNames.Sid, tokenFamilyId.ToString()),
+            new Claim(SessionRevocationEpochValidator.ClaimType, sessionRevocationEpoch.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64)
         };
 
         return WriteSignedToken(claims, audience, AccessTokenLifetime);

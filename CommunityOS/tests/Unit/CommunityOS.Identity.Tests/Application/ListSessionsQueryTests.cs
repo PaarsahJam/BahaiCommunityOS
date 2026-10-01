@@ -161,7 +161,7 @@ public sealed class ListSessionsQueryTests
         var original = Session.Create(account.Id, device.Id, "hash-1", TimeSpan.FromHours(1));
         // A rotated row shares the same logical family; the superseded row is
         // still returned and, being family-scoped, is equally current.
-        var rotated = original.Rotate("hash-2", TimeSpan.FromHours(1));
+        var rotated = original.Rotate("hash-2", TimeSpan.FromHours(1), sessionRevocationEpochAtIssue: 0);
 
         var handler = Handler(account, [original, rotated]);
 

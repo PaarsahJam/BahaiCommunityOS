@@ -37,6 +37,10 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
         builder.Property(x => x.LastLoginOn).HasColumnName("last_login_on");
         builder.Property(x => x.FailedLoginAttempts).HasColumnName("failed_login_attempts").IsRequired();
         builder.Property(x => x.LockedUntil).HasColumnName("locked_until");
+        builder.Property(x => x.SessionRevocationEpoch)
+            .HasColumnName("session_revocation_epoch")
+            .IsRequired()
+            .HasDefaultValue(0L);
 
         builder.OwnsMany<Credential>(
             x => x.Credentials,

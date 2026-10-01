@@ -23,6 +23,10 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(x => x.RevokedOn).HasColumnName("revoked_on");
         builder.Property(x => x.RevocationReason).HasColumnName("revocation_reason").HasMaxLength(200);
         builder.Property(x => x.RefreshTokenUsed).HasColumnName("refresh_token_used").IsRequired();
+        builder.Property(x => x.SessionRevocationEpochAtIssue)
+            .HasColumnName("session_revocation_epoch_at_issue")
+            .IsRequired()
+            .HasDefaultValue(0L);
 
         builder.HasIndex(x => x.RefreshTokenHash).IsUnique();
         builder.HasIndex(x => x.TokenFamilyId);

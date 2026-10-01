@@ -30,6 +30,11 @@ public static class IdentityInfrastructureServiceExtensions
         services.AddScoped<IOAuthClientRepository, OAuthClientRepository>();
         services.AddScoped<IAuthorizationCodeRepository, AuthorizationCodeRepository>();
 
+        // ADR-036 D3: explicit-transaction seam shared by refresh rotation and
+        // emergency invalidation so the account-row lock and persistence commit
+        // atomically as one unit.
+        services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();
+
         // Security services
         services.AddSingleton<RsaSigningKeyProvider>();
         services.AddSingleton<ISigningKeyProvider>(sp => sp.GetRequiredService<RsaSigningKeyProvider>());

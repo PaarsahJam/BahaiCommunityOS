@@ -12,6 +12,10 @@ public sealed record UserAccountUnlockedEvent(Guid UserAccountId) : DomainEvent;
 
 public sealed record UserAccountDeactivatedEvent(Guid UserAccountId) : DomainEvent;
 
+/// <summary>ADR-036 D1 seam: the epoch was advanced by exactly one. Minimal
+/// domain seam for future Q4 propagation; carries no transport/outbox concern.</summary>
+public sealed record SessionRevocationEpochAdvancedEvent(Guid UserAccountId, long Epoch) : DomainEvent;
+
 public sealed record CredentialChangedEvent(Guid UserAccountId) : DomainEvent;
 
 public sealed record ExternalIdentityLinkedEvent(Guid UserAccountId, string Provider, string Subject) : DomainEvent;
