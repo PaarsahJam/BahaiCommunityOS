@@ -4489,7 +4489,10 @@ session revocation retains residual access-token validity up to the current
 15-minute JWT lifetime, and a separate emergency account-wide invalidation
 mechanism is required with a guarantee stronger than ordinary refresh-token
 revocation. The technical implementation of that mechanism remains undecided;
-no architectural option is selected here (Section 9). This ADR records the
+no architectural option is selected here (Section 9). The scoped owner
+technical decisions recorded in Section 19 establish the per-account epoch
+keying and the C1 `UserAccount` persistence/concurrency boundary; they do not
+select the emergency-invalidation mechanism itself. This ADR records the
 current model, clarifies terminology, and presents alternatives for
 project-owner review.
 
@@ -4975,16 +4978,23 @@ refresh-token revocation.
 This decision does **not** select an implementation technology. Redis,
 database introspection, token epochs/versions, or any other mechanism remain
 **alternatives only** (Section 9); none is chosen, ranked, or ratified here.
-The decision also does not define whether invalidation must be literally
-instantaneous; the mechanism's propagation and failure semantics require
-technical design (Section 18).
+The scoped owner decisions in Section 19 narrow this only to the per-account
+epoch keying and the C1 `UserAccount` persistence boundary; they do not select
+an emergency-invalidation technology. The decision also does not define whether
+invalidation must be literally instantaneous; the mechanism's propagation and
+failure semantics require technical design (Section 18).
 
 ### 18. Open technical questions
 
 The policy questions above are approved. The following **technical** questions
-for the emergency invalidation mechanism remain **explicitly unresolved**:
+for the emergency invalidation mechanism remain **explicitly unresolved**;
+question 1 is **partially resolved** and is annotated accordingly:
 
-1. Exact emergency-invalidation mechanism — no technology is selected.
+1. Exact emergency-invalidation mechanism — **partially resolved** (Section 19):
+   the per-account epoch keying and the C1 `UserAccount` persistence boundary
+   are decided. The emergency-invalidation mechanism itself, its state store,
+   and its enforcement model remain open, and no technology is selected for
+   them.
 2. Revocation-state store, if any.
 3. Propagation model and consistency guarantees.
 4. Fail-open versus fail-closed behavior when revocation state is unavailable.
@@ -5008,9 +5018,51 @@ is approved. They are decisions for the project owner, not for an AI agent.
   the current 15-minute JWT lifetime; (2) a separate emergency account-wide
   invalidation mechanism is required with a guarantee stronger than ordinary
   refresh-token revocation. The emergency mechanism's implementation is
-  **not** decided. No architectural option has been selected; nothing in this
-  ADR ratifies Redis, token introspection, blacklists, token epochs/versions,
-  shorter lifetimes, or signing-key rotation.
+  **not** decided. No architectural option has been selected for the
+  emergency-invalidation mechanism; nothing in this ADR ratifies Redis, token
+  introspection, blacklists, token epochs/versions (other than the per-account
+  keying and C1 persistence boundary recorded below), shorter lifetimes, or
+  signing-key rotation.
+- **Owner technical decisions (scoped), 2026-09-30:** The following scoped owner
+  decisions are recorded. They concern the persistence boundary for the
+  per-account revocation epoch only, and are recorded as decisions — not as
+  answers to the open questions in Section 18.
+  - **Per-account keying:** `UserAccount.SessionRevocationEpoch` is the
+    authoritative per-account epoch value.
+  - **C1 persistence invariant:** `session_revocation_epoch` must never decrease
+    across committed writes. A stale whole-row `UserAccount` write from a
+    concurrent non-locking writer must not overwrite a newer committed row, and
+    in particular must not overwrite a newer `SessionRevocationEpoch`.
+  - **Rejection, not clamping:** a stale epoch decrease is **rejected**. It is
+    never clamped, normalized, or silently accepted.
+  - **C1 whole-row concurrency mechanism:** PostgreSQL `xmin`, applied to
+    `UserAccount` **only**. This is not a model-wide convention: it is not
+    applied to `Session`, `OAuthClient`, `AuthorizationCode`, `RecoveryRequest`,
+    `SecurityEvent`, MassTransit Inbox/Outbox entities, owned `UserAccount`
+    credential entities, or unrelated services. `AggregateRoot<TId>` is not
+    modified for this purpose, and no platform-wide concurrency redesign is
+    introduced.
+  - **Distinct conflict, no automatic retry:** a legitimate concurrent operation
+    may fail with a distinct conflict. **No automatic retry is authorized.**
+  - **No migration for the mechanism:** `xmin` is a PostgreSQL system column, so
+    no migration is required solely for this concurrency mechanism. The
+    implementation stage must verify the exact supported per-entity Npgsql
+    configuration surface for the Npgsql 9.0.0 provider rather than assuming a
+    model-wide API can be safely narrowed, and must prove that the resulting
+    SQL/concurrency behavior actually protects the C1 race.
+- **Ratification status:** C1 conformance is a **prerequisite for** ratifying
+  this ADR, not a ratification. This ADR remains **Proposed**. Ratification
+  requires the project owner to answer Section 18 questions 2-8, which remain
+  open; question 1 is partially resolved only as recorded above.
+- **Explicitly not ratified by this record:** the emergency-invalidation
+  mechanism itself, nor its revocation-state store, propagation model, failure
+  semantics, latency requirement, scope granularity, enforcement boundary, or
+  rollout strategy (Section 18, questions 2-8). The refresh-session
+  `Session.SessionRevocationEpochAtIssue` binding remains **provisional**. The
+  existing prototype code, migrations, and tests present in the working tree
+  are evidence and prototype material; they are **not** ratified wholesale by
+  this record, and their migration provenance remains a separate unresolved
+  question.
 - **Implementation:** None.
 - **No implementation performed** — no backend, Flutter, infrastructure,
   migration, package, endpoint, configuration, or test changes were made.

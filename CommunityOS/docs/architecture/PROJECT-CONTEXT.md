@@ -18,8 +18,8 @@ or **[unverified — inspect repo]** as appropriate.
 - **Repository path:** `CommunityOS/` under
   `https://github.com/PaarsahJam/BahaiCommunityOS.git` (remote `origin`).
 - **Current branch:** `master` **[verified this session]**.
-- **Current commit:** `349bfbb` — `feat: revoke all other sessions`
-  **[verified this session]**.
+- **Current commit:** `2d8cb5c` — `docs: record ADR-036 owner decisions and sync
+  project context` **[verified this session]**.
 - **Git status (at time of writing)** **[verified this session]**:
   - `M CommunityOS/docs/architecture/ADR.md` (the six applied ADR-036 wording
     fixes, uncommitted).
@@ -286,7 +286,12 @@ Until ADR-036's technical implementation is approved by the project owner, do
 - Implement Redis revocation.
 - Implement token introspection.
 - Implement access-token blacklists.
-- Implement token epochs/versioning.
+- Implement token epochs/versioning **beyond the scope recorded in ADR-036
+  Section 19**. The per-account epoch keying
+  (`UserAccount.SessionRevocationEpoch`) and the C1 `UserAccount` PostgreSQL
+  `xmin` persistence boundary are the only epoch work the owner has decided;
+  their implementation remains blocked. All other token epoch/versioning
+  implementation stays prohibited.
 - Change JWT validation.
 - Shorten the JWT lifetime solely to resolve this unresolved decision.
 - Change API Gateway authentication responsibilities.
