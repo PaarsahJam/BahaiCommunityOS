@@ -25,7 +25,7 @@ public sealed class LetterConfiguration : IEntityTypeConfiguration<Letter>
             .HasColumnName("status").HasMaxLength(30).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<LetterStatus>(value, ignoreCase: true));
+                value => System.Enum.Parse<LetterStatus>(value, true));
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
 
         builder.Property(x => x.LetterYear).HasColumnName("letter_year");
@@ -90,7 +90,7 @@ public sealed class LetterRecipientConfiguration : IEntityTypeConfiguration<Lett
             .HasColumnName("kind").HasMaxLength(20).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<RecipientKind>(value, ignoreCase: true));
+                value => System.Enum.Parse<RecipientKind>(value, true));
         builder.Property(x => x.PersonId).HasColumnName("person_id");
         builder.Property(x => x.UnitId).HasColumnName("unit_id");
         builder.Property(x => x.DisplayLine).HasColumnName("display_line").HasMaxLength(500);

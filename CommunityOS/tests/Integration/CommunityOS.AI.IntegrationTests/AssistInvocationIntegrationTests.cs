@@ -21,7 +21,7 @@ public class AssistInvocationIntegrationTests
     }
 
     [Fact]
-    public async Task ProviderSeam_ShouldAlwaysReturnDisabledProvider()
+    public void ProviderSeam_ShouldAlwaysReturnDisabledProvider()
     {
         var info = _gateway.GetProviderInfo();
 
@@ -30,7 +30,7 @@ public class AssistInvocationIntegrationTests
     }
 
     [Fact]
-    public async Task ProviderSeam_ShouldAlwaysReturnEmptyCapabilities()
+    public void ProviderSeam_ShouldAlwaysReturnEmptyCapabilities()
     {
         var capabilities = _gateway.ListCapabilities();
 

@@ -145,7 +145,7 @@ public sealed class LocalizationDomainTests
     }
 
     [Fact]
-    public async Task Namespace_creation_rejects_reserved_prefixes()
+    public void Namespace_creation_rejects_reserved_prefixes()
     {
         var act = () => ResourceNamespace.Create("library.ui", null, Actor, Now);
         act.Should().Throw<LocalizationConflictException>();

@@ -18,7 +18,7 @@ public sealed class LocaleConfiguration : IEntityTypeConfiguration<Locale>
             .HasColumnName("status").HasMaxLength(20).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<LocaleStatus>(value, ignoreCase: true));
+                value => System.Enum.Parse<LocaleStatus>(value, true));
         builder.Property(x => x.IsDefault).HasColumnName("is_default").IsRequired();
         builder.Property(x => x.CreatedBy).HasColumnName("created_by").IsRequired();
         builder.Property(x => x.CreatedOn).HasColumnName("created_on").IsRequired();
@@ -93,7 +93,7 @@ public sealed class ResourceRevisionConfiguration : IEntityTypeConfiguration<Res
             .HasColumnName("state").HasMaxLength(20).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<ReviewState>(value, ignoreCase: true));
+                value => System.Enum.Parse<ReviewState>(value, true));
         builder.Property(x => x.Provenance).HasColumnName("provenance").HasMaxLength(100).IsRequired();
         builder.Property(x => x.ProposedBy).HasColumnName("proposed_by").IsRequired();
         builder.Property(x => x.ProposedOn).HasColumnName("proposed_on").IsRequired();
@@ -163,7 +163,7 @@ public sealed class EntityTranslationRevisionConfiguration : IEntityTypeConfigur
             .HasColumnName("state").HasMaxLength(20).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<ReviewState>(value, ignoreCase: true));
+                value => System.Enum.Parse<ReviewState>(value, true));
         builder.Property(x => x.Provenance).HasColumnName("provenance").HasMaxLength(100).IsRequired();
         builder.Property(x => x.ProposedBy).HasColumnName("proposed_by").IsRequired();
         builder.Property(x => x.ProposedOn).HasColumnName("proposed_on").IsRequired();
@@ -199,7 +199,7 @@ public sealed class TranslationSuggestionConfiguration : IEntityTypeConfiguratio
             .HasColumnName("status").HasMaxLength(30).IsRequired()
             .HasConversion(
                 value => value.ToString().ToLowerInvariant(),
-                value => System.Enum.Parse<SuggestionStatus>(value, ignoreCase: true));
+                value => System.Enum.Parse<SuggestionStatus>(value, true));
         builder.Property(x => x.DecidedBy).HasColumnName("decided_by");
         builder.Property(x => x.DecidedOn).HasColumnName("decided_on");
         builder.Property(x => x.CreatedOn).HasColumnName("created_on").IsRequired();

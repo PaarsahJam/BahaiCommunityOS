@@ -246,7 +246,7 @@ public sealed class LocalizationPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Reserved_source_contexts_are_rejected_before_any_storage()
+    public void Reserved_source_contexts_are_rejected_before_any_storage()
     {
         var act = () => EntityTranslation.Create(
             "library", "document", Guid.NewGuid(), "display_name", "en", DateTime.UtcNow);

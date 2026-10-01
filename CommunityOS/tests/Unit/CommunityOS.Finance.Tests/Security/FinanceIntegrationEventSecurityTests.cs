@@ -83,7 +83,7 @@ public class FinanceIntegrationEventSecurityTests
     }
 
     [Fact]
-    public async Task Export_contract_is_limited_to_the_single_recorded_event()
+    public void Export_contract_is_limited_to_the_single_recorded_event()
     {
         // Approve and reject intentionally raise no events; the outbox can
         // therefore export exactly one finance contract in this gate.

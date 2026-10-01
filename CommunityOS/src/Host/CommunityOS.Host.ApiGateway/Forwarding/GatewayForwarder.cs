@@ -121,7 +121,7 @@ public sealed class GatewayForwarder(
         return request;
     }
 
-    private static async Task CopyRequestHeadersAsync(
+    private static Task CopyRequestHeadersAsync(
         HttpRequest source, HttpRequestMessage target,
         DownstreamService service, CancellationToken ct)
     {
@@ -148,5 +148,6 @@ public sealed class GatewayForwarder(
         // Request/correlation propagation (ADR-035): forward the Gateway
         // request/request-ID so downstream services share the trace.
         target.Headers.TryAddWithoutValidation("X-Request-Id", source.HttpContext.TraceIdentifier);
+        return Task.CompletedTask;
     }
 }
