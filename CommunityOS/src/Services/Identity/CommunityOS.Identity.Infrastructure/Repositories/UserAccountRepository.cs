@@ -12,8 +12,12 @@ public sealed class UserAccountRepository(IdentityDbContext db) : IUserAccountRe
         await db.UserAccounts.FirstOrDefaultAsync(x => x.Id == id, ct);
 
     public async Task<UserAccount?> GetByIdForUpdateAsync(Guid id, CancellationToken ct = default) =>
+        // C1 (ADR-036 Section 19, OD-18): the "xmin" system column is listed
+        // explicitly. A bare SELECT * does not return PostgreSQL system columns,
+        // so the rowversion concurrency value would otherwise never be loaded and
+        // the resulting UPDATE predicate could not match.
         await db.UserAccounts.FromSqlInterpolated(
-                $"""SELECT u.* FROM identity.user_accounts AS u WHERE u."Id" = {id} FOR UPDATE""")
+                $"""SELECT u.*, u.xmin FROM identity.user_accounts AS u WHERE u."Id" = {id} FOR UPDATE""")
             .SingleOrDefaultAsync(ct);
 
     public async Task<UserAccount?> GetByEmailAsync(Email email, CancellationToken ct = default) =>

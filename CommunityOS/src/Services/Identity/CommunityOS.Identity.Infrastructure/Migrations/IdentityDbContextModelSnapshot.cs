@@ -290,6 +290,11 @@ namespace CommunityOS.Migrations
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")

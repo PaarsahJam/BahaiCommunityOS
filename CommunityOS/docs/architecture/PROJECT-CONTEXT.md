@@ -18,21 +18,46 @@ or **[unverified — inspect repo]** as appropriate.
 - **Repository path:** `CommunityOS/` under
   `https://github.com/PaarsahJam/BahaiCommunityOS.git` (remote `origin`).
 - **Current branch:** `master` **[verified this session]**.
-- **Current commit:** `2d8cb5c` — `docs: record ADR-036 owner decisions and sync
-  project context` **[verified this session]**.
-- **Git status (at time of writing)** **[verified this session]**:
-  - `M CommunityOS/docs/architecture/ADR.md` (the six applied ADR-036 wording
-    fixes, uncommitted).
-  - `?? CommunityOS/docs/architecture/PROJECT-CONTEXT.md` (this untracked
-    handoff file).
-  - No source code is modified. `bin/`, `obj/`, `artifacts/`, and Flutter/Dart
-    build outputs are git-ignored.
-- **Working-tree change:** the ADR.md modification is **uncommitted** (and
-  therefore unpushed). Nothing related to the current ADR work is committed or
-  pushed **[verified this session: `git status` shows only the two entries above]**.
-- **Push state:** `HEAD == origin/master == 349bfbb` **[verified this session]`,
-  so the last feature commit is already on the remote; only the docs work is
-  ahead of (and not committed to) the repository.
+- **Current commit:** `c49c219` — `feat(identity): add provisional ADR-036
+  epoch/invalidation infrastructure (unratified prototype)` **[verified this
+  session]**.
+- **ADR-036 sequence (3 commits, all unpushed)** **[verified this session]**:
+  - `c739ad6` — `docs(adr-036): record owner-scoped technical decisions and
+    update project context (amendment)`
+  - `c49c219` — `feat(identity): add provisional ADR-036
+    epoch/invalidation infrastructure (unratified prototype)`
+  - C1 — `feat(identity): enforce UserAccount xmin concurrency for session
+    epoch (C1)`, which also carries the final status documentation and
+    `README.md`
+- **ADR-036 status after C1** **[verified this session]**:
+  - The **governance amendment is committed** (`c739ad6`): §17 tail, §18 Q1
+    partial-resolution annotation, and §19 scoped owner technical decisions.
+  - The **provisional prototype is committed** (`c49c219`): per-account
+    `UserAccount.SessionRevocationEpoch`, refresh-session
+    `Session.SessionRevocationEpochAtIssue` binding, account-row `FOR UPDATE`
+    locking for refresh rotation and emergency invalidation, `IUnitOfWork`, the
+    signed `sre` claim and its validation, and two epoch migrations. It is
+    recorded as evidence and prototype material — **provisional and
+    unratified**.
+  - **C1 is implemented and committed:** the `UserAccount` PostgreSQL `xmin`
+    whole-row concurrency boundary selected by OD-18, per ADR-036 §19. Stale
+    whole-row writes are rejected; no clamping and no automatic retry.
+  - ADR-036 remains **Proposed** and unratified. Section 18 questions **Q2–Q8
+    remain open**, question 1 is only partially resolved, and no
+    revocation-state store, propagation model, failure semantics, latency
+    requirement, scope granularity, enforcement boundary, or rollout strategy
+    has been selected. Refresh-session binding, migration provenance, and the
+    other prototype questions remain provisional or unresolved.
+- **Git status after C1** **[verified this session]**: the ADR-036 source, tests,
+  documentation, and `README.md` are committed and clean. Nine unrelated
+  pre-existing working-tree paths remain outside this work and are not part of
+  it: 7 compiler/lint hygiene edits (API Gateway `GatewayForwarder`, Correspondence
+  and Localization entity configurations, and four unrelated test files) plus
+  two agent transcript artifacts (`AI-Agent-latest-response.txt` and its
+  editor backup). `bin/`, `obj/`, `artifacts/`, and Flutter/Dart build outputs
+  are git-ignored.
+- **Push state:** the three ADR-036 commits above are **local only** and not
+  pushed; `origin/master` remains at `2d8cb5c` **[verified this session]**.
 
 ## 2. Completed feature — `feat: revoke all other sessions`
 

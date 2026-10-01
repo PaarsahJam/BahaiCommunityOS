@@ -4496,8 +4496,14 @@ select the emergency-invalidation mechanism itself. This ADR records the
 current model, clarifies terminology, and presents alternatives for
 project-owner review.
 
-**Implementation:** None. This ADR performs no implementation and introduces no
-mechanism.
+**Implementation:** This ADR performs no implementation itself and introduces no
+mechanism. The Section 19 scoped decisions authorized a first implementation
+stage (C1), which has been implemented and committed: the scoped `UserAccount`
+PostgreSQL `xmin` concurrency boundary. That implementation remains dependent
+on the previously committed ADR-036 provisional prototype. Implementing and
+committing C1 does not ratify this ADR: ADR-036 remains **Proposed**, the
+broader prototype remains provisional and unratified, and the Section 18 open
+questions Q2–Q8 remain open.
 
 ### 1. Context
 

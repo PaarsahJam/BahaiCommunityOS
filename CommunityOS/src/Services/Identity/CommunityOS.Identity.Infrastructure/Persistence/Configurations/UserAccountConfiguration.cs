@@ -42,6 +42,20 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
             .IsRequired()
             .HasDefaultValue(0L);
 
+        // C1 (ADR-036 Section 19, OD-18): whole-row concurrency guard protecting
+        // SessionRevocationEpoch. Npgsql's
+        // NpgsqlPostgresModelFinalizingConvention.ProcessRowVersionProperty maps
+        // a uint property that is OnAddOrUpdate and a concurrency token onto the
+        // PostgreSQL "xmin" system column, so the database maintains the guard on
+        // every UPDATE of this row and no migration is involved.
+        // Declared as a shadow property so AggregateRoot<TId> is not modified and
+        // the existing "Version" bigint column keeps its own mapping.
+        // Scoped to UserAccount only: this is not a model-wide convention, and no
+        // other Identity entity (or any entity in another service) is affected.
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .IsRowVersion();
+
         builder.OwnsMany<Credential>(
             x => x.Credentials,
             credential =>
