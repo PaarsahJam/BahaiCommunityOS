@@ -30,6 +30,7 @@ public sealed class OrganizationUnitConfiguration : IEntityTypeConfiguration<Org
                 parent.ToTable("organization_unit_parents");
                 parent.WithOwner().HasForeignKey("unit_id");
                 parent.HasKey(x => x.Id);
+                parent.Property(x => x.Id).ValueGeneratedNever();
 
                 parent.Property(x => x.ParentId).HasColumnName("parent_id");
                 parent.HasIndex(x => x.ParentId);

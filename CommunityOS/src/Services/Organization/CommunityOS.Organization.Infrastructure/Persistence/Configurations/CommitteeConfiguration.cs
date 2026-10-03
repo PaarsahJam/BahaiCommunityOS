@@ -40,6 +40,7 @@ public sealed class CommitteeConfiguration : IEntityTypeConfiguration<Committee>
                 member.ToTable("committee_members");
                 member.WithOwner().HasForeignKey("committee_id");
                 member.HasKey(x => x.Id);
+                member.Property(x => x.Id).ValueGeneratedNever();
 
                 member.Property(x => x.PersonId).HasColumnName("person_id").IsRequired();
                 member.Property(x => x.RoleCode).HasColumnName("role_code").IsRequired().HasMaxLength(100);

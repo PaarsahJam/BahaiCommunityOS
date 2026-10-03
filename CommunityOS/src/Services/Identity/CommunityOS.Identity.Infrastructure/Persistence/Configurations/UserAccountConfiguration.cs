@@ -63,7 +63,9 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
                 credential.ToTable("user_account_credentials");
                 credential.WithOwner().HasForeignKey("user_account_id");
                 credential.HasKey("Id");
-                credential.Property(x => x.Id).HasColumnName("id");
+                credential.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedNever();
                 credential.Property(x => x.Type)
                     .HasConversion(
                         type => type.Id,
@@ -83,7 +85,9 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
                 external.ToTable("user_account_external_identities");
                 external.WithOwner().HasForeignKey("user_account_id");
                 external.HasKey("Id");
-                external.Property(x => x.Id).HasColumnName("id");
+                external.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedNever();
                 external.Property(x => x.Provider).HasColumnName("provider").IsRequired().HasMaxLength(100);
                 external.Property(x => x.Subject).HasColumnName("subject").IsRequired().HasMaxLength(256);
                 external.Property(x => x.LinkedOn).HasColumnName("linked_on").IsRequired();
@@ -98,7 +102,9 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
                 mfa.ToTable("user_account_mfa_methods");
                 mfa.WithOwner().HasForeignKey("user_account_id");
                 mfa.HasKey("Id");
-                mfa.Property(x => x.Id).HasColumnName("id");
+                mfa.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedNever();
                 mfa.Property(x => x.Type)
                     .HasConversion(
                         type => type.Id,
@@ -118,7 +124,9 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
                 device.ToTable("user_account_devices");
                 device.WithOwner().HasForeignKey("user_account_id");
                 device.HasKey("Id");
-                device.Property(x => x.Id).HasColumnName("id");
+                device.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedNever();
                 device.Property(x => x.Name).HasColumnName("name").IsRequired().HasMaxLength(100);
                 device.Property(x => x.Platform).HasColumnName("platform").HasMaxLength(50);
                 device.Property(x => x.UserAgent).HasColumnName("user_agent").HasMaxLength(512);
