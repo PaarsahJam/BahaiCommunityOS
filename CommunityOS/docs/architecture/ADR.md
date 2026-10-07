@@ -4488,11 +4488,13 @@ configuration, or runtime behavior are created here.
 session revocation retains residual access-token validity up to the current
 15-minute JWT lifetime, and a separate emergency account-wide invalidation
 mechanism is required with a guarantee stronger than ordinary refresh-token
-revocation. The technical implementation of that mechanism remains undecided;
-no architectural option is selected here (Section 9). The scoped owner
-technical decisions recorded in Section 19 establish the per-account epoch
-keying and the C1 `UserAccount` persistence/concurrency boundary; they do not
-select the emergency-invalidation mechanism itself. This ADR records the
+revocation. The technical implementation of that mechanism remains undecided
+beyond the Section 19 owner decisions recorded for Section 18 questions Q2-Q7;
+no Section 9 option is selected here, no enforcement contract is specified,
+and question Q8 remains open. The scoped owner technical decisions recorded
+in Section 19 establish the per-account epoch keying and the C1
+`UserAccount` persistence/concurrency boundary; they do not, on their own,
+select the emergency-invalidation mechanism. This ADR records the
 current model, clarifies terminology, and presents alternatives for
 project-owner review.
 
@@ -4502,8 +4504,10 @@ stage (C1), which has been implemented and committed: the scoped `UserAccount`
 PostgreSQL `xmin` concurrency boundary. That implementation remains dependent
 on the previously committed ADR-036 provisional prototype. Implementing and
 committing C1 does not ratify this ADR: ADR-036 remains **Proposed**, the
-broader prototype remains provisional and unratified, and the Section 18 open
-questions Q2–Q8 remain open.
+broader prototype remains provisional and unratified, and Section 18 records
+inherited owner decisions for questions Q2-Q7 while question Q8 (rollout and
+feature-flag strategy) and the details annotated as open under Q2-Q7 remain
+open. This record authorizes no implementation.
 
 ### 1. Context
 
@@ -4993,26 +4997,66 @@ failure semantics require technical design (Section 18).
 ### 18. Open technical questions
 
 The policy questions above are approved. The following **technical** questions
-for the emergency invalidation mechanism remain **explicitly unresolved**;
-question 1 is **partially resolved** and is annotated accordingly:
+for the emergency invalidation mechanism are annotated with their current
+status: question 1 and questions 2-7 are **partially resolved** by the
+inherited owner decisions recorded in Section 19; question 8 remains
+**unresolved**. The question wording below is preserved as originally
+recorded; the annotations are the Phase A provenance reconciliation.
 
 1. Exact emergency-invalidation mechanism — **partially resolved** (Section 19):
    the per-account epoch keying and the C1 `UserAccount` persistence boundary
-   are decided. The emergency-invalidation mechanism itself, its state store,
-   and its enforcement model remain open, and no technology is selected for
-   them.
-2. Revocation-state store, if any.
-3. Propagation model and consistency guarantees.
+   are decided, and Section 19 records the inherited owner decisions for
+   questions 2-7 (store, consistency, failure posture, latency, scope, locus).
+   The concrete enforcement contract and the question 8 rollout decision
+   remain open, and no Section 9 technology option is selected for them.
+2. Revocation-state store, if any. — **partially resolved** (Section 19): the
+   authoritative store for the emergency epoch is Identity's durable
+   PostgreSQL state (`UserAccount.SessionRevocationEpoch`); Redis, the message
+   broker, and any distributed cache are **not** selected as authoritative
+   state. How other services obtain revocation state without reading the
+   Identity database belongs to question 7 and remains unspecified.
+3. Propagation model and consistency guarantees. — **partially resolved**
+   (Section 19): bounded eventual consistency, with the durable emergency
+   invalidation commit as the durability point, and propagation plus
+   reconciliation required so that consumers can recover from missed or
+   delayed propagation, within the latency budget of question 5. Bootstrap,
+   retention, replay, and consumer contracts are **not** decided here; they
+   must be reported as implementation gaps rather than invented.
 4. Fail-open versus fail-closed behavior when revocation state is unavailable.
+   — **partially resolved** (Section 19): emergency-security enforcement is
+   **fail closed**; inability to obtain required authoritative revocation
+   state must not silently become an authorization success, and no fail-open
+   production path is authorized. No specific last-known-state policy is
+   recorded here as an architectural guarantee.
 5. Required emergency-invalidation latency (whether "immediate" is required).
+   — **partially resolved** (Section 19): new requests must be rejected
+   within ≤5 seconds after the durable emergency invalidation commit. The
+   timing window starts after that commit; in-flight requests are excluded;
+   there is no requirement to retroactively cancel an already-running
+   request.
 6. Scope and granularity of emergency invalidation — account-wide only, or
    per-family options as well; whether existing account-wide events (password
    change, password reset, MFA removal) are mapped to the emergency mechanism.
-7. Gateway versus downstream-service responsibilities for enforcement.
-8. Rollout and feature-flag strategy.
+   — **partially resolved** (Section 19): emergency invalidation is
+   **account-wide** and is distinct from ordinary refresh-family revocation;
+   ordinary revocation does not acquire emergency semantics merely because the
+   epoch mechanism exists. The mapping of password change, password reset, and
+   MFA removal to the emergency mechanism is **not** decided and remains open;
+   no event mapping, trigger, route, or command contract may be inferred.
+7. Gateway versus downstream-service responsibilities for enforcement. —
+   **partially resolved** (Section 19): enforcement belongs with Identity as
+   the central authentication/session-revocation authority; the API Gateway
+   remains a transparent forwarder; centralized Gateway enforcement is not
+   selected by this decision; other services must not directly access the
+   Identity database. The concrete enforcement contract for how a downstream
+   service obtains revocation state is not specified and remains open.
+8. Rollout and feature-flag strategy. — **unresolved**. No feature-flag
+   architecture, rollout policy, or production enablement decision is
+   recorded; this question remains an explicit decision boundary.
 
-These questions must be answered before any follow-up design or implementation
-is approved. They are decisions for the project owner, not for an AI agent.
+The remaining open items above must be answered before the corresponding
+follow-up design or implementation is approved. They are decisions for the
+project owner, not for an AI agent.
 
 ### 19. Decision record
 
@@ -5056,22 +5100,88 @@ is approved. They are decisions for the project owner, not for an AI agent.
     configuration surface for the Npgsql 9.0.0 provider rather than assuming a
     model-wide API can be safely narrowed, and must prove that the resulting
     SQL/concurrency behavior actually protects the C1 race.
+- **Inherited owner technical decisions for Section 18 questions Q2-Q7 —
+  recorded 2026-10-07 (Phase A provenance reconciliation).** The decision date
+  of the previous owner workshop is not recorded in this repository; only the
+  recording date is asserted here. These are previous owner decisions being
+  transcribed into ADR-036 terminology — not proposals generated by an agent
+  during implementation, and not a re-opening of the Section 17 policy
+  decisions:
+  - **Q2 — mechanism and store:** the emergency invalidation mechanism uses an
+    account-bound monotonic `SessionRevocationEpoch` (`long`, initial value
+    `0`, durable in PostgreSQL as `user_accounts.session_revocation_epoch`),
+    represented as a signed per-account epoch claim and compared against the
+    authoritative account epoch, independent of ordinary refresh-family
+    revocation. Identity remains the authority for authentication and
+    session-revocation state. Redis, the message broker, and any distributed
+    cache are **not** selected as authoritative state for this mechanism. The
+    scope is not broadened to other aggregates or services, no Section 9
+    option is selected, and the prototype that carries the `sre` claim remains
+    provisional and unratified.
+  - **Q3 — propagation and consistency:** bounded eventual consistency.
+    Propagation and reconciliation are required so that consumers can recover
+    from missed or delayed propagation; the durability point is the durable
+    emergency invalidation commit. Bootstrap, retention, replay, and consumer
+    contracts are **not** decided by this record and must be reported as
+    implementation gaps rather than invented.
+  - **Q4 — failure behavior:** emergency-security enforcement is **fail
+    closed**. Inability to obtain required authoritative revocation state must
+    not silently become an authorization success. No fail-open production path
+    is authorized, and no operational last-known-state behavior is elevated
+    by this record into an architectural guarantee.
+  - **Q5 — latency:** new requests must be rejected within ≤5 seconds after
+    the durable emergency invalidation commit. The timing window starts after
+    that commit; in-flight requests are excluded; there is no requirement to
+    retroactively cancel an already-running request.
+  - **Q6 — scope:** emergency invalidation is **account-wide** and is distinct
+    from ordinary refresh-family revocation. Ordinary revocation does not
+    acquire emergency semantics merely because the epoch mechanism exists. The
+    mapping of password change, password reset, and MFA removal to the
+    emergency mechanism is **not** decided and stays open; no event mapping,
+    database trigger, route, or command contract is implied by this record.
+  - **Q7 — enforcement locus:** enforcement belongs with Identity as the
+    central authentication/session-revocation authority. The API Gateway
+    remains a transparent forwarder, centralized Gateway enforcement is not
+    selected, and other services must not directly access the Identity
+    database. The concrete enforcement contract for how a downstream service
+    obtains revocation state is not specified and remains open. The historical
+    workshop label for this choice does not exist among this ADR's Section 9
+    options and is deliberately not inserted here.
+  - **Q8 — rollout and feature flags:** no owner decision is recorded. Q8
+    remains open; no feature-flag architecture, rollout policy, or production
+    enablement default is authorized or implied.
+  - **Provenance of this record:** (1) these are previous owner decisions from
+    the earlier ADR-036 decision workshop; (2) the current architectural
+    status of this ADR remains **Proposed** and no Section 9 option has been
+    selected; (3) the implementation status is unchanged — C1 is implemented
+    and committed, the surrounding prototype remains provisional and
+    unratified, and this documentation record authorizes no implementation.
 - **Ratification status:** C1 conformance is a **prerequisite for** ratifying
-  this ADR, not a ratification. This ADR remains **Proposed**. Ratification
-  requires the project owner to answer Section 18 questions 2-8, which remain
-  open; question 1 is partially resolved only as recorded above.
+  this ADR, not a ratification. This ADR remains **Proposed**. Section 18
+  questions 2-7 are recorded above as inherited owner decisions and question
+  1 remains partially resolved; Section 18 question 8 (rollout and
+  feature-flag strategy) and the details annotated as open under questions
+  2-7 remain open. Recording those decisions does not ratify this ADR.
 - **Explicitly not ratified by this record:** the emergency-invalidation
-  mechanism itself, nor its revocation-state store, propagation model, failure
-  semantics, latency requirement, scope granularity, enforcement boundary, or
-  rollout strategy (Section 18, questions 2-8). The refresh-session
+  mechanism is not ratified as an ADR status, and Section 18 question 8
+  (rollout strategy) remains wholly undecided. Questions 2-7 are recorded
+  above as inherited owner decisions, but recording them is **not**
+  ratification: this ADR remains **Proposed**, and no Section 9 option,
+  enforcement contract, event mapping, or prototype behavior is ratified by
+  this record. The refresh-session
   `Session.SessionRevocationEpochAtIssue` binding remains **provisional**. The
   existing prototype code, migrations, and tests present in the working tree
   are evidence and prototype material; they are **not** ratified wholesale by
   this record, and their migration provenance remains a separate unresolved
   question.
-- **Implementation:** None.
-- **No implementation performed** — no backend, Flutter, infrastructure,
-  migration, package, endpoint, configuration, or test changes were made.
-- **Technical decisions required from the project owner** — the open technical
-  questions in Section 18 must be answered before any follow-up design or
-  implementation is approved.
+- **Implementation:** None attributable to this decision record itself. The C1
+  stage authorized by the scoped owner technical decisions above has since
+  been implemented and committed; that status is recorded in the ADR front
+  matter and does not ratify this ADR.
+- **No implementation performed by this record** — no backend, Flutter,
+  infrastructure, migration, package, endpoint, configuration, or test changes
+  were made by the documentation decisions recorded here.
+- **Technical decisions required from the project owner** — Section 18
+  question 8 and the details annotated as open under Section 18 questions 2-7
+  must be answered before the corresponding follow-up design or implementation
+  is approved. These are decisions for the project owner, not for an AI agent.

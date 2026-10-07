@@ -42,11 +42,12 @@ or **[unverified — inspect repo]** as appropriate.
   - **C1 is implemented and committed:** the `UserAccount` PostgreSQL `xmin`
     whole-row concurrency boundary selected by OD-18, per ADR-036 §19. Stale
     whole-row writes are rejected; no clamping and no automatic retry.
-  - ADR-036 remains **Proposed** and unratified. Section 18 questions **Q2–Q8
-    remain open**, question 1 is only partially resolved, and no
-    revocation-state store, propagation model, failure semantics, latency
-    requirement, scope granularity, enforcement boundary, or rollout strategy
-    has been selected. Refresh-session binding, migration provenance, and the
+  - ADR-036 remains **Proposed** and unratified. Section 18 questions **Q2-Q7
+    carry inherited owner decisions recorded in ADR-036 §19 (Phase A,
+    2026-10-07)**; question 1 is only partially resolved; question **Q8 and
+    the details annotated as open under Q2-Q7** (enforcement contract,
+    event-to-event mapping, bootstrap/retention/replay/consumer contracts)
+    remain open. Refresh-session binding, migration provenance, and the
     other prototype questions remain provisional or unresolved.
 - **Git status after C1** **[verified this session]**: the ADR-036 source, tests,
   documentation, and `README.md` are committed and clean. Nine unrelated
@@ -288,20 +289,41 @@ A design that provides one does not automatically provide another.
   events, other designated incidents). It is conceptually distinct from ordinary
   session revocation and must provide a stronger guarantee than ordinary
   refresh-token revocation. The implementation technology and whether
-  invalidation must be literally instantaneous are **not** defined.
+  invalidation must be literally instantaneous are **not** defined by the §17
+  policy decision itself; the later owner decisions for §18 Q2 (authoritative
+  store) and Q5 (≤5-second latency boundary) are recorded below and in
+  ADR-036 §19, without changing this policy decision.
 
-**Open technical questions (ADR-036 §18)** — these are **project-owner
-decisions**; the AI agent must not decide them unilaterally:
+**Technical questions (ADR-036 §18)** — these are **project-owner decisions**;
+Q2-Q7 now carry inherited owner decisions recorded in ADR-036 §19 (Phase A,
+2026-10-07); Q8 and the details annotated as open under Q2-Q7 remain
+**open**. The AI agent must not decide any still-open item unilaterally, and
+must not reopen a recorded inherited decision:
 
-1. Exact emergency-invalidation mechanism.
-2. Revocation-state store, if any.
-3. Propagation model and consistency guarantees.
-4. Fail-open versus fail-closed when revocation state is unavailable.
-5. Required emergency-invalidation latency.
+1. Exact emergency-invalidation mechanism — partially resolved (§19).
+2. Revocation-state store, if any. — partially resolved (§19): Identity's
+   durable PostgreSQL state is authoritative; Redis, the broker, and any
+   distributed cache are not selected as authoritative state.
+3. Propagation model and consistency guarantees. — partially resolved (§19):
+   bounded eventual consistency; durability point is the durable emergency
+   commit; propagation and reconciliation required; bootstrap, retention,
+   replay, and consumer contracts not decided.
+4. Fail-open versus fail-closed when revocation state is unavailable. —
+   partially resolved (§19): fail closed; unavailability must not silently
+   become an authorization success; no fail-open production path.
+5. Required emergency-invalidation latency. — partially resolved (§19): ≤5
+   seconds after the durable emergency invalidation commit; in-flight requests
+   excluded; no retroactive cancellation.
 6. Scope and granularity of emergency invalidation (and mapping of existing
-   account-wide events such as password change/reset and MFA removal).
-7. Gateway versus downstream-service responsibilities for enforcement.
-8. Rollout and feature-flag strategy.
+   account-wide events such as password change/reset and MFA removal). —
+   partially resolved (§19): account-wide and distinct from ordinary
+   revocation; the per-event mapping is **not** decided and stays open.
+7. Gateway versus downstream-service responsibilities for enforcement. —
+   partially resolved (§19): Identity is the authentication/session-revocation
+   authority; the Gateway stays a transparent forwarder; no direct Identity
+   database access; the enforcement contract is unspecified and open.
+8. Rollout and feature-flag strategy. — **unresolved**; no flag architecture
+   or rollout policy is decided.
 
 ## 10. Prohibited work before implementation approval
 
@@ -314,9 +336,12 @@ Until ADR-036's technical implementation is approved by the project owner, do
 - Implement token epochs/versioning **beyond the scope recorded in ADR-036
   Section 19**. The per-account epoch keying
   (`UserAccount.SessionRevocationEpoch`) and the C1 `UserAccount` PostgreSQL
-  `xmin` persistence boundary are the only epoch work the owner has decided;
-  their implementation remains blocked. All other token epoch/versioning
-  implementation stays prohibited.
+  `xmin` persistence boundary are the epoch decisions that C1 implements; C1
+  is implemented and committed, while ADR-036 remains **Proposed** and the
+  surrounding prototype remains provisional and unratified. Section 19 also
+  records inherited owner decisions for §18 Q2-Q7 — they are decisions, not
+  implementation authorization. All other token epoch/versioning work, and any
+  implementation beyond an explicitly authorized phase, stays prohibited.
 - Change JWT validation.
 - Shorten the JWT lifetime solely to resolve this unresolved decision.
 - Change API Gateway authentication responsibilities.
