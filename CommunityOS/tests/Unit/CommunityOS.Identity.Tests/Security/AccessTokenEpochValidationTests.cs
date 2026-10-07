@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using NSubstitute;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -268,5 +269,48 @@ public sealed class AccessTokenEpochValidationTests
 
         context.Result.Should().NotBeNull();
         context.Result!.Failure.Should().NotBeNull();
+    }
+
+    // =====================================================================
+    // Q4 (ADR-036 Section 19) — fail closed when the epoch authority is
+    // unavailable. The failure representation itself is deliberately not
+    // asserted: only the invariant that no authorization success is produced.
+    // =====================================================================
+
+    [Fact]
+    public async Task EpochAuthorityUnavailable_PropagatesAndProducesNoAuthenticatedOutcome()
+    {
+        // A token that would be accepted if the authority were reachable.
+        var provider = Provider();
+        var account = AccountAtEpoch(0);
+        var token = IssueAccessToken(provider, account.Id, account.SessionRevocationEpoch);
+
+        var repository = Substitute.For<IUserAccountRepository>();
+        repository.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<UserAccount?>(
+                new NpgsqlException("the database is unreachable")));
+
+        var services = new ServiceCollection();
+        services.AddScoped(_ => repository);
+        var serviceProvider = services.BuildServiceProvider();
+
+        var context = new TokenValidatedContext(
+            new DefaultHttpContext { RequestServices = serviceProvider },
+            new AuthenticationScheme(
+                JwtBearerDefaults.AuthenticationScheme, displayName: null,
+                handlerType: typeof(JwtBearerHandler)),
+            new JwtBearerOptions())
+        {
+            Principal = Validate(provider, token)
+        };
+
+        var act = async () =>
+            await AccessTokenEpochValidationEvents.OnTokenValidatedAsync(context);
+
+        await act.Should().ThrowAsync<NpgsqlException>(
+            "an unavailable epoch authority must fail closed, never silently become an authorization success");
+
+        context.Result.Should().BeNull(
+            "no acceptance result is produced; the propagating failure aborts the JwtBearer pipeline");
     }
 }

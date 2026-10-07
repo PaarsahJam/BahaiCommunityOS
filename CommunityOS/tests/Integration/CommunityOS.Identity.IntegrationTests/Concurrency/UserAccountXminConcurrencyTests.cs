@@ -403,6 +403,56 @@ public sealed class UserAccountXminConcurrencyTests : IAsyncLifetime
     }
 
     // =====================================================================
+    // Test E — production repository seam (UserAccountRepository.UpdateAsync)
+    // =====================================================================
+
+    [Fact]
+    public async Task Production_repository_seam_stale_write_is_rejected_without_retry()
+    {
+        var id = await SeedAsync();
+
+        var sqlLog = new List<string>();
+        await using (var writerDb = CreateContext(sqlLog))
+        {
+            // The production seam itself, not db.UserAccounts.Update(): every
+            // ordinary writer (LoginCommand, ChangePasswordCommand,
+            // ResetPasswordCommand, MfaEnrollmentCommands, ...) loads through
+            // IUserAccountRepository and persists via this UpdateAsync.
+            var repository = new UserAccountRepository(writerDb);
+
+            var stale = await repository.GetByIdAsync(id);
+            stale.Should().NotBeNull();
+            stale!.SessionRevocationEpoch.Should().Be(0);
+
+            // A competing emergency invalidation commits while the writer still
+            // holds its tracked, non-locking copy of the row.
+            await InvalidateAsync(_provider, id);
+            (await ReadEpochAsync(id)).Should().Be(1);
+
+            // Ordinary production mutation on the now-stale entity. Without the
+            // concurrency guard this whole-row UPDATE would persist the older
+            // epoch 0 over the committed epoch 1.
+            stale.UpdatePassword("stale-password-hash");
+            sqlLog.Clear();
+
+            var act = async () => await repository.UpdateAsync(stale);
+            await act.Should().ThrowAsync<DbUpdateConcurrencyException>(
+                "a stale write through UserAccountRepository.UpdateAsync must fail with the EF concurrency failure");
+
+            var userAccountUpdates = sqlLog
+                .Where(s => s.Contains("UPDATE", StringComparison.OrdinalIgnoreCase)
+                            && s.Contains("identity.user_accounts", StringComparison.Ordinal))
+                .ToList();
+
+            userAccountUpdates.Should().HaveCount(1,
+                "the conflict is surfaced at the repository seam with exactly one UPDATE attempt, i.e. no retry");
+        }
+
+        (await ReadEpochAsync(id)).Should().Be(1,
+            "the newer committed epoch survives and is not clamped or normalized by the rejected stale write");
+    }
+
+    // =====================================================================
     // Concurrency proof — the generated UPDATE is conditional on xmin
     // =====================================================================
 

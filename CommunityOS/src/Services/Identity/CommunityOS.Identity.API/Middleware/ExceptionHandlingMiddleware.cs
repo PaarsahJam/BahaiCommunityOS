@@ -1,5 +1,6 @@
 using CommunityOS.Identity.Domain.Exceptions;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -39,6 +40,7 @@ internal sealed partial class ExceptionHandlingMiddleware(
             MfaMethodNotFoundException           => (StatusCodes.Status404NotFound,     ex.Message),
             MfaLastVerifiedMethodException       => (StatusCodes.Status409Conflict,      ex.Message),
             DuplicateEmailException              => (StatusCodes.Status409Conflict,      ex.Message),
+            DbUpdateConcurrencyException         => (StatusCodes.Status409Conflict,      "Concurrency conflict."),
             AccountNotVerifiedException          => (StatusCodes.Status403Forbidden,     ex.Message),
             AccountLockedException               => (StatusCodes.Status423Locked,        ex.Message),
             AccountDeactivatedException          => (StatusCodes.Status403Forbidden,     ex.Message),
