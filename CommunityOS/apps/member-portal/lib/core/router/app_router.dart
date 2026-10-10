@@ -125,6 +125,18 @@ class AppRouter {
                   MembershipPage(createMembershipBloc: createMembership),
             ),
             GoRoute(
+              path: '/meetings',
+              name: 'meetings',
+              builder: (context, state) =>
+                  const MeetingsPage(),
+            ),
+            GoRoute(
+              path: '/activities',
+              name: 'activities',
+              builder: (context, state) =>
+                  const ActivitiesPage(),
+            ),
+            GoRoute(
               path: '/notifications',
               name: 'notifications',
               builder: (context, state) => NotificationCenterPage(
@@ -177,6 +189,8 @@ bool _isProtectedPath(String path) =>
     path == '/membership' ||
     path == '/account' ||
     path == '/notifications' ||
+    path == '/meetings' ||
+    path == '/activities' ||
     path.startsWith('/profile');
 
 /// Bridges an [AuthBloc] state [Stream] to the [Listenable] contract that

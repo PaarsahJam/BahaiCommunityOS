@@ -193,5 +193,65 @@
   "notificationTypeCommunityActivity": "Community activity",
   "notificationTypeCommunityEvent": "Community event",
   "notificationTypeCommunityMeeting": "Community meeting",
+  "meetingsTitle": "Meetings",
+  "meetingsNoMeetings": "No meetings found",
+  "meetingsLoading": "Loading meetings…",
+  "meetingsDate": "Date",
+  "meetingsLocation": "Location",
+  "meetingsStatus": "Status",
+  "@meetingsTitle": {
+    "description": "Title for the meetings screen.",
+    "placeholders": {}
+  },
+  "@meetingsNoMeetings": {
+    "description": "Label shown when no meetings are available.",
+    "placeholders": {}
+  },
+  "@meetingsLoading": {
+    "description": "Label shown while meetings are being loaded.",
+    "placeholders": {}
+  },
+  "@meetingsDate": {
+    "description": "Label for the date field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsLocation": {
+    "description": "Label for the location field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsStatus": {
+    "description": "Label for the status field in meeting detail.",
+    "placeholders": {}
+  },
+  "activitiesTitle": "Activities",
+  "activitiesNoActivities": "No activities found",
+  "activitiesLoading": "Loading activities…",
+  "activitiesDate": "Date",
+  "activitiesLocation": "Location",
+  "activitiesStatus": "Status",
+  "@activitiesTitle": {
+    "description": "Title for the activities screen.",
+    "placeholders": {}
+  },
+  "@activitiesNoActivities": {
+    "description": "Label shown when no activities are available.",
+    "placeholders": {}
+  },
+  "@activitiesLoading": {
+    "description": "Label shown while activities are being loaded.",
+    "placeholders": {}
+  },
+  "@activitiesDate": {
+    "description": "Label for the date field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesLocation": {
+    "description": "Label for the location field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesStatus": {
+    "description": "Label for the status field in activity detail.",
+    "placeholders": {}
+  },
   "notificationTypeGeneral": "General"
 }
