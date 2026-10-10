@@ -1,5 +1,5 @@
-// dart format width=80
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// dart format width=80
 
 // **************************************************************************
 // InjectableConfigGenerator
@@ -20,11 +20,21 @@ import 'package:member_portal/core/network/error_mapper.dart' as _i678;
 import 'package:member_portal/core/network/refresh_coordinator.dart' as _i245;
 import 'package:member_portal/core/storage/token_storage.dart' as _i182;
 import 'package:member_portal/di/modules.dart' as _i539;
+import 'package:member_portal/features/activities/data/activities_api.dart'
+    as _i859;
+import 'package:member_portal/features/activities/domain/activities_repository.dart'
+    as _i145;
 import 'package:member_portal/features/auth/application/auth_bloc.dart'
     as _i952;
 import 'package:member_portal/features/auth/data/auth_api.dart' as _i922;
 import 'package:member_portal/features/auth/domain/auth_repository.dart'
     as _i552;
+import 'package:member_portal/features/meetings/bloc/meetings_bloc.dart'
+    as _i950;
+import 'package:member_portal/features/meetings/data/meetings_api.dart'
+    as _i687;
+import 'package:member_portal/features/meetings/data/meetings_repository.dart'
+    as _i405;
 import 'package:member_portal/features/member/data/member_api.dart' as _i214;
 import 'package:member_portal/features/member/domain/member_repository.dart'
     as _i278;
@@ -63,10 +73,6 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i922.AuthApi>(),
           gh<_i182.TokenStorage>(),
         ));
-    gh.lazySingleton<_i4.AuthInterceptor>(() => _i4.AuthInterceptor(
-          gh<_i182.TokenStorage>(),
-          gh<_i245.RefreshCoordinator>(),
-        ));
     gh.singleton<_i361.Dio>(() => networkModule.provideAuthorizedDio(
           gh<_i973.AppConfig>(),
           gh<_i182.TokenStorage>(),
@@ -78,6 +84,24 @@ extension GetItInjectableX on _i174.GetIt {
         () => apiModule.provideMemberApi(gh<_i361.Dio>()));
     gh.lazySingleton<_i697.NotificationApi>(
         () => apiModule.provideNotificationApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i687.MeetingsApi>(
+        () => apiModule.provideMeetingsApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i859.ActivitiesApi>(
+        () => apiModule.provideActivitiesApi(gh<_i361.Dio>()));
+    gh.lazySingleton<_i4.AuthInterceptor>(() => _i4.AuthInterceptor(
+          gh<_i182.TokenStorage>(),
+          gh<_i245.RefreshCoordinator>(),
+        ));
+    gh.lazySingleton<_i145.ActivitiesRepository>(
+        () => _i145.ActivitiesRepository(
+              gh<_i859.ActivitiesApi>(),
+              gh<_i678.ErrorMapper>(),
+            ));
+    gh.lazySingleton<_i405.MeetingsRepository>(() => _i405.MeetingsRepository(
+          gh<_i687.MeetingsApi>(),
+          gh<_i678.ErrorMapper>(),
+          gh<_i245.RefreshCoordinator>(),
+        ));
     gh.lazySingleton<_i142.NotificationRepository>(
         () => _i142.NotificationRepository(
               gh<_i697.NotificationApi>(),
@@ -95,6 +119,8 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i182.TokenStorage>(),
           gh<_i678.ErrorMapper>(),
         ));
+    gh.factory<_i950.MeetingsBloc>(
+        () => _i950.MeetingsBloc(gh<_i405.MeetingsRepository>()));
     gh.lazySingleton<_i952.AuthBloc>(() => _i952.AuthBloc(
           gh<_i552.AuthRepository>(),
           gh<_i245.RefreshCoordinator>(),

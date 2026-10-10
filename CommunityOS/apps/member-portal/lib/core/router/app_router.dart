@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/activities/application/activities_bloc.dart';
+import '../../features/activities/presentation/activities_page.dart';
 import '../../features/auth/application/auth_bloc.dart';
 import '../../features/auth/application/auth_state.dart';
 import '../../features/auth/presentation/login_page.dart';
@@ -10,6 +12,7 @@ import '../../features/auth/presentation/mfa_page.dart';
 import '../../features/account/application/account_bloc.dart';
 import '../../features/account/application/security_bloc.dart';
 import '../../features/account/presentation/account_page.dart';
+import '../../features/meetings/presentation/meetings_page.dart';
 import '../../features/member/application/member_session_bloc.dart';
 import '../../features/member/application/membership_bloc.dart';
 import '../../features/member/application/profile_bloc.dart';
@@ -66,6 +69,7 @@ class AppRouter {
     AccountBloc Function()? createAccount,
     SecurityBloc Function()? createSecurity,
     NotificationBloc Function()? createNotifications,
+    ActivitiesBloc Function()? createActivities,
   }) {
     final pending = PendingRouteStore();
 
@@ -134,7 +138,7 @@ class AppRouter {
               path: '/activities',
               name: 'activities',
               builder: (context, state) =>
-                  const ActivitiesPage(),
+                  ActivitiesPage(createBloc: createActivities),
             ),
             GoRoute(
               path: '/notifications',

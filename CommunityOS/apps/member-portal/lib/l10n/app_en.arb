@@ -253,5 +253,65 @@
     "description": "Label for the status field in activity detail.",
     "placeholders": {}
   },
+  "@activitiesDescription": {
+    "description": "Label for the description field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesStartsAt": {
+    "description": "Label for the start time field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesEndsAt": {
+    "description": "Label for the end time field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesFormat": {
+    "description": "Label for the format field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesOnline": {
+    "description": "Label for online format value in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesInPerson": {
+    "description": "Label for in-person format value in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesOnlineUrl": {
+    "description": "Label for the online URL field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesOrganizer": {
+    "description": "Label for the organizer field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesOrganizationUnit": {
+    "description": "Label for the organization unit field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesCapacity": {
+    "description": "Label for the capacity field in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesOpen": {
+    "description": "Label for the open status in activity detail.",
+    "placeholders": {}
+  },
+  "@activitiesRefresh": {
+    "description": "Label for the refresh action on activities screen.",
+    "placeholders": {}
+  },
+    "activitiesDescription": "Description",
+  "activitiesStartsAt": "Starts at",
+  "activitiesEndsAt": "Ends at",
+  "activitiesFormat": "Format",
+  "activitiesOnline": "Online",
+  "activitiesInPerson": "In person",
+  "activitiesOnlineUrl": "Online URL",
+  "activitiesOrganizer": "Organizer",
+  "activitiesOrganizationUnit": "Organization unit",
+  "activitiesCapacity": "Capacity",
+  "activitiesOpen": "Open",
+  "activitiesRefresh": "Refresh",
   "notificationTypeGeneral": "General"
 }
