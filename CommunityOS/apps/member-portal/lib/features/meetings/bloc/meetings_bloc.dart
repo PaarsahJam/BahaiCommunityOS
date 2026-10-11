@@ -1,8 +1,5 @@
 import 'package:bloc/bloc.dart';
 
-import '../../core/network/error_mapper.dart';
-import '../../core/network/refresh_coordinator.dart';
-import '../domain/meetings_models.dart';
 import '../domain/meetings_event.dart';
 import '../domain/meetings_state.dart';
 import '../data/meetings_repository.dart';
@@ -18,15 +15,15 @@ import 'package:injectable/injectable.dart';
 @injectable
 class MeetingsBloc extends Bloc<MeetingsEvent, MeetingsState> {
   MeetingsBloc(this._repository) : super(const MeetingsState.initial()) {
-    on<MeetingsEvent.loadMeetings>(_onLoadMeetings);
-    on<MeetingsEvent.loadDetail>(_onLoadDetail);
-    on<MeetingsEvent.refresh>(_onRefresh);
+    on<MeetingsLoadMeetings>(_onLoadMeetings);
+    on<MeetingsLoadDetail>(_onLoadDetail);
+    on<MeetingsRefresh>(_onRefresh);
   }
 
   final MeetingsRepository _repository;
 
   Future<void> _onLoadMeetings(
-    MeetingsEvent.loadMeetings event,
+    MeetingsLoadMeetings event,
     Emitter<MeetingsState> emit,
   ) async {
     emit(const MeetingsState.loading());
@@ -44,7 +41,7 @@ class MeetingsBloc extends Bloc<MeetingsEvent, MeetingsState> {
   }
 
   Future<void> _onLoadDetail(
-    MeetingsEvent.loadDetail event,
+    MeetingsLoadDetail event,
     Emitter<MeetingsState> emit,
   ) async {
     emit(const MeetingsState.loading());
@@ -57,7 +54,10 @@ class MeetingsBloc extends Bloc<MeetingsEvent, MeetingsState> {
     );
   }
 
-  Future<void> _onRefresh(_) async {
+  Future<void> _onRefresh(
+    MeetingsRefresh event,
+    Emitter<MeetingsState> emit,
+  ) async {
     emit(const MeetingsState.initial());
     add(const MeetingsEvent.loadMeetings());
   }

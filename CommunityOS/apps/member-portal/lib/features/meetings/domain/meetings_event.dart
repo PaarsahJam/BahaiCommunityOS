@@ -1,28 +1,33 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-part 'meetings_event.g.dart';
+import '../../../core/error/app_exception.dart';
+import '../data/meetings_dtos.dart';
+
+part 'meetings_event.freezed.dart';
 
 @freezed
-abstract class MeetingsEvent with _$MeetingsEvent implements Equatable {
-  const factory MeetingsEvent.initial() = _MeetingsEventInitial;
+sealed class MeetingsEvent with _$MeetingsEvent {
+  const factory MeetingsEvent.initial() = MeetingsEventInitial;
 
-  const factory MeetingsEvent.loadMeetings() = _MeetingsEventLoadMeetings;
+  const factory MeetingsEvent.loadMeetings({
+    DateTime? from,
+    DateTime? to,
+    String? organizationUnitId,
+  }) = MeetingsLoadMeetings;
 
-  const factory MeetingsEvent.loadMeetingsFailure() = _MeetingsEventLoadMeetingsFailure;
+  const factory MeetingsEvent.loadMeetingsFailure() =
+      MeetingsLoadMeetingsFailure;
 
   const factory MeetingsEvent.loadMeetingsSuccess(List<MeetingDto> meetings) =
-      _MeetingsEventLoadMeetingsSuccess;
+      MeetingsLoadMeetingsSuccess;
 
-  const factory MeetingsEvent.loadDetail(String id) = _MeetingsEventLoadDetail;
+  const factory MeetingsEvent.loadDetail(String id) = MeetingsLoadDetail;
 
   const factory MeetingsEvent.loadDetailSuccess(MeetingDto meeting) =
-      _MeetingsEventLoadDetailSuccess;
+      MeetingsLoadDetailSuccess;
 
   const factory MeetingsEvent.loadDetailFailure(AppException error) =
-      _MeetingsEventLoadDetailFailure;
+      MeetingsLoadDetailFailure;
 
-  const factory MeetingsEvent.refresh() = _MeetingsEventRefresh;
-
-  @override
-  List<Object> get props => [];
+  const factory MeetingsEvent.refresh() = MeetingsRefresh;
 }

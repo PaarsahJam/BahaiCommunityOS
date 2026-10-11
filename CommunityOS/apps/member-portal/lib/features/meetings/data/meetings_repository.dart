@@ -1,96 +1,68 @@
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
 
-import '../../../core/network/auth_interceptor.dart';
+import '../../../core/error/app_exception.dart';
 import '../../../core/network/error_mapper.dart';
-import '../../../core/network/refresh_coordinator.dart';
-import '../../account/domain/account_exceptions.dart';
-import '../../auth/data/auth_api.dart';
-import '../../auth/data/auth_dtos.dart';
-import '../../auth/domain/auth_models.dart';
 import '../data/meetings_api.dart';
-import '../data/meetings_dtos.dart';
 import '../domain/meetings_models.dart';
 
 /// Community member-facing meetings repository.
 ///
 /// Orchestrates authenticated access to the Meetings API. The backend remains
 /// authoritative for all data and authorization; this client only maps outcomes
-/// into typed results and never re-authorizes locally.
+/// into typed results and never re-authorizes locally. Every failure is mapped
+/// to a typed application exception by the shared error mapper and is never
+/// conflated with a successful empty result.
 @LazySingleton()
 class MeetingsRepository {
-  MeetingsRepository(
-    this._api,
-    this._mapper,
-    this._coordinator,
-  );
+  MeetingsRepository(this._api, this._mapper);
 
   final MeetingsApi _api;
   final ErrorMapper _mapper;
-  final RefreshCoordinator _coordinator;
 
-  /// Loads the list of available meetings for the authenticated member.
-  ///
-  /// Error semantics:
-  /// * 401 from any call propagates as an unauthenticated/expired-session
-  ///   outcome;
-  /// * 403 propagates as forbidden;
-  /// * network, timeout and server failures propagate as a failed outcome.
-  Future<Either<AppException, List<MeetingDto>>> listMeetings({
+  /// Loads the list of available meetings for the authenticated member,
+  /// optionally narrowed by the verified backend filters.
+  Future<MeetingsListResult> listMeetings({
     DateTime? from,
     DateTime? to,
     String? organizationUnitId,
   }) async {
     try {
-      final dto = await _api.listMeetings(
-        from: from,
-        to: to,
-        organizationUnitId: organizationUnitId,
+      final dto = await _guard(
+        () => _api.listMeetings(
+          from: from,
+          to: to,
+          organizationUnitId: organizationUnitId,
+        ),
       );
-      return right(dto.meetings);
+      return MeetingsListResult.success(dto.meetings);
     } on UnauthorizedException {
-      return left(const UnauthorizedException('Unauthenticated'));
+      return const MeetingsListResult.unauthenticated();
     } on ForbiddenException {
-      return left(const ForbiddenException('Forbidden'));
+      return const MeetingsListResult.forbidden();
     } on AppException catch (error) {
-      return left(error);
-    } catch (error) {
-      return left(
-        const RequestTimeoutException('The request timed out. Please try again.'),
-      );
+      return MeetingsListResult.failed(error);
     }
   }
 
-  /// Loads a meeting's details by its ID.
-  ///
-  /// Error semantics:
-  /// * 401 from any call propagates as an unauthenticated/expired-session
-  ///   outcome;
-  /// * 404 propagates as not found;
-  /// * 403 propagates as forbidden;
-  /// * network, timeout and server failures propagate as a failed outcome.
-  Future<Either<AppException, MeetingDto>> getMeetingById(String id) async {
+  /// Loads a single meeting's details by its identifier.
+  Future<MeetingsDetailResult> getMeetingById(String id) async {
     try {
-      final dto = await _api.getMeeting(id: id);
-      return right(dto);
+      final dto = await _guard(() => _api.getMeeting(id: id));
+      return MeetingsDetailResult.success(dto);
     } on UnauthorizedException {
-      return left(const UnauthorizedException('Unauthenticated'));
-    } on NotFoundException {
-      return left(const NotFoundException('Meeting not found'));
+      return const MeetingsDetailResult.unauthenticated();
     } on ForbiddenException {
-      return left(const ForbiddenException('Forbidden'));
+      return const MeetingsDetailResult.forbidden();
+    } on NotFoundException {
+      return const MeetingsDetailResult.notFound();
     } on AppException catch (error) {
-      return left(error);
-    } catch (error) {
-      return left(
-        const RequestTimeoutException('The request timed out. Please try again.'),
-      );
+      return MeetingsDetailResult.failed(error);
     }
   }
 
-  /// Guard method mapping Dio errors to AppExceptions.
-  ///
-  /// Mirrors the pattern used in [MemberRepository._guard].
+  /// Guard method mapping Dio errors to [AppException]s via the shared
+  /// [ErrorMapper], mirroring the convention used by the other repositories.
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();

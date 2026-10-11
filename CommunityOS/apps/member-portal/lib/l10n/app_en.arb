@@ -199,6 +199,16 @@
   "meetingsDate": "Date",
   "meetingsLocation": "Location",
   "meetingsStatus": "Status",
+  "meetingsDescription": "Description",
+  "meetingsStartsAt": "Starts at",
+  "meetingsEndsAt": "Ends at",
+  "meetingsTimeZone": "Time zone",
+  "meetingsOrganizer": "Organizer",
+  "meetingsOrganizationUnit": "Organization unit",
+  "meetingsCapacity": "Capacity",
+  "meetingsOpen": "Open",
+  "meetingsClosed": "Closed",
+  "meetingsRefresh": "Refresh",
   "@meetingsTitle": {
     "description": "Title for the meetings screen.",
     "placeholders": {}
@@ -221,6 +231,46 @@
   },
   "@meetingsStatus": {
     "description": "Label for the status field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsDescription": {
+    "description": "Label for the description field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsStartsAt": {
+    "description": "Label for the start time field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsEndsAt": {
+    "description": "Label for the end time field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsTimeZone": {
+    "description": "Label for the time zone field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsOrganizer": {
+    "description": "Label for the organizer field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsOrganizationUnit": {
+    "description": "Label for the organization unit field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsCapacity": {
+    "description": "Label for the capacity field in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsOpen": {
+    "description": "Label for the open registration status in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsClosed": {
+    "description": "Label for the closed registration status in meeting detail.",
+    "placeholders": {}
+  },
+  "@meetingsRefresh": {
+    "description": "Label for the refresh action on the meetings screen.",
     "placeholders": {}
   },
   "activitiesTitle": "Activities",

@@ -97,11 +97,6 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i859.ActivitiesApi>(),
               gh<_i678.ErrorMapper>(),
             ));
-    gh.lazySingleton<_i405.MeetingsRepository>(() => _i405.MeetingsRepository(
-          gh<_i687.MeetingsApi>(),
-          gh<_i678.ErrorMapper>(),
-          gh<_i245.RefreshCoordinator>(),
-        ));
     gh.lazySingleton<_i142.NotificationRepository>(
         () => _i142.NotificationRepository(
               gh<_i697.NotificationApi>(),
@@ -117,6 +112,10 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i922.AuthApi>(),
           gh<_i922.AccountApi>(),
           gh<_i182.TokenStorage>(),
+          gh<_i678.ErrorMapper>(),
+        ));
+    gh.lazySingleton<_i405.MeetingsRepository>(() => _i405.MeetingsRepository(
+          gh<_i687.MeetingsApi>(),
           gh<_i678.ErrorMapper>(),
         ));
     gh.factory<_i950.MeetingsBloc>(

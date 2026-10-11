@@ -26,6 +26,6 @@ abstract class MeetingsApi {
 
   @GET('meetings/{id}')
   Future<MeetingDto> getMeeting({
-    @Path('id') String id,
+    @Path('id') required String id,
   });
 }

@@ -6,26 +6,27 @@ import 'package:member_portal/l10n/generated/app_localizations.dart';
 import '../../../core/error/app_exception.dart';
 import '../../../core/ui/exception_message.dart';
 import '../../../di/injection.dart';
-import '../application/meetings_bloc.dart';
-import '../application/meetings_event.dart';
-import '../application/meetings_state.dart';
+import '../../member/application/member_session_bloc.dart';
+import '../../member/application/member_session_state.dart';
+import '../bloc/meetings_bloc.dart';
 import '../data/meetings_dtos.dart';
-import '../domain/meetings_models.dart';
+import '../domain/meetings_event.dart';
+import '../domain/meetings_state.dart';
 
 /// Meetings feature, rendered inside the authenticated member shell.
 ///
 /// Displays a list of meetings available to the member and allows opening
 /// a meeting detail screen. The backend is authoritative for all data;
-/// the client only fetches read‑only information.
+/// the client only fetches read-only information.
 class MeetingsPage extends StatefulWidget {
   const MeetingsPage({super.key});
 
   @override
-State<MeetingsPage> createState() => _MeetingsPageState();
+  State<MeetingsPage> createState() => _MeetingsPageState();
 }
 
 class _MeetingsPageState extends State<MeetingsPage> {
-  late final MeetingsBloc _bloc = () => MeetingsBloc(getIt<MeetingsRepository>())();
+  late final MeetingsBloc _bloc = getIt<MeetingsBloc>();
 
   String? get _personId {
     final state = context.read<MemberSessionBloc>().state;
@@ -63,32 +64,33 @@ class _MeetingsPageState extends State<MeetingsPage> {
         child: BlocBuilder<MeetingsBloc, MeetingsState>(
           builder: (context, state) {
             return switch (state) {
-              MeetingsState.initial() => const _MeetingsInitialView(),
-              MeetingsState.loading() => const _MeetingsLoadingView(),
-              MeetingsState.listSuccess(:final meetings) =>
-                  _MeetingsListView(meetings: meetings),
-              MeetingsState.detailSuccess(:final meeting) =>
-                  _MeetingsDetailView(meeting: meeting),
-              MeetingsState.failed(:final error) =>
-                  _MeetingsErrorView(error: error),
+              MeetingsStateInitial() => const _MeetingsInitialView(),
+              MeetingsStateLoading() => const _MeetingsLoadingView(),
+              MeetingsStateListSuccess(:final meetings) =>
+                _MeetingsListView(meetings: meetings),
+              MeetingsStateDetailSuccess(:final meeting) =>
+                _MeetingsDetailView(meeting: meeting),
+              MeetingsStateFailed(:final error) =>
+                _MeetingsErrorView(error: error),
             };
           },
         ),
       ),
     );
   }
+}
 
-  void _retry() {
-    final personId = _personId;
-    if (personId != null) {
-      context.read<MeetingsBloc>().add(const MeetingsEvent.loadMeetings());
-    }
-  }
-
-  @override
-  void endRefresh() {
-    // No-op for meetings; refresh is driven by the initial load event.
-  }
+/// Formats a start/end range into one display string when at least the start is
+/// available; otherwise [null].
+String? _formatDateRange(
+  DateFormat dateFormat,
+  DateTime? startsAt,
+  DateTime? endsAt,
+) {
+  if (startsAt == null) return null;
+  final start = dateFormat.format(startsAt);
+  if (endsAt == null) return start;
+  return '$start – ${dateFormat.format(endsAt)}';
 }
 
 class _MeetingsInitialView extends StatelessWidget {
@@ -103,7 +105,8 @@ class _MeetingsInitialView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event, size: 48, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.event,
+                size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 12),
             Text(l10n.meetingsLoading,
                 style: Theme.of(context).textTheme.titleMedium),
@@ -145,7 +148,9 @@ class _MeetingsListView extends StatelessWidget {
             meeting: meeting,
             dateFormat: dateFormat,
             onTap: () {
-              context.read<MeetingsBloc>().add(MeetingsEvent.loadDetail(meeting.id));
+              context
+                  .read<MeetingsBloc>()
+                  .add(MeetingsEvent.loadDetail(meeting.id));
             },
           ),
       ],
@@ -166,7 +171,8 @@ class _MeetingsEmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.event, size: 48, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.event,
+                size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 12),
             Text(l10n.meetingsNoMeetings,
                 style: Theme.of(context).textTheme.titleMedium,
@@ -192,6 +198,11 @@ class _MeetingsListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final location = meeting.location;
+    final dateRange =
+        _formatDateRange(dateFormat, meeting.startsAt, meeting.endsAt);
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
@@ -203,21 +214,21 @@ class _MeetingsListItem extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${l10n.meetingsDate}: ${dateFormat.format(meeting.startsAt)} – '
-                  '${dateFormat.format(meeting.endsAt)}',
-              style: theme.textTheme.bodyMedium,
-            ),
-            if (meeting.location.isNotEmpty) ...[
+            if (dateRange != null)
+              Text(
+                '${l10n.meetingsDate}: $dateRange',
+                style: theme.textTheme.bodyMedium,
+              ),
+            if (location != null && location.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                '${l10n.meetingsLocation}: ${meeting.location}',
+                '${l10n.meetingsLocation}: $location',
                 style: theme.textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 4),
             Text(
-              '${l10n.meetingsStatus}: ${meeting.status',
+              '${l10n.meetingsStatus}: ${meeting.status}',
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -251,9 +262,11 @@ class _MeetingsErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             OutlinedButton(
               onPressed: () {
-                context.read<MeetingsBloc>().add(const MeetingsEvent.loadMeetings());
+                context
+                    .read<MeetingsBloc>()
+                    .add(const MeetingsEvent.loadMeetings());
               },
-              child: Text(l10n.refresh),
+              child: Text(l10n.homeRetry),
             ),
           ],
         ),
@@ -271,6 +284,14 @@ class _MeetingsDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final dateFormat = DateFormat.yMMMd(l10n.localeName);
+    final description = meeting.description;
+    final startsAt = meeting.startsAt;
+    final endsAt = meeting.endsAt;
+    final timeZone = meeting.timeZone;
+    final location = meeting.location;
+    final organizer = meeting.organizerPersonId;
+    final organizationUnit = meeting.organizationUnitId;
+    final registrationOpen = meeting.registrationOpen;
 
     return Scaffold(
       appBar: AppBar(
@@ -278,7 +299,9 @@ class _MeetingsDetailView extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            context.read<MeetingsBloc>().add(const MeetingsEvent.loadMeetings());
+            context
+                .read<MeetingsBloc>()
+                .add(const MeetingsEvent.loadMeetings());
           },
         ),
       ),
@@ -287,30 +310,43 @@ class _MeetingsDetailView extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _DetailRow(l10n.meetingsTitle, meeting.title),
-            const SizedBox(height: 8),
-            _DetailRow(l10n.meetingsDescription, meeting.description),
-            const SizedBox(height: 8),
-            _DetailRow(l10n.meetingsStartsAt, dateFormat.format(meeting.startsAt)),
-            _DetailRow(l10n.meetingsEndsAt, dateFormat.format(meeting.endsAt)),
-            if (meeting.timeZone.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _DetailRow(l10n.meetingsTimeZone, meeting.timeZone),
+            if (description != null && description.trim().isNotEmpty) ...[
+              _DetailRow(l10n.meetingsDescription, description),
+              const SizedBox(height: 8),
             ],
-            if (meeting.location.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _DetailRow(l10n.meetingsLocation, meeting.location),
+            if (startsAt != null) ...[
+              _DetailRow(l10n.meetingsStartsAt, dateFormat.format(startsAt)),
+              const SizedBox(height: 8),
             ],
-            const SizedBox(height: 8),
-            _DetailRow(l10n.meetingsOrganizer, meeting.organizerPersonId),
-            const SizedBox(height: 8),
-            _DetailRow(l10n.meetingsOrganizationUnit, meeting.organizationUnitId),
-            const SizedBox(height: 8),
+            if (endsAt != null) ...[
+              _DetailRow(l10n.meetingsEndsAt, dateFormat.format(endsAt)),
+              const SizedBox(height: 8),
+            ],
+            if (timeZone != null && timeZone.isNotEmpty) ...[
+              _DetailRow(l10n.meetingsTimeZone, timeZone),
+              const SizedBox(height: 8),
+            ],
+            if (location != null && location.isNotEmpty) ...[
+              _DetailRow(l10n.meetingsLocation, location),
+              const SizedBox(height: 8),
+            ],
+            if (organizer != null && organizer.isNotEmpty) ...[
+              _DetailRow(l10n.meetingsOrganizer, organizer),
+              const SizedBox(height: 8),
+            ],
+            if (organizationUnit != null && organizationUnit.isNotEmpty) ...[
+              _DetailRow(l10n.meetingsOrganizationUnit, organizationUnit),
+              const SizedBox(height: 8),
+            ],
             _DetailRow(l10n.meetingsStatus, meeting.status),
-            const SizedBox(height: 16),
-            if (meeting.registrationOpen != null)
-              _DetailRow(l10n.meetingsCapacity,
-                  '${meeting.capacity ?? '–'} ${meeting.registrationOpen! ? '${l10n.meetingsOpen}' : '${l10n.meetingsClosed}'}'),
+            if (registrationOpen != null) ...[
+              const SizedBox(height: 8),
+              _DetailRow(
+                l10n.meetingsCapacity,
+                '${meeting.capacity ?? '–'} '
+                '${registrationOpen ? l10n.meetingsOpen : l10n.meetingsClosed}',
+              ),
+            ],
           ],
         ),
       ),

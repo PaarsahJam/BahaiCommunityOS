@@ -15,8 +15,8 @@ abstract class MeetingDto with _$MeetingDto {
     String? location,
     String? organizerPersonId,
     String? organizationUnitId,
-    String status = 'scheduled',
-    String visibility = 'members',
+    @Default('scheduled') String status,
+    @Default('members') String visibility,
     int? capacity,
     bool? registrationOpen,
   }) = _MeetingDto;

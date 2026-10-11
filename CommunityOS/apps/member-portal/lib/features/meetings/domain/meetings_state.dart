@@ -1,39 +1,32 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-part 'meetings_state.g.dart';
+import '../../../core/error/app_exception.dart';
+import '../data/meetings_dtos.dart';
+
+part 'meetings_state.freezed.dart';
 
 @freezed
-abstract class MeetingsState with _$MeetingsState implements Equatable {
+sealed class MeetingsState with _$MeetingsState {
   const MeetingsState._();
 
   /// Initial state - no meetings have been loaded yet.
-  const factory MeetingsState.initial() = _MeetingsStateInitial;
+  const factory MeetingsState.initial() = MeetingsStateInitial;
 
   /// Loading state - meetings or detail is being fetched.
-  const factory MeetingsState.loading() = _MeetingsStateLoading;
+  const factory MeetingsState.loading() = MeetingsStateLoading;
 
   /// Success state for the meetings list.
   ///
   /// Contains the list of meetings available to the member.
   const factory MeetingsState.listSuccess(List<MeetingDto> meetings) =
-      _MeetingsStateListSuccess;
+      MeetingsStateListSuccess;
 
   /// Success state for a meeting detail.
   ///
   /// Contains the detailed information for a single meeting.
   const factory MeetingsState.detailSuccess(MeetingDto meeting) =
-      _MeetingsStateDetailSuccess;
+      MeetingsStateDetailSuccess;
 
   /// Failed state - an error occurred while loading meetings or detail.
-  const factory MeetingsState.failed(AppException error) = _MeetingsStateFailed;
-
-  @override
-  List<Object> get props =>
-      switch (this) {
-        MeetingsState.initial() => [],
-        MeetingsState.loading() => [],
-        MeetingsState.listSuccess(meetings) => [meetings],
-        MeetingsState.detailSuccess(meeting) => [meeting],
-        MeetingsState.failed(error) => [error],
-      };
+  const factory MeetingsState.failed(AppException error) = MeetingsStateFailed;
 }
