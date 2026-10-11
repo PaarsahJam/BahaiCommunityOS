@@ -326,6 +326,90 @@ public class CommunitySecurityRegressionTests
         await act.Should().ThrowAsync<AuthorizationForbiddenException>();
     }
 
+    // --- Meeting read queries are gated by community.meeting.read ---
+
+    [Fact]
+    public async Task GetMeetingsQuery_throws_without_read_grant()
+    {
+        var h = CreateHarness();
+        h.DenyAll();
+        var unit = Guid.NewGuid();
+
+        var act = () => h.Sender.Send(new GetMeetingsQuery(ActorId, null, null, unit));
+
+        await act.Should().ThrowAsync<AuthorizationForbiddenException>();
+
+        // The read evaluation must carry the meeting-read permission and the
+        // requested organization-unit context.
+        await h.Repos.Evaluator.Received(1)
+            .EvaluateAsync(Arg.Is<AuthorizationRequest>(r =>
+                r.Permission == CommunityPermissions.MeetingRead &&
+                r.Context.OrganizationUnitId == unit), Arg.Any<CancellationToken>());
+        // Denied before any data is read.
+        await h.Repos.Meetings.DidNotReceiveWithAnyArgs()
+            .ListAsync(default, default, default, default);
+    }
+
+    [Fact]
+    public async Task GetMeetingsQuery_proceeds_with_read_grant()
+    {
+        var h = CreateHarness();
+        h.AllowAll();
+        var unit = Guid.NewGuid();
+        var meeting = Meeting.Create(
+            "Feast", null, Now, Now.AddHours(1), "UTC", null,
+            null, unit, MeetingStatus.Scheduled, MeetingVisibility.Members);
+        h.Repos.Meetings.ListAsync(
+                Arg.Any<DateTime?>(), Arg.Any<DateTime?>(),
+                Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns([meeting]);
+
+        var result = await h.Sender.Send(new GetMeetingsQuery(ActorId, null, null, unit));
+
+        result.Should().ContainSingle(m => m.Id == meeting.Id);
+        await h.Repos.Evaluator.Received(1)
+            .EvaluateAsync(Arg.Is<AuthorizationRequest>(r =>
+                r.Permission == CommunityPermissions.MeetingRead), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetMeetingByIdQuery_throws_without_read_grant()
+    {
+        var h = CreateHarness();
+        h.DenyAll();
+        var meeting = Meeting.Create(
+            "Feast", null, Now, Now.AddHours(1), "UTC", null,
+            null, Guid.NewGuid(), MeetingStatus.Scheduled, MeetingVisibility.Members);
+        h.Repos.Meetings.GetByIdAsync(meeting.Id, Arg.Any<CancellationToken>()).Returns(meeting);
+
+        var act = () => h.Sender.Send(new GetMeetingByIdQuery(ActorId, meeting.Id));
+
+        await act.Should().ThrowAsync<AuthorizationForbiddenException>();
+    }
+
+    [Fact]
+    public async Task GetMeetingByIdQuery_supplies_meeting_resource_context()
+    {
+        var h = CreateHarness();
+        h.DenyAll();
+        var unit = Guid.NewGuid();
+        var meeting = Meeting.Create(
+            "Feast", null, Now, Now.AddHours(1), "UTC", null,
+            null, unit, MeetingStatus.Scheduled, MeetingVisibility.Members);
+        h.Repos.Meetings.GetByIdAsync(meeting.Id, Arg.Any<CancellationToken>()).Returns(meeting);
+
+        var act = () => h.Sender.Send(new GetMeetingByIdQuery(ActorId, meeting.Id));
+        await act.Should().ThrowAsync<AuthorizationForbiddenException>();
+
+        // The detail read must scope the decision to the specific meeting.
+        await h.Repos.Evaluator.Received(1)
+            .EvaluateAsync(Arg.Is<AuthorizationRequest>(r =>
+                r.Permission == CommunityPermissions.MeetingRead &&
+                r.Context.ResourceType == "meeting" &&
+                r.Context.ResourceId == meeting.Id &&
+                r.Context.OrganizationUnitId == unit), Arg.Any<CancellationToken>());
+    }
+
     // --- Self-scoped person resolution (GET /my-person) ---
 
     [Fact]

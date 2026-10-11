@@ -28,14 +28,14 @@ class MeetingsRepository {
     String? organizationUnitId,
   }) async {
     try {
-      final dto = await _guard(
+      final meetings = await _guard(
         () => _api.listMeetings(
           from: from,
           to: to,
           organizationUnitId: organizationUnitId,
         ),
       );
-      return MeetingsListResult.success(dto.meetings);
+      return MeetingsListResult.success(meetings);
     } on UnauthorizedException {
       return const MeetingsListResult.unauthenticated();
     } on ForbiddenException {

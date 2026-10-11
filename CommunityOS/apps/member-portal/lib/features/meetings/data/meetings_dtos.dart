@@ -24,13 +24,3 @@ abstract class MeetingDto with _$MeetingDto {
   factory MeetingDto.fromJson(Map<String, dynamic> json) =>
       _$MeetingDtoFromJson(json);
 }
-
-@freezed
-abstract class MeetingListDto with _$MeetingListDto {
-  const factory MeetingListDto({
-    required List<MeetingDto> meetings,
-  }) = _MeetingListDto;
-
-  factory MeetingListDto.fromJson(Map<String, dynamic> json) =>
-      _$MeetingListDtoFromJson(json);
-}

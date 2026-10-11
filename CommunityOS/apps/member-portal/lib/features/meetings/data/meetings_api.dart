@@ -13,12 +13,15 @@ part 'meetings_api.g.dart';
 ///   person identifier is ever supplied by the client.
 /// * `memberships/by-person/{personId}` returns 204/200-null when the person
 ///   has no membership record.
+/// * `GET /meetings` returns a bare JSON array (the backend serializes
+///   `IReadOnlyList<MeetingDto>` directly), so the list method is typed as
+///   `List<MeetingDto>` — there is no wrapper object.
 @RestApi()
 abstract class MeetingsApi {
   factory MeetingsApi(Dio dio, {String baseUrl}) = _MeetingsApi;
 
   @GET('meetings')
-  Future<MeetingListDto> listMeetings({
+  Future<List<MeetingDto>> listMeetings({
     @Query('from') DateTime? from,
     @Query('to') DateTime? to,
     @Query('organizationUnitId') String? organizationUnitId,
